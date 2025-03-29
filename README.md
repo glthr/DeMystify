@@ -14,10 +14,10 @@ Our analysis explores various aspects of the graph, including path analysis, clu
 
 ## Stay Up-to-Date
 
-For in-depth articles and updates on DeMystify, visit our blog series on glthr.com:
+For in-depth articles and updates on DeMystify, visit our blog series on [glthr.com](https://glthr.com):
 
-* The Myst Graph: A New Perspective on Myst
-* The Myst Graph II: Revealing New Findings
+* [The Myst Graph: A New Perspective on Myst](https://glthr.com/myst-graph-1)
+* [The Myst Graph, 2: Revealing New Findings](https://glthr.com/myst-graph-2)
 
 ## Disclaimer
 
