@@ -4,6 +4,8 @@
 
 DeMystify is an unofficial open-source project graph-based analysis of the classic Myst game. In other words, it represents Myst as a graph.
 
+**Please note that the graph generator, written in Go, has not been released yet; it will be released in this repository in a couple of weekends (probably in April).**
+
 ## The Myst Graph
 
 The Myst Graph represents the relationships between the game's cards. It features 1,364 nodes and 3,189 directed or bidirectional edges, shedding light on the game's complex structure.
