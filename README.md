@@ -4,7 +4,7 @@
 
 DeMystify is an unofficial open-source project graph-based analysis of the classic Myst game. In other words, it represents Myst as a graph.
 
-**Please note that the graph generator, written in Go, has not been released yet; it will be released in this repository in a couple of weekends (probably in April).**
+**Please note that the graph generator, written in Go, has not been released yet; it will be released in this repository on Sunday, May 11, 2025. Contributions will be welcomed!**
 
 ## The Myst Graph
 
@@ -20,6 +20,7 @@ For in-depth articles and updates on DeMystify, visit our blog series on [glthr.
 
 * [The Myst Graph: A New Perspective on Myst](https://glthr.com/myst-graph-1)
 * [The Myst Graph, 2: Revealing New Findings](https://glthr.com/myst-graph-2)
+* [The Myst Graph, 3: Generating the Graph with DeMystify](https://glthr.com/myst-graph-3) *[will be published on May 11, 2025]*
 
 ## Disclaimer
 
