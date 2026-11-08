@@ -16,7 +16,7 @@ func (g *Generator) writeComponentClusters(buf *bytes.Buffer) {
 		return
 	}
 
-	buf.WriteString(fmt.Sprintf("  // Main component\n"))
+	buf.WriteString("  // Main component\n")
 
 	// categorize the components
 	mainComp, smallComps, singletons := g.categorizeComponents(components)
@@ -30,7 +30,7 @@ func (g *Generator) writeComponentClusters(buf *bytes.Buffer) {
 	g.placeSingletons(buf, singletons)
 
 	// place the small components
-	g.placeSmallComponents(buf, smallComps)
+	g.placeSmallComponents(buf, smallComps, len(singletons) > 0)
 }
 
 // categorizeComponents separates components into main, small, and singletons
@@ -140,7 +140,7 @@ func (g *Generator) placeSingletons(buf *bytes.Buffer, singletons []int64) {
 }
 
 // placeSmallComponents positions small components at bottom-left
-func (g *Generator) placeSmallComponents(buf *bytes.Buffer, components [][]int64) {
+func (g *Generator) placeSmallComponents(buf *bytes.Buffer, components [][]int64, hasSingletons bool) {
 	if len(components) == 0 {
 		return
 	}
@@ -155,7 +155,9 @@ func (g *Generator) placeSmallComponents(buf *bytes.Buffer, components [][]int64
 	// keep away from the main component
 	buf.WriteString("  \"__MAIN_ANCHOR__\" -> \"__SMALL_ANCHOR__\" [style=invis, weight=0.0001, len=100, constraint=true];\n")
 
-	buf.WriteString("  \"__SMALL_ANCHOR__\" -> \"__SINGLETON_ANCHOR__\" [style=invis, weight=0.0001, len=100, constraint=true];\n")
+	if hasSingletons {
+		buf.WriteString("  \"__SMALL_ANCHOR__\" -> \"__SINGLETON_ANCHOR__\" [style=invis, weight=0.0001, len=100, constraint=true];\n")
+	}
 
 	for i, comp := range components {
 		if len(comp) == 0 {

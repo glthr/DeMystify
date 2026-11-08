@@ -49,3 +49,15 @@ func TestGenerateNilClearsPreviousPath(t *testing.T) {
 		t.Fatalf("nil path retained previous highlighting:\n%s", output)
 	}
 }
+
+func TestSmallComponentsDoNotCreatePhantomSingleton(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	metadata.Stats.ConnectedComponents = [][]int64{{metadata.Nodes[0].GraphID, metadata.Nodes[1].GraphID}, {2, 3}}
+	output, err := g.Generate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(output, `"__SINGLETON_ANCHOR__"`) {
+		t.Fatalf("small component created nonexistent singleton anchor:\n%s", output)
+	}
+}
