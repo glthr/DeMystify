@@ -63,11 +63,22 @@ type Paths struct {
 func (p *Parser) getPaths() ([]Paths, error) {
 	var results []Paths
 
-	err := filepath.Walk(p.stacksDir, func(path string, info os.FileInfo, err error) error {
+	root, err := filepath.EvalSymlinks(p.stacksDir)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("stack input must be a directory: %s", p.stacksDir)
+	}
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == p.stacksDir || !info.IsDir() {
+		if !info.IsDir() {
 			return nil
 		}
 
@@ -87,6 +98,9 @@ func (p *Parser) getPaths() ([]Paths, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no %s files found in %s", stackFileName, p.stacksDir)
 	}
 
 	return results, nil
