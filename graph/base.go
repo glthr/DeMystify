@@ -36,6 +36,19 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 		IdStackMap: make(map[int64]string, len(metadata.Nodes)),
 	}
 
+	// Parallel lines are alternative ways to make the same move. Their cost
+	// is the cheapest available line, rather than Gonum's default sum.
+	g.Graph.EdgeWeightFunc = func(lines gograph.WeightedLines) float64 {
+		weight := math.Inf(1)
+		if lines != nil {
+			defer lines.Reset()
+			for lines.Next() {
+				weight = math.Min(weight, lines.WeightedLine().Weight())
+			}
+		}
+		return weight
+	}
+
 	// add nodes
 	for _, node := range metadata.Nodes {
 		if err := g.AddNode(node); err != nil {
@@ -124,3 +137,16 @@ func (g *MystGraph) HasEdgeFromTo(uid, vid int64) bool {
 func (g *MystGraph) Edge(uid, vid int64) gograph.Edge {
 	return g.Graph.Edge(uid, vid)
 }
+
+func (g *MystGraph) Weight(uid, vid int64) (float64, bool) {
+	if uid == vid {
+		return 0, g.Node(uid) != nil
+	}
+	return g.Graph.Weight(uid, vid)
+}
+
+func (g *MystGraph) WeightedEdge(uid, vid int64) gograph.WeightedEdge {
+	return g.Graph.WeightedEdge(uid, vid)
+}
+
+var _ gograph.WeightedDirected = (*MystGraph)(nil)

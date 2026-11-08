@@ -94,3 +94,32 @@ func TestReaddingEdgeUpdatesItsWeight(t *testing.T) {
 		}
 	}
 }
+
+func TestWeightedShortestPath(t *testing.T) {
+	g, nodes := newTestGraph(t, 3)
+	for _, e := range []struct {
+		from, to int
+		weight   float64
+	}{{0, 2, 9}, {0, 1, 2}, {1, 2, 3}} {
+		if err := g.AddEdge(&common.Edge{Source: nodes[e.from], Target: nodes[e.to]}, e.weight); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := g.ComputeShortestPath(0, 2, nil)
+	if err != nil || got.Distance != 5 || !reflect.DeepEqual(got.Path, []int64{0, 1, 2}) {
+		t.Fatalf("weighted path = %+v, %v; want distance 5 through B", got, err)
+	}
+}
+
+func TestBacktrackingOnlyPathIsUnreachable(t *testing.T) {
+	g, nodes := newTestGraph(t, 2)
+	if err := g.addEdgeWithAttributes(&common.Edge{Source: nodes[0], Target: nodes[1], Attributes: []common.EdgeAttribute{common.Backtracking}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := g.ComputeShortestPath(0, 1, nil); err == nil {
+		t.Fatalf("backtracking-only route accepted: %+v", got)
+	}
+	if _, ok := g.ComputeAllShortestPaths()[0][1]; ok {
+		t.Fatal("backtracking-only route included in all shortest paths")
+	}
+}

@@ -16,7 +16,7 @@ func (pa *pathAnalyzer) shortestPathReachable(to int64, distances path.Shortest,
 			if visited[previous] || reachable[previous] {
 				continue
 			}
-			w, ok := pa.g.Graph.Weight(previous, current)
+			w, ok := pa.g.Weight(previous, current)
 			if ok && equalDistance(w+distances.WeightTo(current), distances.WeightTo(previous)) {
 				reachable[previous] = true
 				queue = append(queue, previous)

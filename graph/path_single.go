@@ -30,7 +30,7 @@ func (pa *pathAnalyzer) computeSimpleShortestPath(from, to int64) (*common.Short
 		reachable := pa.shortestPathReachable(to, distances, visited)
 		found := false
 		for _, next := range pa.g.traverser.getSortedNeighbors(current, true) {
-			w, ok := pa.g.Graph.Weight(current, next)
+			w, ok := pa.g.Weight(current, next)
 			if ok && !visited[next] && reachable[next] &&
 				equalDistance(w+distances.WeightTo(next), distances.WeightTo(current)) {
 				info.Path = append(info.Path, next)

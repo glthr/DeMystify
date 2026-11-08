@@ -29,9 +29,4 @@ func (g reversedPathGraph) Edge(from, to int64) gograph.Edge {
 	return edge.ReversedEdge()
 }
 
-func (g reversedPathGraph) Weight(from, to int64) (float64, bool) {
-	if from == to {
-		return 0, g.g.Node(from) != nil
-	}
-	return g.g.Graph.Weight(to, from)
-}
+func (g reversedPathGraph) Weight(from, to int64) (float64, bool) { return g.g.Weight(to, from) }
