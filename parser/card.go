@@ -37,6 +37,9 @@ type simpleContent struct {
 
 // ParseSimpleCard parses a card XML file and returns only the needed data
 func ParseSimpleCard(parentStack *HyperCardStack, filepath string, cardIdNameMap map[int]string) (*HyperCardCard, error) {
+	if parentStack == nil {
+		return nil, fmt.Errorf("card requires a parent stack")
+	}
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
@@ -63,6 +66,10 @@ func ParseSimpleCard(parentStack *HyperCardStack, filepath string, cardIdNameMap
 	err = xml.Unmarshal(content, &c)
 	if err != nil {
 		return nil, err
+	}
+
+	if c.ID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d in %s: expected a positive integer", c.ID, filepath)
 	}
 
 	// process script for each part
