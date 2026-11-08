@@ -157,16 +157,17 @@ func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
 		return false
 	}
 
-	attrMap1 := make(map[common.EdgeAttribute]bool, len(edge1.Attributes))
+	attrMap1 := make(map[common.EdgeAttribute]int, len(edge1.Attributes))
 	for _, attr := range edge1.Attributes {
-		attrMap1[attr] = true
+		attrMap1[attr]++
 	}
 
 	// ensure that all attributes match
 	for _, attr := range edge2.Attributes {
-		if !attrMap1[attr] {
+		if attrMap1[attr] == 0 {
 			return false
 		}
+		attrMap1[attr]--
 	}
 
 	return true

@@ -161,3 +161,26 @@ func TestCustomPathSelfLoopRenderedOnce(t *testing.T) {
 		t.Fatalf("self-loop was duplicated or lost its styling: %v", lines)
 	}
 }
+
+func TestPathPrefersEnabledParallelEdge(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	metadata.Edges = []*common.Edge{
+		{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.Disabled}},
+		{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.Backtracking}},
+	}
+	output, err := g.Generate([]int64{metadata.Nodes[0].GraphID, metadata.Nodes[1].GraphID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "Pop back on path") || !strings.Contains(output, "Disabled edge") {
+		t.Fatalf("path highlighting selected a disabled edge over an enabled one:\n%s", output)
+	}
+}
+
+func TestEdgeAttributeMatchingCountsDuplicates(t *testing.T) {
+	first := common.Edge{Attributes: []common.EdgeAttribute{common.IntraAge, common.CrossAge}}
+	second := common.Edge{Attributes: []common.EdgeAttribute{common.IntraAge, common.IntraAge}}
+	if (&Generator{}).edgeAttributesMatch(&first, &second) {
+		t.Fatal("different duplicate attributes must not match")
+	}
+}

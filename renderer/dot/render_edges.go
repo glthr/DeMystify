@@ -54,13 +54,13 @@ func (g *Generator) sortEdges(edges []common.Edge) []common.Edge {
 	sortedEdges := make([]common.Edge, len(edges))
 	copy(sortedEdges, edges)
 
-	sort.Slice(sortedEdges, func(i, j int) bool {
-		// sort by type and attributes
-		if sortedEdges[i].IsOfType(common.Backtracking) != sortedEdges[j].IsOfType(common.Backtracking) {
-			return !sortedEdges[i].IsOfType(common.Backtracking) // non-backtracking first
-		}
+	sort.SliceStable(sortedEdges, func(i, j int) bool {
+		// Prefer enabled edges when choosing a parallel edge to highlight.
 		if sortedEdges[i].IsOfType(common.Disabled) != sortedEdges[j].IsOfType(common.Disabled) {
 			return !sortedEdges[i].IsOfType(common.Disabled) // non-disabled first
+		}
+		if sortedEdges[i].IsOfType(common.Backtracking) != sortedEdges[j].IsOfType(common.Backtracking) {
+			return !sortedEdges[i].IsOfType(common.Backtracking) // non-backtracking first
 		}
 		// default to transitivity ID
 		return sortedEdges[i].TransitivityID < sortedEdges[j].TransitivityID
