@@ -35,6 +35,10 @@ func (g *MystGraph) AddNode(node *common.Node) error {
 	g.NodeMap[node.Name] = *node
 	g.IdNameMap[node.GraphID] = node.Name
 	g.IdStackMap[node.GraphID] = node.StackName
+	if !g.building {
+		g.Metadata.Nodes = append(g.Metadata.Nodes, node)
+		g.Metadata.TotalNodes = uint(g.Graph.Nodes().Len())
+	}
 
 	return nil
 }

@@ -17,6 +17,8 @@ type MystGraph struct {
 	IdNameMap  map[int64]string
 	IdStackMap map[int64]string
 
+	building bool // Constructor inputs already belong to Metadata.
+
 	traverser    *traverser
 	nodeAnalyzer *nodesAnalyzer
 	pathAnalyzer *pathAnalyzer
@@ -28,6 +30,7 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 	}
 
 	g := &MystGraph{
+		building:   true,
 		Graph:      multi.NewWeightedDirectedGraph(),
 		Metadata:   metadata,
 		NodeMap:    make(map[string]common.Node, len(metadata.Nodes)),
@@ -62,6 +65,8 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 			return nil, fmt.Errorf("failed to add edge: %w", err)
 		}
 	}
+
+	g.building = false
 
 	// initialize analyzers
 	g.traverser = newTraverser(g)
