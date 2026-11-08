@@ -1,5 +1,7 @@
 # Second code audit and fresh source conversion
 
+This is the historical second-audit ledger. [Subsequent refinements](MODEL_REFINEMENTS.md) recover additional picture evidence and correct source/caller interpretation. Their default DOT deliberately differs from the controlled comparisons below.
+
 This audit starts at `4335f9d`. It tests both the supplied XML snapshot and a fresh conversion of the archived HyperCard stacks. The additional code fixes preserve the default DOT byte-for-byte on either input. The input snapshots themselves differ by one navigation relationship.
 
 ## Fresh conversion provenance

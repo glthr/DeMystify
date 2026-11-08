@@ -4,6 +4,8 @@ This first-audit ledger uses the supplied XML snapshot of six Myst stacks and 1,
 
 A [second audit and fresh raw-stack conversion](AUDIT_ROUND_2.md) subsequently verified the same-input DOT byte-for-byte and recovered one further Dunny relationship from the fresh input (3,215 pairs / 3,228 records). The tables below retain the first audit's controlled comparison.
 
+A [later model review](MODEL_REFINEMENTS.md) restores Myst:8631's source label under the clarified definition, connects the 18 real valve callers, and documents further script forms. The measurements below describe the first audit, before those refinements.
+
 ## Maintenance verification
 
 The maintenance code checkpoint is `da4e2bb`. It preserves every node, label, attribute, edge, and declaration order in the reference graph. The complete DOT files match after sorting attributes within each statement and ignoring blank lines. Attribute formatting changes do not change the represented graph.

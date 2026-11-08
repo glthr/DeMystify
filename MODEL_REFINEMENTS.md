@@ -26,7 +26,17 @@ These 18 caller entries replace three definition-only arrows. They retain contex
 
 Four unquoted `go to card black` statements on Myst:72560 and 77588 recover two distinct references to existing Myst:23444. HyperTalk permits an unbound single-word literal; the resolver requires an existing original card name and conservatively rejects imported identifier bindings, incomplete background scope, reserved syntax and numeric-word ordinals.
 
-The wider sweep found 51 previously unsupported `go` statements: those four resolved statements, 44 bare `go card` statements, and three relative/variable statements in the Myst:23279 media-path utility. A current-card meaning for the bare form has not been established from the checked primary references; destinations are not guessed. The utility's card sweep is not evidence of ordinary gameplay routes. Event sends, simulated clicks, image substitution and external-resource behavior also require execution context.
+The XML sweep found 51 statements unsupported by literal navigation patterns: four unquoted Black statements, 44 bare `go card` statements, and three relative/variable statements in the Myst:23279 media-path utility. Shared player code explains conditional destinations for the 21 q-button bare statements; the other 23 do not identify fixed destinations from their owning object alone. The utility rewrites media paths and is not evidence of ordinary gameplay routes. Event sends, simulated clicks and image substitution also require execution context.
+
+## Conditional Zip navigation omitted from the six-Age import
+
+The root player application contains a shared `on go` wrapper, activated through the player/ALLRes startup scripts. Options > Zip Mode toggles `Quick`. For a q-named runtime target, the wrapper can redirect a go command to the same-Age card named by its first word, when that name is in the Age's visited list. Otherwise it passes the ordinary command on. Local visibility and script conditions still apply.
+
+The independently reconciled inventory contains 525 direct-go q buttons and 527 go statements. 524 buttons resolve to 510 distinct candidate pairs; 497 are absent from the ordinary graph and 13 already occur there. Additional pairs by Age: Channelwood 150, Selenitic 116, Myst 99, Stoneship 78, Mechanical 54. Four buttons are initially hidden. One target, Channelwood:2153 part 7 `qbri1`, does not resolve; the similar `qbr1` is not silently substituted.
+
+[The complete 510-pair catalogue](audit/conditional-zip-connections.csv) records this separate conditional layer. It is an analysis result, not a stateful implementation or an addition to the default ordinary-mode graph. Actual calls depend on runtime message target, Zip setting, visit history and local conditions.
+
+As an illustrative sensitivity check, adding every candidate at once gives 3,729 pairs, dock-to-ending 19 and diameter 74. These are **stateless union results**, not a playable new-game route. The article's 24/130 measurements should be labeled as ordinary-graph distances with Zip links omitted, rather than mode-independent game-travel bounds.
 
 ## What the self-reference evidence establishes
 
