@@ -3,6 +3,7 @@ package dot
 import (
 	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -65,15 +66,25 @@ func TestSmallComponentsDoNotCreatePhantomSingleton(t *testing.T) {
 func TestNodeLabelEscapingAndPathStyling(t *testing.T) {
 	g, metadata := newTestGenerator(t)
 	node := metadata.Nodes[0]
+	original := "quoted \"name\" \\ path\nnext"
 	secondary := "one, label=two"
 	copy := g.graph.NodeMap[node.Name]
+	copy.OriginalName = &original
 	copy.SecondaryName = &secondary
 	g.graph.NodeMap[node.Name] = copy
 	output, err := g.Generate([]int64{node.GraphID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, `label="A\none, label=two"`) {
-		t.Fatalf("path style corrupted label comma:\n%s", output)
+	expected := `label="A (quoted \"name\" \\ path\nnext)\none, label=two"`
+	if !strings.Contains(output, expected) {
+		t.Fatalf("label was not safely escaped or path style corrupted its comma:\n%s", output)
+	}
+	if neato, err := exec.LookPath("neato"); err == nil {
+		cmd := exec.Command(neato, "-Tdot")
+		cmd.Stdin = strings.NewReader(output)
+		if diagnostic, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("Graphviz rejected generated DOT: %v\n%s", err, diagnostic)
+		}
 	}
 }

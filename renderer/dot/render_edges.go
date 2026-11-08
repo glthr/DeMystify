@@ -461,7 +461,7 @@ func (g *Generator) buildEdgeStyleString(style edgeStyle) string {
 
 	appendIfNotEmpty := func(key, value string) {
 		if value != "" {
-			parts = append(parts, fmt.Sprintf("%s=\"%s\"", key, value))
+			parts = append(parts, fmt.Sprintf("%s=\"%s\"", key, escapeForDOT(value)))
 		}
 	}
 
@@ -486,7 +486,7 @@ func (g *Generator) buildEdgeStyleString(style edgeStyle) string {
 	}
 
 	if style.tooltip != "" {
-		parts = append(parts, fmt.Sprintf("tooltip=\"%s\"", strings.ReplaceAll(style.tooltip, "\"", "\\\"")))
+		parts = append(parts, fmt.Sprintf("tooltip=\"%s\"", escapeForDOT(style.tooltip)))
 	}
 
 	appendIfNotEmpty("arrowhead", style.arrowhead)

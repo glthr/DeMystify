@@ -116,8 +116,7 @@ func (g *Generator) getNodeStyle(id int64, node common.Node) nodeStyle {
 		// add secondary name (if available)
 		name := g.getDisplayName(node)
 		if node.SecondaryName != nil {
-			style.label = fmt.Sprintf("%s\\n%s", name,
-				escapeForDOT(*node.SecondaryName))
+			style.label = fmt.Sprintf("%s\n%s", name, *node.SecondaryName)
 		}
 	} else if node.IsOfType(common.IsStack) {
 		style.fillColor = "#fff9c4"
@@ -148,7 +147,7 @@ func (g *Generator) buildNodeStyleString(style nodeStyle) string {
 	// add a property if its value is not empty
 	appendIfNotEmpty := func(key, value string) {
 		if value != "" {
-			parts = append(parts, fmt.Sprintf("%s=\"%s\"", key, value))
+			parts = append(parts, fmt.Sprintf("%s=\"%s\"", key, escapeForDOT(value)))
 		}
 	}
 
@@ -163,7 +162,7 @@ func (g *Generator) buildNodeStyleString(style nodeStyle) string {
 	}
 
 	if style.tooltip != "" {
-		parts = append(parts, fmt.Sprintf("tooltip=\"%s\"", strings.ReplaceAll(style.tooltip, "\"", "\\\"")))
+		parts = append(parts, fmt.Sprintf("tooltip=\"%s\"", escapeForDOT(style.tooltip)))
 	}
 
 	appendIfNotEmpty("label", style.label)
@@ -175,9 +174,7 @@ func (g *Generator) buildNodeStyleString(style nodeStyle) string {
 
 // escapeForDOT escapes special characters for DOT string literals
 func escapeForDOT(input string) string {
-	// escape backslashes first to avoid double escaping
-	result := strings.ReplaceAll(input, "\\", "\\\\")
-	// escape quotes
-	result = strings.ReplaceAll(result, "\"", "\\\"")
-	return result
+	input = strings.ReplaceAll(input, "\r\n", "\n")
+	input = strings.ReplaceAll(input, "\r", "\n")
+	return strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "\n", "\\n").Replace(input)
 }

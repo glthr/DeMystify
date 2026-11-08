@@ -26,8 +26,8 @@ func (g *Generator) applyAnalysisStyles() error {
 		name := g.getDisplayName(*nodeObj)
 		secondaryName := nodeObj.SecondaryName
 		if secondaryName != nil {
-			background := escapeForDOT(*secondaryName)
-			style.label = fmt.Sprintf("%s\\n%s", name, background)
+			background := *secondaryName
+			style.label = fmt.Sprintf("%s\n%s", name, background)
 		}
 
 		g.nodeStyles[id] = style
