@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"slices"
 	"sort"
 
 	gograph "gonum.org/v1/gonum/graph"
@@ -69,87 +70,33 @@ func (g *MystGraph) FormatPathAsNames(path []int64) []string {
 // FindConnectedComponents returns connected components in the graph as ID arrays
 // with guaranteed deterministic ordering
 func (g *MystGraph) FindConnectedComponents() [][]int64 {
-	allNodeIDs := make([]int64, 0, g.Graph.Nodes().Len())
-	nodes := g.Graph.Nodes()
-	for nodes.Next() {
-		allNodeIDs = append(allNodeIDs, nodes.Node().ID())
-	}
-
-	sort.Slice(allNodeIDs, func(i, j int) bool {
-		return allNodeIDs[i] < allNodeIDs[j]
-	})
-
-	visited := make(map[int64]bool, len(allNodeIDs))
-
+	visited := make(map[int64]bool, g.Graph.Nodes().Len())
 	var components [][]int64
-
-	// process nodes in deterministic order
-	for _, startID := range allNodeIDs {
-		if visited[startID] {
-			continue // skip if already visited or out of bounds
+	for _, start := range g.traverser.getAllNodeIDs() {
+		if visited[start] {
+			continue
 		}
-
-		// start a new component with BFS from this node
-		var component []int64
-		queue := []int64{startID}
-		visited[startID] = true
-		component = append(component, startID)
-
-		for len(queue) > 0 {
-			current := queue[0]
-			queue = queue[1:]
-
-			outNeighbors := g.traverser.getSortedNeighbors(current, true)
-
-			for _, neighbor := range outNeighbors {
-				if !visited[neighbor] {
-					visited[neighbor] = true
-					component = append(component, neighbor)
-					queue = append(queue, neighbor)
-				}
-			}
-
-			inNeighbors := g.traverser.getSortedNeighbors(current, false)
-
-			for _, neighbor := range inNeighbors {
-				if !visited[neighbor] {
-					visited[neighbor] = true
-					component = append(component, neighbor)
-					queue = append(queue, neighbor)
+		component := []int64{start}
+		visited[start] = true
+		for i := 0; i < len(component); i++ {
+			current := component[i]
+			neighbors := append(g.traverser.getSortedNeighbors(current, true),
+				g.traverser.getSortedNeighbors(current, false)...)
+			for _, next := range neighbors {
+				if !visited[next] {
+					visited[next] = true
+					component = append(component, next)
 				}
 			}
 		}
-
-		// sort component nodes for deterministic order
-		sort.Slice(component, func(i, j int) bool {
-			return component[i] < component[j]
-		})
-
+		slices.Sort(component)
 		components = append(components, component)
 	}
-
-	// sort components deterministically
 	sort.Slice(components, func(i, j int) bool {
-		// first by size (largest first)
 		if len(components[i]) != len(components[j]) {
 			return len(components[i]) > len(components[j])
 		}
-
-		// for components of equal size, compare individual node IDs
-		minLen := len(components[i])
-		if len(components[j]) < minLen {
-			minLen = len(components[j])
-		}
-
-		for k := 0; k < minLen; k++ {
-			if components[i][k] != components[j][k] {
-				return components[i][k] < components[j][k]
-			}
-		}
-
-		// if all common elements are equal, the shorter component comes first
-		return len(components[i]) < len(components[j])
+		return slices.Compare(components[i], components[j]) < 0
 	})
-
 	return components
 }
