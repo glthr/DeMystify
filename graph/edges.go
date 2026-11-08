@@ -89,31 +89,24 @@ func (g *MystGraph) GetEdgeAttributes(sourceID, targetID int64) ([]common.EdgeAt
 
 // AddEdgeAttribute adds an attribute to an edge in the metadata
 func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.EdgeAttribute) bool {
-	for i, edge := range g.Metadata.Edges {
+	changed := false
+	for _, edge := range g.Metadata.Edges {
 		if edge.Source.GraphID == sourceID && edge.Target.GraphID == targetID {
-			for _, attr := range edge.Attributes {
-				if attr == attribute {
-					return false // attribute already exists
-				}
+			if !slices.Contains(edge.Attributes, attribute) {
+				edge.Attributes = append(slices.Clone(edge.Attributes), attribute)
+				changed = true
 			}
-
-			g.Metadata.Edges[i].Attributes = append(g.Metadata.Edges[i].Attributes, attribute)
-
-			// update the edge map as well
-			if targetMap, ok := g.EdgeMap[sourceID]; ok {
-				if edges, ok := targetMap[targetID]; ok {
-					for j := range edges {
-						edges[j].Attributes = append(edges[j].Attributes, attribute)
-					}
-					targetMap[targetID] = edges
-				}
-			}
-
-			return true
+		}
+	}
+	for i := range g.EdgeMap[sourceID][targetID] {
+		edge := &g.EdgeMap[sourceID][targetID][i]
+		if !slices.Contains(edge.Attributes, attribute) {
+			edge.Attributes = append(slices.Clone(edge.Attributes), attribute)
+			changed = true
 		}
 	}
 
-	return false
+	return changed
 }
 
 // GetAllEdges returns all edges from sourceID to targetID

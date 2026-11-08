@@ -259,3 +259,32 @@ func TestNodeStackAndAttributesStayInSync(t *testing.T) {
 		t.Fatal("analysis attribute missing from NodeMap used by renderer")
 	}
 }
+
+func TestEdgeAttributeUpdatesAllParallelMetadata(t *testing.T) {
+	nodes := []*common.Node{{Name: "A"}, {Name: "B"}}
+	edges := []*common.Edge{
+		{Source: nodes[0], Target: nodes[1], TransitivityID: 1},
+		{Source: nodes[0], Target: nodes[1], TransitivityID: 2},
+	}
+	g, err := NewGraph(&common.Metadata{Nodes: nodes, Edges: edges})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !g.AddEdgeAttribute(0, 1, common.SelfReference) {
+		t.Fatal("attribute was not added")
+	}
+	for _, edge := range edges {
+		if !edge.IsOfType(common.SelfReference) {
+			t.Fatal("only the first parallel metadata edge was updated")
+		}
+	}
+	if g.AddEdgeAttribute(0, 1, common.SelfReference) {
+		t.Fatal("adding the same attribute again should report no change")
+	}
+	all, _ := g.GetAllEdges(0, 1)
+	for _, edge := range all {
+		if len(edge.Attributes) != 1 || edge.Attributes[0] != common.SelfReference {
+			t.Fatalf("edge map attributes were not synchronized: %+v", edge)
+		}
+	}
+}
