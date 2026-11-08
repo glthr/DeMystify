@@ -28,15 +28,16 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 			return false
 		}
 
-		attrMap1 := make(map[common.EdgeAttribute]bool)
+		attrMap1 := make(map[common.EdgeAttribute]int)
 		for _, attr := range attrs1 {
-			attrMap1[attr] = true
+			attrMap1[attr]++
 		}
 
 		for _, attr := range attrs2 {
-			if !attrMap1[attr] {
+			if attrMap1[attr] == 0 {
 				return false
 			}
+			attrMap1[attr]--
 		}
 
 		return true
