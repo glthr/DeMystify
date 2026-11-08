@@ -18,11 +18,7 @@ func (na *nodesAnalyzer) findNodeWithMostIncomingEdges() common.NodeDegreeInfo {
 	var maxNode common.NodeDegreeInfo
 	maxInDegree := -1
 
-	nodes := na.g.Graph.Nodes()
-	for nodes.Next() {
-		node := nodes.Node()
-		id := node.ID()
-
+	for _, id := range na.g.traverser.getAllNodeIDs() {
 		inDegree := 0
 		to := na.g.To(id)
 		for to.Next() {
@@ -47,11 +43,7 @@ func (na *nodesAnalyzer) findNodeWithMostOutgoingEdges() common.NodeDegreeInfo {
 	var maxNode common.NodeDegreeInfo
 	maxOutDegree := -1
 
-	nodes := na.g.Graph.Nodes()
-	for nodes.Next() {
-		node := nodes.Node()
-		id := node.ID()
-
+	for _, id := range na.g.traverser.getAllNodeIDs() {
 		outDegree := 0
 		from := na.g.From(id)
 		for from.Next() {
@@ -127,11 +119,7 @@ func (na *nodesAnalyzer) findIsolatedNodes() []common.NodeInfo {
 func (na *nodesAnalyzer) findNodesWithSelfLoops() []common.NodeInfo {
 	var result []common.NodeInfo
 
-	nodes := na.g.Graph.Nodes()
-	for nodes.Next() {
-		node := nodes.Node()
-		id := node.ID()
-
+	for _, id := range na.g.traverser.getAllNodeIDs() {
 		// check if the node has an edge to itself
 		if na.g.HasEdgeFromTo(id, id) {
 			na.g.AddEdgeAttribute(id, id, common.SelfReference)

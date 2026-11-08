@@ -338,3 +338,15 @@ func TestDisabledBacktrackingEdgesDoNotAffectNodeDegrees(t *testing.T) {
 		t.Fatalf("sink nodes = %+v; want both nodes", got)
 	}
 }
+
+func TestDegreeTiesUseLowestNodeID(t *testing.T) {
+	g, _ := newTestGraph(t, 3)
+	for range 20 {
+		if got := g.FindNodeWithMostIncomingEdges(); got.ID != 0 {
+			t.Fatalf("incoming degree tie chose node %d, want 0", got.ID)
+		}
+		if got := g.FindNodeWithMostOutgoingEdges(); got.ID != 0 {
+			t.Fatalf("outgoing degree tie chose node %d, want 0", got.ID)
+		}
+	}
+}
