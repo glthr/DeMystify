@@ -77,3 +77,20 @@ func TestGraphRejectsInvalidInput(t *testing.T) {
 		}
 	}
 }
+
+func TestReaddingEdgeUpdatesItsWeight(t *testing.T) {
+	g, nodes := newTestGraph(t, 2)
+	edge := &common.Edge{Source: nodes[0], Target: nodes[1]}
+	for _, weight := range []float64{8, 3, 7} {
+		if err := g.AddEdge(edge, weight); err != nil {
+			t.Fatal(err)
+		}
+		got, err := g.ComputeShortestPath(0, 1, nil)
+		if err != nil || got.Distance != weight {
+			t.Fatalf("readded edge: %+v, %v; want updated weight %v", got, err, weight)
+		}
+		if got := g.Graph.WeightedLines(0, 1).Len(); got != 1 {
+			t.Fatalf("duplicate edge created %d parallel lines", got)
+		}
+	}
+}

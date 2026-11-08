@@ -17,12 +17,6 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 	if math.IsNaN(weight) || weight < 0 {
 		return fmt.Errorf("edge weight must be non-negative, got %v", weight)
 	}
-	// NOTE: using multi.WeightedLine as it notably supports self-loops
-	g.Graph.SetWeightedLine(multi.WeightedLine{
-		F: multi.Node(edge.Source.GraphID),
-		T: multi.Node(edge.Target.GraphID),
-		W: weight,
-	})
 
 	if _, ok := g.EdgeMap[edge.Source.GraphID]; !ok {
 		g.EdgeMap[edge.Source.GraphID] = make(map[int64][]common.Edge)
@@ -48,21 +42,25 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 		return true
 	}
 
-	isDuplicate := false
-	if edges, ok := g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID]; ok {
-		for _, existingEdge := range edges {
-			if existingEdge.TransitivityID == edge.TransitivityID &&
-				areAttributesEqual(existingEdge.Attributes, edge.Attributes) {
-				isDuplicate = true
-				break
-			}
+	lineID := len(g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID])
+	for i, existingEdge := range g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] {
+		if existingEdge.TransitivityID == edge.TransitivityID &&
+			areAttributesEqual(existingEdge.Attributes, edge.Attributes) {
+			lineID = i
+			break
 		}
 	}
 
-	// only add to the edge map if it is not a duplicate
-	if !isDuplicate {
+	// Each metadata edge has a stable line ID within this source/target pair.
+	// Re-adding an identical edge updates its weight; distinct parallel edges
+	// retain separate lines rather than overwriting line zero.
+	g.Graph.SetWeightedLine(multi.WeightedLine{
+		F: g.Node(edge.Source.GraphID), T: g.Node(edge.Target.GraphID),
+		W: weight, UID: int64(lineID),
+	})
+	if lineID == len(g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID]) {
 		newEdge := common.Edge{
-			Attributes:     edge.Attributes,
+			Attributes:     slices.Clone(edge.Attributes),
 			Source:         edge.Source,
 			Target:         edge.Target,
 			TransitivityID: edge.TransitivityID,
@@ -122,16 +120,6 @@ func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.
 func (g *MystGraph) GetAllEdges(sourceID, targetID int64) ([]common.Edge, bool) {
 	if targetMap, ok := g.EdgeMap[sourceID]; ok {
 		if edges, ok := targetMap[targetID]; ok && len(edges) > 0 {
-
-			// sort edges by ID before returning
-			slices.SortFunc(edges, func(a, b common.Edge) int {
-				if a.Source.GraphID < b.Source.GraphID {
-					return -1
-				} else if a.Source.GraphID > b.Source.GraphID {
-					return 1
-				}
-				return 0
-			})
 			return edges, true
 		}
 	}
