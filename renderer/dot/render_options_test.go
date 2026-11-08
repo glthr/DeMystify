@@ -45,3 +45,33 @@ func TestNumericLabelsKeepSecondaryNames(t *testing.T) {
 		}
 	}
 }
+
+func TestAnalysisPreservesPageBorders(t *testing.T) {
+	for _, page := range []struct {
+		attrs []common.NodeAttribute
+		color string
+	}{
+		{[]common.NodeAttribute{common.ContainsBluePage}, "#0000ff"},
+		{[]common.NodeAttribute{common.ContainsRedPage}, "#ff0000"},
+		{[]common.NodeAttribute{common.ContainsWhitePage}, "#dedbdb"},
+		{[]common.NodeAttribute{common.ContainsBluePage, common.ContainsRedPage}, "#6a1cea"},
+	} {
+		for _, index := range []int{0, 1} {
+			g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge})
+			node := metadata.Nodes[index]
+			node.Attributes = append(node.Attributes, page.attrs...)
+			g.graph.Process()
+			if _, err := g.Generate(nil); err != nil {
+				t.Fatal(err)
+			}
+			style := g.getNodeStyle(node.GraphID, g.graph.NodeMap[node.Name])
+			fill := "#98FB98"
+			if index == 1 {
+				fill = "#FFA07A"
+			}
+			if style.borderColor != page.color || style.penWidth != 3 || style.fillColor != fill {
+				t.Errorf("page %v, node %d: lost page border or analysis fill: %+v", page.attrs, index, style)
+			}
+		}
+	}
+}

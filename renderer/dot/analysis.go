@@ -16,11 +16,14 @@ func (g *Generator) applyAnalysisStyles() error {
 			return err
 		}
 
-		style := nodeStyle{
-			fillColor:   fillColor,
-			borderColor: borderColor,
-			penWidth:    penWidth,
-			tooltip:     tooltip,
+		style := g.getBaseNodeStyle(id, *nodeObj)
+		style.fillColor = fillColor
+		style.tooltip = tooltip
+		if !nodeObj.IsOfType(common.ContainsBluePage) &&
+			!nodeObj.IsOfType(common.ContainsRedPage) &&
+			!nodeObj.IsOfType(common.ContainsWhitePage) {
+			style.borderColor = borderColor
+			style.penWidth = penWidth
 		}
 
 		name := g.getDisplayName(*nodeObj)

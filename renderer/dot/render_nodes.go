@@ -82,7 +82,10 @@ func (g *Generator) getNodeStyle(id int64, node common.Node) nodeStyle {
 	if style, hasStyle := g.nodeStyles[id]; hasStyle {
 		return style
 	}
+	return g.getBaseNodeStyle(id, node)
+}
 
+func (g *Generator) getBaseNodeStyle(id int64, node common.Node) nodeStyle {
 	// create a default style
 	style := nodeStyle{}
 
