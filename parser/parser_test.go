@@ -299,3 +299,27 @@ func TestParseSimpleCardRejectsWrongXMLRoot(t *testing.T) {
 		t.Fatal("want an error for a stack XML document passed as a card")
 	}
 }
+
+func FuzzIdentifyScriptLinks(f *testing.F) {
+	for _, script := range []string{
+		"go card id 2",
+		"push card id 3 of stack \"Example\"\ngo card id 2",
+		"pop card\r-- push card\rput \"1,A,0\" into ALL_Page",
+		"push card id 2 of stack \"Example\"",
+		"go card id 999999999999999999999999999999999",
+	} {
+		f.Add(script)
+	}
+	f.Fuzz(func(t *testing.T, text string) {
+		if len(text) > 4096 {
+			t.Skip()
+		}
+		stack := &HyperCardStack{Name: "Example"}
+		card := testCard(stack, 1, text)
+		p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{card, testCard(stack, 2), testCard(stack, 3)}}
+		for _, source := range []any{stack, card} {
+			var id int64
+			_, _ = p.identifyScriptLinks(source, card.Scripts[0], &id)
+		}
+	})
+}
