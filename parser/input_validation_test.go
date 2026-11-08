@@ -44,3 +44,35 @@ func TestStacksRejectAmbiguousIdentities(t *testing.T) {
 		}
 	}
 }
+
+func TestImportRejectsDuplicateCardFiles(t *testing.T) {
+	path := writeXMLFixture(t, stackFileName, "<stack><name>Example</name></stack>")
+	for _, name := range []string{"card_1.xml", "card_2.xml"} {
+		if err := os.WriteFile(filepath.Join(filepath.Dir(path), name), []byte("<card><id>1</id></card>"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := NewParser(filepath.Dir(path)); err == nil {
+		t.Fatal("accepted two files defining the same card ID")
+	}
+}
+
+func TestImportRejectsCaseInsensitiveStackAliases(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"Example", "example"} {
+		dir := filepath.Join(root, name)
+		// Use distinct filesystem names even on case-insensitive filesystems.
+		if name == "example" {
+			dir += "-copy"
+		}
+		if err := os.Mkdir(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, stackFileName), []byte("<stack><name>"+name+"</name></stack>"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := NewParser(root); err == nil {
+		t.Fatal("accepted stack names that resolve to the same case-insensitive identity")
+	}
+}

@@ -130,13 +130,21 @@ func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
 		if err != nil {
 			return err
 		}
+		if _, err := p.GetStackByName(stack.Name); err == nil {
+			return fmt.Errorf("duplicate stack name %q", stack.Name)
+		}
 		p.stacks = append(p.stacks, stack)
 
+		seenCards := make(map[int]bool, len(stackPath.cardsFilepaths))
 		for _, cardPath := range stackPath.cardsFilepaths {
 			card, parseErr := ParseSimpleCard(stack, cardPath, cardIdNameMap)
 			if parseErr != nil {
 				return parseErr
 			}
+			if seenCards[card.ID] {
+				return fmt.Errorf("duplicate card ID %d in stack %q", card.ID, stack.Name)
+			}
+			seenCards[card.ID] = true
 
 			p.cards = append(p.cards, card)
 		}
