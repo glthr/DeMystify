@@ -33,6 +33,13 @@ func RenderPDF(dotFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate PDF: %w\nOutput: %s", err, cmdOutput)
 	}
+	info, err := os.Stat(output.Name())
+	if err != nil {
+		return fmt.Errorf("reading rendered PDF: %w", err)
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("neato produced an empty PDF")
+	}
 	if err := os.Rename(output.Name(), pdfFilePath); err != nil {
 		return fmt.Errorf("saving rendered PDF: %w", err)
 	}
