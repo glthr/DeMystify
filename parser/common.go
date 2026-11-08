@@ -14,11 +14,12 @@ import (
 const stackFileName = "stack_-1.xml"
 
 type Parser struct {
-	stacksDir   string
-	stacks      []*HyperCardStack
-	cards       []*HyperCardCard
-	links       []*HyperCardLink
-	pushedLinks map[*HyperCardLink]bool
+	stacksDir     string
+	stacks        []*HyperCardStack
+	cards         []*HyperCardCard
+	links         []*HyperCardLink
+	pushedLinks   map[*HyperCardLink]bool
+	stackHandlers map[*HyperCardStack]map[string]stackHandlerSummary
 }
 
 type HyperCardLink struct {
