@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"runtime"
 
 	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
@@ -130,16 +129,8 @@ func ComputeShortestPath(
 }
 
 func CheckNeatoInstalled() error {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("where", "neato")
-	} else {
-		cmd = exec.Command("which", "neato")
-	}
-
-	output, err := cmd.Output()
-	if err != nil || len(output) == 0 {
-		return fmt.Errorf("Neato is not installed")
+	if _, err := exec.LookPath("neato"); err != nil {
+		return fmt.Errorf("neato is not installed: %w", err)
 	}
 
 	return nil
