@@ -510,3 +510,93 @@ func (g *Generator) buildEdgeStyleString(style edgeStyle) string {
 
 	return strings.Join(parts, ", ")
 }
+
+// renderMetadataEdges preserves each metadata edge, merging only individual reverse edges
+// with matching attributes. Tracking whole node pairs would discard parallel edges.
+func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
+	var loops, bidirectional, regular bytes.Buffer
+	processed := make(map[string][]bool)
+	for fromID, targets := range g.edgesMap {
+		for toID, edges := range targets {
+			targets[toID] = g.sortEdges(edges)
+			processed[g.getNodePairID(fromID, toID)] = make([]bool, len(edges))
+		}
+	}
+
+	type pathEdge struct {
+		fromID, toID int64
+		edge         common.Edge
+	}
+	var pathEdges []pathEdge
+	highlighted := make(map[string]bool)
+	if len(g.customPath) > 1 {
+		g.writeCustomPathInfo(buf)
+	}
+
+	for _, fromID := range g.getSortedNodeIDs(g.edgesMap) {
+		for _, toID := range g.getSortedTargetIDs(g.edgesMap[fromID], fromID, false) {
+			pairID := g.getNodePairID(fromID, toID)
+			reverseID := g.getNodePairID(toID, fromID)
+			for i, edge := range g.edgesMap[fromID][toID] {
+				if processed[pairID][i] {
+					continue
+				}
+				processed[pairID][i] = true
+
+				if g.isOnCustomPath(fromID, toID) && !highlighted[pairID] {
+					pathEdges = append(pathEdges, pathEdge{fromID, toID, edge})
+					highlighted[pairID] = true
+					continue
+				}
+				if fromID == toID {
+					g.renderSelfLoopEdge(&loops, fromID, &edge, false)
+					continue
+				}
+
+				// Keep both directions explicit when either is highlighted.
+				matched := false
+				if !g.isOnCustomPath(fromID, toID) && !g.isOnCustomPath(toID, fromID) {
+					for j, reverse := range g.edgesMap[toID][fromID] {
+						if !processed[reverseID][j] && g.edgeAttributesMatch(&edge, &reverse) {
+							processed[reverseID][j] = true
+							g.renderBidirectionalEdge(&bidirectional, fromID, toID, &edge)
+							matched = true
+							break
+						}
+					}
+				}
+				if !matched {
+					g.renderEdge(&regular, fromID, toID, &edge, false)
+				}
+			}
+		}
+	}
+
+	buf.Write(loops.Bytes())
+	buf.Write(bidirectional.Bytes())
+	buf.Write(regular.Bytes())
+
+	// Render highlights last so ordinary parallel edges cannot obscure them.
+	for _, item := range pathEdges {
+		if item.fromID == item.toID {
+			g.renderSelfLoopEdge(buf, item.fromID, &item.edge, true)
+		} else {
+			g.renderEdge(buf, item.fromID, item.toID, &item.edge, true)
+		}
+	}
+	// A supplied custom path may contain implied transitions absent from metadata.
+	for i := 0; i+1 < len(g.customPath); i++ {
+		fromID, toID := g.customPath[i], g.customPath[i+1]
+		pairID := g.getNodePairID(fromID, toID)
+		if highlighted[pairID] {
+			continue
+		}
+		edge := common.Edge{Source: &common.Node{GraphID: fromID}, Target: &common.Node{GraphID: toID}}
+		buf.WriteString(fmt.Sprintf("  // Adding implied path edge: %d -> %d\n", fromID, toID))
+		style := g.applyEdgeStyle(&edge, true)
+		style.tooltip += " (implied)"
+		buf.WriteString(fmt.Sprintf("  \"%d\" -> \"%d\" [%s];\n", fromID, toID, g.buildEdgeStyleString(style)))
+		highlighted[pairID] = true
+	}
+	buf.WriteString("\n")
+}
