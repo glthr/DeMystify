@@ -4,11 +4,13 @@ import (
 	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
 	"github.com/glthr/DeMystify/parser"
+	"github.com/glthr/DeMystify/renderer/dot"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
-"strings"
 )
 
 func TestCheckNeatoInstalledUsesPath(t *testing.T) {
@@ -86,5 +88,35 @@ func TestRunReportsUsageBeforeCheckingDependencies(t *testing.T) {
 		if err := run(args); err == nil || !strings.Contains(err.Error(), "usage:") {
 			t.Fatalf("run(%v) = %v, want usage error", args, err)
 		}
+	}
+}
+
+func TestSyntheticPipeline(t *testing.T) {
+	p, g, metadata := parsedTestGraph(t)
+	g.Process()
+	shortest, err := ComputeShortestPath(p, g, "Test Age", 1, "Test Age", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shortest.Distance != 1 || len(shortest.Path) != 2 {
+		t.Fatalf("unexpected shortest path: %+v", shortest)
+	}
+	content, err := dot.NewGenerator(g, metadata).Generate(shortest.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, label := range []string{"Test Age:1", "Test Age:2"} {
+		if !strings.Contains(content, label) {
+			t.Fatalf("DOT output is missing %q", label)
+		}
+	}
+	neato, err := exec.LookPath("neato")
+	if err != nil {
+		t.Skip("Graphviz is unavailable; parser, graph, and DOT checks passed")
+	}
+	cmd := exec.Command(neato, "-Tdot")
+	cmd.Stdin = strings.NewReader(content)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Graphviz rejected generated DOT: %v\n%s", err, output)
 	}
 }
