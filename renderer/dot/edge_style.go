@@ -56,17 +56,8 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 
 		enrichTransitiveEdgeIDTooltip(&style.tooltip, edge)
 
-		// set colors based on transitivity ID
-		if style.color == "" {
-			colorIndex := int(edge.TransitivityID) % len(nodesColors)
-			style.color = darkenColor(nodesColors[colorIndex])
-		}
-
+		completeRestrictiveStyle(edge.TransitivityID, &style)
 		style.arrowhead = "none"
-
-		if style.penWidth == 0 {
-			style.penWidth = 1.2
-		}
 
 		return style
 	}
@@ -90,6 +81,20 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 	// for regular edges, apply base styling
 	g.applyBaseEdgeStyle(edge, &style)
 	return style
+}
+
+// completeRestrictiveStyle supplies the appearance shared by both edge halves.
+func completeRestrictiveStyle(transitivityID int64, style *edgeStyle) {
+	if style.color == "" {
+		colorIndex := int(transitivityID % int64(len(nodesColors)))
+		if colorIndex < 0 {
+			colorIndex += len(nodesColors)
+		}
+		style.color = darkenColor(nodesColors[colorIndex])
+	}
+	if style.penWidth == 0 {
+		style.penWidth = 1.2
+	}
 }
 
 // applyBaseEdgeStyle applies basic styling to an edge
