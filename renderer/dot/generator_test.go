@@ -88,3 +88,44 @@ func TestNodeLabelEscapingAndPathStyling(t *testing.T) {
 		}
 	}
 }
+
+func TestBidirectionalMergeRetainsParallelEdges(t *testing.T) {
+	g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge}, []common.EdgeAttribute{common.IntraAge})
+	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.Disabled}})
+	g.initializeEdgesMap()
+	output, err := g.Generate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edgeLines(output)) != 2 || !strings.Contains(output, "Disabled edge") {
+		t.Fatalf("bidirectional merge lost disabled parallel edge:\n%s", output)
+	}
+}
+
+func TestCustomPathPreservesReverseAndParallelEdges(t *testing.T) {
+	g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge}, []common.EdgeAttribute{common.IntraAge})
+	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.Disabled}})
+	g.initializeEdgesMap()
+	output, err := g.Generate([]int64{metadata.Nodes[0].GraphID, metadata.Nodes[1].GraphID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edgeLines(output)) != 3 || !strings.Contains(output, "Disabled edge") {
+		t.Fatalf("path highlight lost reverse or parallel edges:\n%s", output)
+	}
+}
+
+func TestBidirectionalMergeRetainsTransitiveEdges(t *testing.T) {
+	g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge}, []common.EdgeAttribute{common.IntraAge})
+	metadata.Edges = append(metadata.Edges,
+		&common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.RestrictiveTransitivityTail}, TransitivityID: 1},
+		&common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.RestrictiveTransitivityTail}, TransitivityID: 2},
+	)
+	output, err := g.Generate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edgeLines(output)) != 3 || !strings.Contains(output, "Tail ID 1") || !strings.Contains(output, "Tail ID 2") {
+		t.Fatalf("bidirectional merge discarded transitive edges:\n%s", output)
+	}
+}

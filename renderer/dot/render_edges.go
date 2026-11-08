@@ -9,44 +9,9 @@ import (
 	"github.com/glthr/DeMystify/common"
 )
 
-// writeEdges writes all edges with their styles to the DOT output
+// writeEdges renders individual metadata edges without dropping parallel records.
 func (g *Generator) writeEdges(buf *bytes.Buffer) {
-	// initialize tracking structures
-	processedPairs := make(map[string]bool)           // track processed node pairs
-	bidirectionalPairs := make(map[string]bool)       // track bidirectional pairs
-	renderedNodePairs := make(map[string]bool)        // track node pairs with rendered edges
-	transitiveEdgesProcessed := make(map[string]bool) // track processed transitive edges
-
-	if g.edgesMap == nil || len(g.edgesMap) == 0 {
-		g.initializeEdgesMap()
-	}
-
-	if g.customPathEdgeSet == nil || len(g.customPathEdgeSet) == 0 {
-		g.initializeCustomPath()
-	}
-
-	if len(g.customPath) > 1 {
-		g.writeCustomPathInfo(buf)
-	}
-
-	// find all bidirectional edges and self-loops
-	g.identifyBidirectionalEdges(bidirectionalPairs)
-	selfLoops := g.identifySelfLoops()
-
-	// process in efficient order:
-	// 1. self-loops
-	g.processSelfLoops(buf, selfLoops)
-
-	// 2. bidirectional matched edges (skipping custom path edges)
-	g.processBidirectionalEdges(buf, processedPairs, bidirectionalPairs, renderedNodePairs, true)
-
-	// 3. regular edges (skipping custom path edges)
-	g.processRegularEdges(buf, processedPairs, renderedNodePairs, transitiveEdgesProcessed, true)
-
-	// 4. custom path edges - rendered last
-	g.processCustomPathEdges(buf, processedPairs)
-
-	buf.WriteString("\n")
+	g.renderMetadataEdges(buf)
 }
 
 // processBidirectionalEdges handles bidirectional edges with matching attributes
