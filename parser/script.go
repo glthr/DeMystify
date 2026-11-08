@@ -70,6 +70,9 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
 		return link, err
 	}
+	if link := p.handleGoToUnquotedCardName(source, command); link != nil {
+		return link, nil
+	}
 	if !disabled {
 		if handled := p.handlePopCard(source, command); handled {
 			return nil, nil

@@ -45,6 +45,8 @@ func TestOriginalMystImport(t *testing.T) {
 		{"Myst:28552", "Myst:23444"},
 		{"Myst:55938", "Myst:23444"},
 		{"Myst:77008", "Myst:23444"},
+		{"Myst:72560", "Myst:23444"},
+		{"Myst:77588", "Myst:23444"},
 		{"Selenitic Age:59926", "Selenitic Age:62357"},
 		{"Stoneship Age:53570", "Stoneship Age:25833"},
 	} {
@@ -106,9 +108,9 @@ func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
 		}
 		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
 		case "on mouseup 5119 end mouseup":
-			return 3229, 3242, false
+			return 3231, 3244, false
 		case "on mouseup go to card id 5119 end mouseup":
-			return 3230, 3243, true
+			return 3232, 3245, true
 		}
 	}
 	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")
