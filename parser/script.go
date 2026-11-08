@@ -17,6 +17,18 @@ type ScriptLine struct {
 	IsDisabled bool
 }
 
+var (
+	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)go( to)? card "([^"]+)" of stack "([^"]+)"`)
+	goToCardOfStackPattern      = regexp.MustCompile(`(?i)go( to)? card id (\d+) of stack "([^"]+)"`)
+	goToCardPattern             = regexp.MustCompile(`(?i)go( to)? card id (\d+)`)
+	popCardPattern              = regexp.MustCompile(`(?i)pop card`)
+	bluePagePattern             = regexp.MustCompile(`(?i)put "(\d+),A,0" into ALL_Page`)
+	redPagePattern              = regexp.MustCompile(`(?i)put "(\d+),S,0" into ALL_Page`)
+	whitePagePattern            = regexp.MustCompile(`(?i)put "Atrus" into ALL_Page`)
+	pushCardOfStackPattern      = regexp.MustCompile(`(?i)push card id (\d+) of stack "([^"]+)"`)
+	pushCardPattern             = regexp.MustCompile(`(?i)push card`)
+)
+
 func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, error) {
 	if link, err := p.handleGoToNamedCardOfStack(source, command); link != nil || err != nil {
 		return link, err
@@ -44,8 +56,7 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 
 func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card "{card name}" of stack "{stack name}"`
-	pattern := regexp.MustCompile(`(?i)go( to)? card "([^"]+)" of stack "([^"]+)"`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := goToNamedCardOfStackPattern.FindStringSubmatch(command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -76,8 +87,7 @@ func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperC
 
 func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {card id} of stack "{stack name}"`
-	pattern := regexp.MustCompile(`(?i)go( to)? card id (\d+) of stack "([^"]+)"`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := goToCardOfStackPattern.FindStringSubmatch(command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -109,8 +119,7 @@ func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLi
 
 func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {id}`
-	pattern := regexp.MustCompile(`(?i)go( to)? card id (\d+)`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := goToCardPattern.FindStringSubmatch(command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -148,8 +157,7 @@ func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, err
 
 func (p *Parser) handlePopCard(source any, command string) bool {
 	// `pop card"`
-	pattern := regexp.MustCompile(`(?i)pop card`)
-	if matches := pattern.FindStringSubmatch(command); matches != nil {
+	if matches := popCardPattern.FindStringSubmatch(command); matches != nil {
 		source.(*HyperCardCard).IsPopCard = true
 		return true
 	}
@@ -157,9 +165,6 @@ func (p *Parser) handlePopCard(source any, command string) bool {
 }
 
 func (p *Parser) handlePagePatterns(source any, command string) bool {
-	bluePagePattern := regexp.MustCompile(`(?i)put "(\d+),A,0" into ALL_Page`)
-	redPagePattern := regexp.MustCompile(`(?i)put "(\d+),S,0" into ALL_Page`)
-	whitePagePattern := regexp.MustCompile(`(?i)put "Atrus" into ALL_Page`)
 
 	if matches := bluePagePattern.FindStringSubmatch(command); matches != nil {
 		source.(*HyperCardCard).HasBluePage = true
@@ -181,8 +186,7 @@ func (p *Parser) handlePagePatterns(source any, command string) bool {
 
 func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `push card id {card id} of stack "{stack name}"`
-	pattern := regexp.MustCompile(`(?i)push card id (\d+) of stack "([^"]+)"`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := pushCardOfStackPattern.FindStringSubmatch(command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -218,8 +222,7 @@ func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLi
 
 func (p *Parser) handlePushCard(source any, command string) bool {
 	// `push card`
-	pattern := regexp.MustCompile(`(?i)push card`)
-	if matches := pattern.FindStringSubmatch(command); matches != nil {
+	if matches := pushCardPattern.FindStringSubmatch(command); matches != nil {
 		switch s := source.(type) {
 		case *HyperCardStack:
 			s.IsPushStack = true
