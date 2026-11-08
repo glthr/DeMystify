@@ -39,11 +39,11 @@ func (g *Generator) applyAnalysisStyles() error {
 			if err := applyStyle(node.GraphID, "#FFFF99", "", "Isolated node", 0); err != nil {
 				return err
 			}
-		} else if node.IsOfType(common.IsSink) {
+		} else if node.IsOfType(common.IsSink) && g.config.HighlightSinks {
 			if err := applyStyle(node.GraphID, "#FFA07A", "#FF4500", "Sink node (no outgoing connections)", 1.5); err != nil {
 				return err
 			}
-		} else if node.IsOfType(common.IsSource) {
+		} else if node.IsOfType(common.IsSource) && g.config.HighlightSources {
 			if err := applyStyle(node.GraphID, "#98FB98", "#228B22", "Source node (no incoming connections)", 1.5); err != nil {
 				return err
 			}
