@@ -67,8 +67,14 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 		}
 		g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] = append(
 			g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID], newEdge)
+		if !g.building {
+			g.Metadata.Edges = append(g.Metadata.Edges, &newEdge)
+		}
 	}
 
+	if !g.building {
+		g.Metadata.TotalEdges = uint(g.Graph.Edges().Len())
+	}
 	return nil
 }
 
