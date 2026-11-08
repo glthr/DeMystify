@@ -50,7 +50,7 @@ func (g *Generator) applyAnalysisStyles() error {
 				return err
 			}
 		} else if node.IsOfType(common.IsSource) && g.config.HighlightSources {
-			if err := applyStyle(node.GraphID, "#98FB98", "#228B22", "Source node (no incoming connections)", 1.5); err != nil {
+			if err := applyStyle(node.GraphID, "#98FB98", "#228B22", "Source node (no incoming connections from other nodes)", 1.5); err != nil {
 				return err
 			}
 		}

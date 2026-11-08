@@ -1,0 +1,511 @@
+source,conditional_target,already_in_ordinary_graph,ordinary_distance,bare_go_subset,part_names
+Channelwood Age:10036,Channelwood Age:10780,False,3,False,qphp2
+Channelwood Age:10298,Channelwood Age:10780,False,2,False,qphp2
+Channelwood Age:11029,Channelwood Age:13703,False,5,False,qsi2
+Channelwood Age:11327,Channelwood Age:10780,False,8,False,qphp2
+Channelwood Age:11657,Channelwood Age:13703,False,4,False,qsi2
+Channelwood Age:11997,Channelwood Age:10780,False,9,False,qphp2
+Channelwood Age:12062,Channelwood Age:13703,False,3,False,qsi2
+Channelwood Age:12417,Channelwood Age:10780,False,10,False,qphp2
+Channelwood Age:12547,Channelwood Age:13703,False,2,False,qsi2
+Channelwood Age:13049,Channelwood Age:10780,False,11,False,qphp2
+Channelwood Age:13268,Channelwood Age:16663,False,7,False,qls
+Channelwood Age:13553,Channelwood Age:10780,False,12,True,qphp2 left;qphp2
+Channelwood Age:13703,Channelwood Age:16663,False,6,False,qls
+Channelwood Age:13949,Channelwood Age:10780,False,13,False,qphp2
+Channelwood Age:14175,Channelwood Age:16663,False,5,False,qls
+Channelwood Age:14602,Channelwood Age:16663,False,4,False,qls
+Channelwood Age:15273,Channelwood Age:16663,False,3,False,qls
+Channelwood Age:15551,Channelwood Age:10780,False,16,True,qphp2
+Channelwood Age:15551,Channelwood Age:14360,False,2,False,qsr2
+Channelwood Age:15662,Channelwood Age:16663,False,2,False,qls
+Channelwood Age:16582,Channelwood Age:14360,False,3,False,qsr2
+Channelwood Age:17121,Channelwood Age:14360,False,4,False,qsr2
+Channelwood Age:17225,Channelwood Age:75778,False,6,False,qts
+Channelwood Age:17626,Channelwood Age:19143,False,3,False,qsi3
+Channelwood Age:17667,Channelwood Age:10780,False,14,False,qphp2
+Channelwood Age:17973,Channelwood Age:19143,False,2,False,qsi3
+Channelwood Age:18638,Channelwood Age:20137,False,3,False,qsi4
+Channelwood Age:18775,Channelwood Age:17667,False,2,False,qsl2
+Channelwood Age:19143,Channelwood Age:20137,False,2,False,qsi4
+Channelwood Age:19143,Channelwood Age:33578,False,4,False,qsi7
+Channelwood Age:19212,Channelwood Age:17667,False,3,False,qsl2
+Channelwood Age:19870,Channelwood Age:17667,False,4,False,qsl2
+Channelwood Age:20137,Channelwood Age:21498,False,2,False,qsi5
+Channelwood Age:20137,Channelwood Age:26492,False,2,False,qsi6
+Channelwood Age:20241,Channelwood Age:17667,False,5,False,qsl2
+Channelwood Age:20680,Channelwood Age:23467,False,5,False,qel1
+Channelwood Age:20680,Channelwood Age:25490,False,5,False,qpip1
+Channelwood Age:20934,Channelwood Age:19870,False,2,False,qsr3
+Channelwood Age:21498,Channelwood Age:23467,False,4,False,qel1 right
+Channelwood Age:21498,Channelwood Age:25490,False,4,False,qpip1
+Channelwood Age:21943,Channelwood Age:23467,False,3,False,qel1
+Channelwood Age:22520,Channelwood Age:23467,False,2,False,qel1
+Channelwood Age:23050,Channelwood Age:22077,False,2,False,qsr5
+Channelwood Age:23632,Channelwood Age:22077,False,3,False,qsr5
+Channelwood Age:23887,Channelwood Age:25490,False,3,False,qpip1
+Channelwood Age:24265,Channelwood Age:20934,False,2,False,qsr4
+Channelwood Age:24323,Channelwood Age:25490,False,2,False,qpip1
+Channelwood Age:2465,Channelwood Age:19870,False,2,False,qsr3
+Channelwood Age:25142,Channelwood Age:24265,False,2,False,qsl5
+Channelwood Age:25804,Channelwood Age:24265,False,3,False,qsl5
+Channelwood Age:26492,Channelwood Age:31551,False,6,False,qbr1
+Channelwood Age:27330,Channelwood Age:2465,False,2,False,qsl4
+Channelwood Age:27804,Channelwood Age:2465,False,3,False,qsl4
+Channelwood Age:28195,Channelwood Age:2465,False,4,False,qsl4
+Channelwood Age:28195,Channelwood Age:27330,False,2,False,qsr6
+Channelwood Age:28810,Channelwood Age:27330,False,3,False,qsr6
+Channelwood Age:29021,Channelwood Age:31551,False,5,False,qbr1 right
+Channelwood Age:29197,Channelwood Age:2465,False,2,False,qsl4
+Channelwood Age:29603,Channelwood Age:31551,False,4,False,qbr1
+Channelwood Age:29713,Channelwood Age:2465,False,3,False,qsl4
+Channelwood Age:30164,Channelwood Age:31551,False,3,False,qbr1
+Channelwood Age:30460,Channelwood Age:29197,False,2,False,qsl6
+Channelwood Age:30460,Channelwood Age:35578,False,2,False,qsr7
+Channelwood Age:30631,Channelwood Age:31551,False,2,False,qbr1
+Channelwood Age:30934,Channelwood Age:29197,False,3,False,qsl6
+Channelwood Age:30934,Channelwood Age:35578,False,3,False,qsr7
+Channelwood Age:31432,Channelwood Age:29197,False,4,False,qsl6 left
+Channelwood Age:31432,Channelwood Age:35578,False,4,False,qsr7
+Channelwood Age:31551,Channelwood Age:41466,False,11,False,qel3 right
+Channelwood Age:31961,Channelwood Age:29197,False,5,False,qsl6 left
+Channelwood Age:31961,Channelwood Age:35578,False,5,False,qsr7
+Channelwood Age:33358,Channelwood Age:32368,False,2,False,qsl3
+Channelwood Age:33578,Channelwood Age:31551,False,6,False,qbr1
+Channelwood Age:33832,Channelwood Age:32368,False,3,False,qsl3
+Channelwood Age:34505,Channelwood Age:32368,False,4,False,qsl3
+Channelwood Age:35112,Channelwood Age:31551,False,5,False,qbr1
+Channelwood Age:35651,Channelwood Age:31551,False,4,False,qbr1
+Channelwood Age:36725,Channelwood Age:41466,False,10,False,qel3 right
+Channelwood Age:37272,Channelwood Age:41466,False,9,False,qel3 right
+Channelwood Age:38264,Channelwood Age:41466,False,7,False,qel3
+Channelwood Age:38457,Channelwood Age:37442,False,2,False,qbr2
+Channelwood Age:38861,Channelwood Age:41466,False,6,False,qel3
+Channelwood Age:39330,Channelwood Age:41466,False,5,False,qel3 left
+Channelwood Age:39809,Channelwood Age:41466,False,4,False,qel3 left
+Channelwood Age:40121,Channelwood Age:37442,False,5,False,qbr2 left
+Channelwood Age:40222,Channelwood Age:41466,False,3,False,qel3
+Channelwood Age:40631,Channelwood Age:37442,False,6,False,qbr2
+Channelwood Age:40846,Channelwood Age:41466,False,2,False,qel3
+Channelwood Age:41077,Channelwood Age:37442,False,7,False,qbr2
+Channelwood Age:41669,Channelwood Age:37442,False,9,False,qbr2
+Channelwood Age:41669,Channelwood Age:43979,False,5,False,qpip2
+Channelwood Age:42194,Channelwood Age:37442,False,8,False,qbr2 right
+Channelwood Age:42194,Channelwood Age:43979,False,4,False,qpip2
+Channelwood Age:42420,Channelwood Age:43979,False,3,False,qpip2
+Channelwood Age:42690,Channelwood Age:41466,False,2,False,qel3
+Channelwood Age:42940,Channelwood Age:43979,False,2,False,qpip2;qpip2 right
+Channelwood Age:43713,Channelwood Age:41466,False,4,False,qel3
+Channelwood Age:44229,Channelwood Age:41466,False,5,False,qel3
+Channelwood Age:4459,Channelwood Age:8881,False,8,False,qphp1
+Channelwood Age:50725,Channelwood Age:46136,False,2,False,qel4
+Channelwood Age:6971,Channelwood Age:8881,False,7,False,qphp1
+Channelwood Age:70615,Channelwood Age:72506,False,4,False,qus
+Channelwood Age:70784,Channelwood Age:72506,False,3,False,qus
+Channelwood Age:71489,Channelwood Age:72506,False,2,False,qus
+Channelwood Age:72353,Channelwood Age:71418,False,2,False,qhut
+Channelwood Age:72768,Channelwood Age:71418,False,3,False,qhut
+Channelwood Age:7283,Channelwood Age:8881,False,6,False,qphp1
+Channelwood Age:73346,Channelwood Age:75778,False,5,False,qts
+Channelwood Age:73852,Channelwood Age:75778,False,4,False,qts
+Channelwood Age:74168,Channelwood Age:73038,False,2,False,qbs
+Channelwood Age:74269,Channelwood Age:75778,False,3,False,qts
+Channelwood Age:74505,Channelwood Age:73038,False,3,False,qbs
+Channelwood Age:74809,Channelwood Age:75778,False,2,False,qts
+Channelwood Age:75252,Channelwood Age:73038,False,4,False,qbs
+Channelwood Age:75674,Channelwood Age:73038,False,5,False,qbs
+Channelwood Age:76263,Channelwood Age:73038,False,6,False,qbs
+Channelwood Age:76503,Channelwood Age:80492,False,5,False,qtmp
+Channelwood Age:7663,Channelwood Age:8881,False,5,False,qphp1
+Channelwood Age:76659,Channelwood Age:92317,False,4,False,qsir
+Channelwood Age:77034,Channelwood Age:92317,False,3,False,qsir
+Channelwood Age:77454,Channelwood Age:92317,False,2,False,qsir
+Channelwood Age:7761,Channelwood Age:8881,False,4,False,qphp1
+Channelwood Age:77805,Channelwood Age:76503,False,2,False,qhi
+Channelwood Age:78158,Channelwood Age:76503,False,3,False,qhi
+Channelwood Age:78451,Channelwood Age:80492,False,4,False,qtmp left
+Channelwood Age:78770,Channelwood Age:76659,True,1,False,qel2 left;qel2
+Channelwood Age:78770,Channelwood Age:92317,False,5,False,qsir
+Channelwood Age:78886,Channelwood Age:80492,False,3,False,qtmp left
+Channelwood Age:78886,Channelwood Age:83143,False,7,False,qach
+Channelwood Age:79112,Channelwood Age:76659,False,2,False,qel2 left
+Channelwood Age:79496,Channelwood Age:80492,False,2,False,qtmp
+Channelwood Age:79496,Channelwood Age:83143,False,6,False,qach right
+Channelwood Age:80103,Channelwood Age:76659,False,4,False,qel2
+Channelwood Age:80159,Channelwood Age:80492,True,1,False,qtmp
+Channelwood Age:80159,Channelwood Age:83143,False,5,False,qach right
+Channelwood Age:80492,Channelwood Age:83143,False,4,False,qach
+Channelwood Age:8059,Channelwood Age:8881,False,3,False,qphp1
+Channelwood Age:80720,Channelwood Age:76659,False,5,False,qel2
+Channelwood Age:81100,Channelwood Age:83143,False,3,False,qach
+Channelwood Age:81586,Channelwood Age:80720,False,2,False,qtmp3
+Channelwood Age:82793,Channelwood Age:76659,False,8,False,qel2 left
+Channelwood Age:82793,Channelwood Age:80720,False,3,False,qtmp3
+Channelwood Age:82793,Channelwood Age:82060,True,1,False,qtmp2
+Channelwood Age:8323,Channelwood Age:8881,False,2,False,qphp1
+Channelwood Age:83255,Channelwood Age:76659,False,9,False,qel2
+Channelwood Age:83255,Channelwood Age:80720,False,4,False,qtmp3
+Channelwood Age:83255,Channelwood Age:82060,False,2,False,qtmp2
+Channelwood Age:8881,Channelwood Age:13703,False,6,False,qsi2
+Channelwood Age:9075,Channelwood Age:10780,False,7,False,qphp2
+Channelwood Age:92512,Channelwood Age:76503,False,4,False,qhi
+Channelwood Age:9420,Channelwood Age:10780,False,6,False,qphp2
+Channelwood Age:9721,Channelwood Age:10780,False,5,False,qphp2
+Channelwood Age:9781,Channelwood Age:10780,False,4,False,qphp2
+Mechanical Age:10209,Mechanical Age:11084,False,3,False,qach2
+Mechanical Age:12991,Mechanical Age:15376,False,2,False,qeis
+Mechanical Age:13233,Mechanical Age:41131,False,2,False,qsir1
+Mechanical Age:16009,Mechanical Age:9075,False,7,False,qedr
+Mechanical Age:16757,Mechanical Age:34882,False,2,False,qel1
+Mechanical Age:17797,Mechanical Age:34421,False,3,False,qsir3
+Mechanical Age:22133,Mechanical Age:9075,False,6,True,qedr
+Mechanical Age:22499,Mechanical Age:15376,False,9,False,qeis
+Mechanical Age:22809,Mechanical Age:9075,False,2,False,qedr
+Mechanical Age:23400,Mechanical Age:23934,False,2,False,qdrs
+Mechanical Age:2383,Mechanical Age:32302,False,4,False,qach4
+Mechanical Age:24230,Mechanical Age:9846,False,3,False,qach1
+Mechanical Age:24452,Mechanical Age:9846,False,2,False,qach1
+Mechanical Age:24888,Mechanical Age:25440,False,2,False,qdra
+Mechanical Age:26778,Mechanical Age:9075,False,3,False,qedr
+Mechanical Age:26888,Mechanical Age:29105,False,8,False,qnis
+Mechanical Age:27151,Mechanical Age:29105,False,7,False,qnis
+Mechanical Age:27417,Mechanical Age:29105,False,6,False,qnis
+Mechanical Age:28101,Mechanical Age:29105,False,4,False,qnis
+Mechanical Age:28222,Mechanical Age:29105,False,3,False,qnis
+Mechanical Age:28639,Mechanical Age:29105,False,2,False,qnis
+Mechanical Age:29262,Mechanical Age:31168,False,7,False,qndr
+Mechanical Age:29561,Mechanical Age:31168,False,6,True,qndr
+Mechanical Age:29888,Mechanical Age:31168,False,5,True,qndr
+Mechanical Age:30166,Mechanical Age:31168,False,4,False,qndr
+Mechanical Age:3017,Mechanical Age:5967,False,5,False,qsdr
+Mechanical Age:30341,Mechanical Age:31168,False,3,False,qndr
+Mechanical Age:30681,Mechanical Age:31168,False,2,False,qndr
+Mechanical Age:32302,Mechanical Age:25440,False,3,False,qdra
+Mechanical Age:32588,Mechanical Age:23934,False,3,False,qdrs
+Mechanical Age:34421,Mechanical Age:32588,False,4,False,qsir4
+Mechanical Age:35295,Mechanical Age:50114,False,2,False,qel2
+Mechanical Age:35617,Mechanical Age:15376,False,10,False,qeis
+Mechanical Age:38013,Mechanical Age:47302,False,2,False,qwar
+Mechanical Age:39260,Mechanical Age:9846,False,4,False,qach1
+Mechanical Age:39604,Mechanical Age:41131,False,4,False,qsir1
+Mechanical Age:39710,Mechanical Age:50114,False,3,False,qel2
+Mechanical Age:41131,Mechanical Age:48636,False,4,False,qsir2
+Mechanical Age:4421,Mechanical Age:5967,False,5,False,qsdr
+Mechanical Age:45089,Mechanical Age:15376,False,11,False,qeis
+Mechanical Age:46050,Mechanical Age:29105,False,9,False,qnis
+Mechanical Age:46082,Mechanical Age:6858,False,5,False,qsis
+Mechanical Age:46338,Mechanical Age:47302,False,3,False,qwar
+Mechanical Age:47603,Mechanical Age:48091,False,2,False,qwdr
+Mechanical Age:4850,Mechanical Age:5967,False,4,False,qsdr
+Mechanical Age:48777,Mechanical Age:2383,False,2,False,qach3
+Mechanical Age:4956,Mechanical Age:5967,False,2,False,qsdr
+Mechanical Age:49567,Mechanical Age:34421,False,2,False,qsir3
+Mechanical Age:49680,Mechanical Age:2383,False,3,False,qach3
+Mechanical Age:5533,Mechanical Age:6858,False,3,False,qsis
+Mechanical Age:5756,Mechanical Age:6858,False,2,False,qsis
+Mechanical Age:6249,Mechanical Age:6858,False,4,False,qsis
+Mechanical Age:7467,Mechanical Age:5967,False,3,False,qsdr
+Mechanical Age:9418,Mechanical Age:41131,False,3,False,qsir1
+Myst:10575,Myst:4495,False,4,False,qdoc
+Myst:11197,Myst:4495,False,3,False,qdoc
+Myst:11197,Myst:7902,False,4,False,qste
+Myst:11357,Myst:18993,False,5,False,qfor
+Myst:11521,Myst:13712,False,6,False,qshi left
+Myst:11943,Myst:30320,False,5,False,qbre2
+Myst:12224,Myst:2123,False,3,False,qpat1
+Myst:12224,Myst:9189,False,2,False,qpla
+Myst:12527,Myst:13712,False,3,False,qshi
+Myst:12527,Myst:30320,False,4,False,qbre2
+Myst:13071,Myst:13712,False,2,False,qshi
+Myst:14069,Myst:27005,False,4,False,qpat
+Myst:14084,Myst:27005,False,3,False,qpat
+Myst:14569,Myst:18993,False,4,False,qfor
+Myst:14817,Myst:13712,False,6,False,qshi
+Myst:15359,Myst:17571,False,2,False,qmin
+Myst:15359,Myst:18993,False,3,False,qfor
+Myst:15587,Myst:11521,False,2,False,qlib
+Myst:15974,Myst:18993,False,2,False,qfor
+Myst:16155,Myst:11521,False,3,False,qlib
+Myst:16440,Myst:21716,False,4,False,qclo
+Myst:16774,Myst:11521,False,4,False,qlib
+Myst:17084,Myst:21716,False,3,False,qclo
+Myst:17319,Myst:60085,False,4,False,qclo2
+Myst:17571,Myst:34663,False,8,False,qgen
+Myst:18304,Myst:11521,False,6,False,qlib
+Myst:18304,Myst:15587,False,4,False,qfou
+Myst:18553,Myst:15587,False,5,False,qfou
+Myst:18993,Myst:21716,False,3,False,qclo
+Myst:19240,Myst:11521,False,5,False,qlib
+Myst:19652,Myst:32178,False,3,False,qtre
+Myst:20099,Myst:21716,False,2,False,qclo
+Myst:20226,Myst:32178,False,3,False,qtre
+Myst:20615,Myst:60085,False,3,True,qclo2
+Myst:20863,Myst:19652,False,2,False,qcab
+Myst:21170,Myst:21716,False,3,False,qclo
+Myst:2123,Myst:2737,False,5,False,qdoc3
+Myst:2123,Myst:2838,False,6,False,qdoc2;qdoc2
+Myst:21716,Myst:60085,False,2,False,qclo2
+Myst:22764,Myst:18304,False,2,False,qfor2
+Myst:22896,Myst:60085,False,3,False,qclo2
+Myst:25094,Myst:86826,False,4,False,qvau
+Myst:26663,Myst:13712,False,4,False,qshi
+Myst:26663,Myst:30320,False,4,False,qbre2
+Myst:27316,Myst:31383,False,3,True,qbre1
+Myst:2737,Myst:10973,False,4,True,qgea
+Myst:28930,Myst:34663,False,6,False,qgen
+Myst:29665,Myst:27005,False,2,False,qpat
+Myst:31619,Myst:32178,False,2,False,qtre
+Myst:32403,Myst:19652,False,3,False,qcab
+Myst:33668,Myst:34663,False,4,False,qgen
+Myst:33976,Myst:34663,False,3,False,qgen
+Myst:34228,Myst:34663,False,2,False,qgen
+Myst:34888,Myst:40799,False,7,False,qgen2
+Myst:35305,Myst:40799,False,6,False,qgen2
+Myst:35524,Myst:40799,False,5,False,qgen2
+Myst:35605,Myst:40799,False,3,False,qgen2
+Myst:40600,Myst:40799,False,2,False,qgen2
+Myst:44138,Myst:40799,False,4,False,qgen2
+Myst:44417,Myst:34663,False,7,False,qgen
+Myst:44564,Myst:34663,False,5,False,qgen
+Myst:4495,Myst:57822,False,3,False,qboa
+Myst:4495,Myst:7902,False,5,False,qste right
+Myst:48883,Myst:52656,False,8,False,qele
+Myst:50829,Myst:52656,False,7,False,qele
+Myst:5234,Myst:86826,False,5,False,qvau
+Myst:52926,Myst:46851,False,8,False,qcen
+Myst:53495,Myst:46851,False,7,False,qcen
+Myst:56703,Myst:60085,False,2,False,qclo2
+Myst:59122,Myst:5026,False,3,False,qpla2
+Myst:59355,Myst:10973,False,5,True,qgea
+Myst:59355,Myst:5026,False,2,False,qpla2
+Myst:5956,Myst:4495,False,2,False,qdoc;qdoc
+Myst:5956,Myst:57822,False,5,False,qboa
+Myst:60372,Myst:18304,False,5,False,qfor2
+Myst:60372,Myst:19652,False,6,False,qcab right
+Myst:60452,Myst:18304,False,4,False,qfor2
+Myst:60828,Myst:18304,False,3,False,qfor2
+Myst:6551,Myst:4495,True,1,False,qdoc
+Myst:6551,Myst:57822,False,4,False,qboa
+Myst:6798,Myst:4495,False,2,False,qdoc left
+Myst:6798,Myst:7902,False,2,False,qste
+Myst:7040,Myst:10973,False,4,False,qgea
+Myst:7040,Myst:2737,False,4,True,qdoc3 right;qdoc3;qdoc3
+Myst:7191,Myst:2838,False,6,True,qdoc2
+Myst:77365,Myst:7902,False,6,True,qste
+Myst:7902,Myst:11943,False,4,False,qpat2
+Myst:7902,Myst:9189,False,3,False,qpla
+Myst:79408,Myst:86826,False,3,False,qvau
+Myst:8079,Myst:11943,False,3,False,qpat2
+Myst:8079,Myst:9189,False,2,False,qpla
+Myst:8336,Myst:10973,False,5,True,qgea
+Myst:8336,Myst:5026,False,2,False,qpla2
+Myst:86000,Myst:86826,False,2,False,qvau
+Myst:88101,Myst:2838,False,6,False,qdoc2
+Myst:88345,Myst:2838,False,5,False,qdoc2
+Myst:88671,Myst:2838,False,4,False,qdoc2
+Myst:88832,Myst:2838,False,3,False,qdoc2
+Myst:89294,Myst:2838,False,2,False,qdoc2
+Myst:9960,Myst:30320,False,6,False,qbre2
+Selenitic Age:10153,Selenitic Age:11445,True,1,False,qclo
+Selenitic Age:10153,Selenitic Age:12324,False,2,False,qpat2;qpat2
+Selenitic Age:10474,Selenitic Age:29147,False,3,False,qcal1
+Selenitic Age:10474,Selenitic Age:8207,False,4,False,qpat1
+Selenitic Age:11112,Selenitic Age:29147,False,4,False,qcal1
+Selenitic Age:11604,Selenitic Age:12953,False,5,False,qpat3
+Selenitic Age:11604,Selenitic Age:17415,False,4,False,qsto1 right
+Selenitic Age:12227,Selenitic Age:12953,False,3,False,qpat3 left;qpat3
+Selenitic Age:12686,Selenitic Age:12953,False,2,False,qpat3
+Selenitic Age:12953,Selenitic Age:13774,False,3,False,qpat4
+Selenitic Age:13395,Selenitic Age:13774,False,2,False,qpat4
+Selenitic Age:13395,Selenitic Age:21856,False,3,False,qtun
+Selenitic Age:14183,Selenitic Age:14695,False,3,False,qpat5
+Selenitic Age:14695,Selenitic Age:15135,False,3,False,qpat6
+Selenitic Age:15029,Selenitic Age:11112,False,3,False,qclo1 right
+Selenitic Age:15029,Selenitic Age:17415,False,4,False,qsto1
+Selenitic Age:15135,Selenitic Age:11112,False,2,False,qclo1
+Selenitic Age:16769,Selenitic Age:17415,False,2,False,qsto1
+Selenitic Age:17143,Selenitic Age:17415,True,1,False,qsto1
+Selenitic Age:17194,Selenitic Age:28273,False,4,False,qpas1
+Selenitic Age:17415,Selenitic Age:19168,False,6,True,qsto
+Selenitic Age:18023,Selenitic Age:19168,False,4,False,qsto
+Selenitic Age:18304,Selenitic Age:19168,False,3,False,qsto
+Selenitic Age:18512,Selenitic Age:19168,False,2,False,qsto
+Selenitic Age:19395,Selenitic Age:20978,False,5,False,qsto2
+Selenitic Age:19630,Selenitic Age:20978,False,4,False,qsto2 left;qsto2
+Selenitic Age:20027,Selenitic Age:20978,False,3,True,qsto2 left;qsto2
+Selenitic Age:20415,Selenitic Age:20978,False,2,False,qsto2
+Selenitic Age:21177,Selenitic Age:12953,False,5,False,qpat3
+Selenitic Age:21389,Selenitic Age:12953,False,4,True,qpat3
+Selenitic Age:21709,Selenitic Age:17415,False,2,False,qsto1
+Selenitic Age:21856,Selenitic Age:23452,False,4,False,qpas
+Selenitic Age:22095,Selenitic Age:23452,False,3,False,qpas Down
+Selenitic Age:22429,Selenitic Age:28273,False,3,False,qpas1
+Selenitic Age:2252,Selenitic Age:5801,False,4,False,qdor
+Selenitic Age:23452,Selenitic Age:22095,False,3,False,qtun1 up
+Selenitic Age:23981,Selenitic Age:23452,False,2,False,qpas
+Selenitic Age:24125,Selenitic Age:23452,False,3,False,qpas
+Selenitic Age:24823,Selenitic Age:40120,False,4,True,qtow
+Selenitic Age:24883,Selenitic Age:40120,False,3,False,qtow
+Selenitic Age:25246,Selenitic Age:5801,False,5,False,qdor
+Selenitic Age:25583,Selenitic Age:40120,False,2,True,qtow
+Selenitic Age:26749,Selenitic Age:27502,False,4,False,qtun2
+Selenitic Age:27015,Selenitic Age:27502,False,3,False,qtun2
+Selenitic Age:27502,Selenitic Age:28273,False,3,False,qpas1 down
+Selenitic Age:27672,Selenitic Age:28273,False,2,False,qpas1
+Selenitic Age:28273,Selenitic Age:27502,False,3,False,qtun2 up
+Selenitic Age:29147,Selenitic Age:30113,False,4,False,qcal2
+Selenitic Age:29378,Selenitic Age:30113,False,3,False,qcal2
+Selenitic Age:29522,Selenitic Age:30113,False,2,False,qcal2
+Selenitic Age:30885,Selenitic Age:31357,False,2,False,qcal3 right
+Selenitic Age:31046,Selenitic Age:31357,True,1,False,qcal3
+Selenitic Age:31357,Selenitic Age:11445,False,3,False,qclo
+Selenitic Age:32185,Selenitic Age:33146,False,3,False,qfou1
+Selenitic Age:32578,Selenitic Age:33146,False,2,False,qfou1
+Selenitic Age:33514,Selenitic Age:34053,False,4,False,qfou
+Selenitic Age:33578,Selenitic Age:34053,False,3,False,qfou
+Selenitic Age:33989,Selenitic Age:34053,False,2,False,qfou
+Selenitic Age:35615,Selenitic Age:36746,False,4,True,qfou2
+Selenitic Age:35933,Selenitic Age:36746,False,3,False,qfou2
+Selenitic Age:36321,Selenitic Age:36746,False,2,False,qfou2
+Selenitic Age:37016,Selenitic Age:37398,False,2,False,qfou3
+Selenitic Age:38066,Selenitic Age:27502,False,2,False,qtun2
+Selenitic Age:38335,Selenitic Age:59522,False,4,False,qbook
+Selenitic Age:38470,Selenitic Age:23452,False,4,False,qpas
+Selenitic Age:38883,Selenitic Age:27502,False,2,False,qtun2 up
+Selenitic Age:38973,Selenitic Age:27502,True,1,False,qtun2 up
+Selenitic Age:38973,Selenitic Age:28273,False,2,False,qpas1 down
+Selenitic Age:40422,Selenitic Age:13774,False,4,False,qpat4 left
+Selenitic Age:40703,Selenitic Age:21856,False,2,False,qtun
+Selenitic Age:41140,Selenitic Age:15135,False,2,False,qpat6
+Selenitic Age:41779,Selenitic Age:14695,False,2,False,qpat5
+Selenitic Age:42081,Selenitic Age:43809,False,7,False,qhal
+Selenitic Age:42331,Selenitic Age:43809,False,6,False,qhal
+Selenitic Age:42717,Selenitic Age:43809,False,5,False,qhal
+Selenitic Age:42772,Selenitic Age:43809,False,4,False,qhal
+Selenitic Age:43138,Selenitic Age:43809,False,3,False,qhal
+Selenitic Age:43281,Selenitic Age:43809,False,2,False,qhal
+Selenitic Age:4375,Selenitic Age:55809,False,4,False,qspa
+Selenitic Age:43809,Selenitic Age:46177,False,6,False,qbay
+Selenitic Age:44077,Selenitic Age:46177,False,5,False,qbay
+Selenitic Age:44361,Selenitic Age:46177,False,4,False,qbay
+Selenitic Age:45359,Selenitic Age:46177,False,3,False,qbay
+Selenitic Age:45637,Selenitic Age:46177,False,2,False,qbay
+Selenitic Age:46409,Selenitic Age:48887,False,7,False,qhal1
+Selenitic Age:46723,Selenitic Age:48887,False,6,False,qhal1
+Selenitic Age:46893,Selenitic Age:48887,False,5,False,qhal1
+Selenitic Age:47305,Selenitic Age:48887,False,4,False,qhal1
+Selenitic Age:47612,Selenitic Age:48887,False,3,False,qhal1
+Selenitic Age:47707,Selenitic Age:48887,False,2,False,qhal1
+Selenitic Age:4819,Selenitic Age:55809,False,3,False,qspa
+Selenitic Age:4871,Selenitic Age:55809,False,2,False,qspa
+Selenitic Age:48887,Selenitic Age:49998,False,5,False,qhal2
+Selenitic Age:49062,Selenitic Age:49998,False,4,False,qhal2
+Selenitic Age:49257,Selenitic Age:49998,False,3,False,qhal2
+Selenitic Age:49553,Selenitic Age:49998,False,2,False,qhal2
+Selenitic Age:5193,Selenitic Age:22095,True,1,False,qtun1 up
+Selenitic Age:5193,Selenitic Age:23452,False,2,False,qpas down
+Selenitic Age:56076,Selenitic Age:59522,False,3,False,qbook
+Selenitic Age:56929,Selenitic Age:59522,False,6,False,qbook
+Selenitic Age:57194,Selenitic Age:59522,False,5,False,qbook
+Selenitic Age:57373,Selenitic Age:57644,True,1,False,qshi
+Selenitic Age:58072,Selenitic Age:57644,False,3,False,qshi
+Selenitic Age:58308,Selenitic Age:57644,False,2,False,qshi
+Selenitic Age:58460,Selenitic Age:59522,False,2,False,qbook
+Selenitic Age:60223,Selenitic Age:57644,False,7,False,qshi
+Selenitic Age:60619,Selenitic Age:57644,False,6,False,qshi
+Selenitic Age:6070,Selenitic Age:29147,False,3,False,qcal1
+Selenitic Age:60716,Selenitic Age:57644,False,5,False,qshi
+Selenitic Age:60990,Selenitic Age:57644,False,4,False,qshi
+Selenitic Age:6361,Selenitic Age:29147,False,2,False,qcal1
+Selenitic Age:6473,Selenitic Age:7030,False,2,False,qdor2
+Selenitic Age:6677,Selenitic Age:7030,True,1,False,qdor2
+Selenitic Age:7030,Selenitic Age:55809,False,6,False,qspa
+Selenitic Age:7202,Selenitic Age:22095,False,2,False,qtun1 up
+Selenitic Age:7202,Selenitic Age:23452,True,1,False,qpas down
+Selenitic Age:7475,Selenitic Age:55809,False,5,False,qspa
+Selenitic Age:8207,Selenitic Age:33146,False,4,True,qfou1
+Selenitic Age:8871,Selenitic Age:29147,False,2,False,qcal1
+Selenitic Age:8871,Selenitic Age:30113,False,6,False,qcal2
+Selenitic Age:9028,Selenitic Age:7030,False,3,False,qdor2
+Selenitic Age:9028,Selenitic Age:8207,False,2,False,qpat1
+Selenitic Age:9389,Selenitic Age:11445,False,2,False,qclo
+Selenitic Age:9389,Selenitic Age:12324,False,3,False,qpat2
+Stoneship Age:10143,Stoneship Age:11193,False,4,False,qtel
+Stoneship Age:10287,Stoneship Age:11193,False,3,False,qtel
+Stoneship Age:10747,Stoneship Age:11193,False,2,False,qtel
+Stoneship Age:11348,Stoneship Age:12033,False,3,False,qpum
+Stoneship Age:11707,Stoneship Age:12033,False,2,False,qpum
+Stoneship Age:12443,Stoneship Age:4355,False,4,False,qste2
+Stoneship Age:12578,Stoneship Age:4355,False,3,False,qste2
+Stoneship Age:13046,Stoneship Age:4355,False,2,False,qste2
+Stoneship Age:13219,Stoneship Age:8776,False,4,False,qbow
+Stoneship Age:14622,Stoneship Age:44466,False,4,False,qtel2 right
+Stoneship Age:14901,Stoneship Age:44466,False,3,False,qtel2
+Stoneship Age:15190,Stoneship Age:44466,False,2,False,qtel2
+Stoneship Age:16033,Stoneship Age:44466,False,7,False,qtel2
+Stoneship Age:16772,Stoneship Age:17526,False,3,False,qDad1
+Stoneship Age:16949,Stoneship Age:17526,False,2,False,qDad1
+Stoneship Age:17526,Stoneship Age:19700,False,6,False,qdadD
+Stoneship Age:18724,Stoneship Age:19700,False,2,False,qDadD
+Stoneship Age:20478,Stoneship Age:22222,False,5,False,qDad2
+Stoneship Age:21557,Stoneship Age:24357,False,3,False,qLigD
+Stoneship Age:22387,Stoneship Age:23242,False,3,False,qdadU
+Stoneship Age:22530,Stoneship Age:23242,False,2,False,qDadU
+Stoneship Age:23638,Stoneship Age:24357,False,2,False,qLigD
+Stoneship Age:24007,Stoneship Age:11193,False,7,False,qtel
+Stoneship Age:24202,Stoneship Age:24357,True,1,False,qLigD;qLigD
+Stoneship Age:24357,Stoneship Age:26625,False,4,True,qLigU
+Stoneship Age:25223,Stoneship Age:26625,False,3,False,qLigU
+Stoneship Age:25561,Stoneship Age:7846,False,4,False,qste4 right
+Stoneship Age:25863,Stoneship Age:26625,False,2,False,qligU
+Stoneship Age:28272,Stoneship Age:29531,False,7,False,qSirD
+Stoneship Age:28578,Stoneship Age:29531,False,6,False,qSirD
+Stoneship Age:28820,Stoneship Age:29531,False,5,False,qSirD
+Stoneship Age:29150,Stoneship Age:29531,False,2,False,qSirD
+Stoneship Age:29732,Stoneship Age:32230,False,7,False,qSirU
+Stoneship Age:3004,Stoneship Age:8776,False,3,False,qbow
+Stoneship Age:30057,Stoneship Age:32230,False,6,False,qSirU
+Stoneship Age:30263,Stoneship Age:32230,False,5,False,qSirU
+Stoneship Age:30666,Stoneship Age:32230,False,4,False,qSirU
+Stoneship Age:30890,Stoneship Age:32230,False,3,False,qSirU
+Stoneship Age:31136,Stoneship Age:32230,False,2,False,qSirU
+Stoneship Age:32358,Stoneship Age:34261,False,7,False,qAchD
+Stoneship Age:32643,Stoneship Age:34261,False,6,False,qAchD
+Stoneship Age:32964,Stoneship Age:34261,False,5,False,qAchD
+Stoneship Age:33179,Stoneship Age:34261,False,4,False,qAchD
+Stoneship Age:33288,Stoneship Age:34261,False,3,False,qAchD
+Stoneship Age:33592,Stoneship Age:34261,False,2,False,qAchD
+Stoneship Age:34559,Stoneship Age:36189,False,7,False,qAchU
+Stoneship Age:34573,Stoneship Age:36189,False,6,False,qAchU
+Stoneship Age:34998,Stoneship Age:36189,False,5,False,qAchU
+Stoneship Age:35205,Stoneship Age:36189,False,4,False,qAchU
+Stoneship Age:35436,Stoneship Age:36189,False,3,False,qAchU
+Stoneship Age:35832,Stoneship Age:36189,False,2,False,qAchU
+Stoneship Age:36440,Stoneship Age:29531,False,4,False,qSirD
+Stoneship Age:36761,Stoneship Age:29531,False,3,False,qSirD
+Stoneship Age:38423,Stoneship Age:11193,False,7,False,qtel right
+Stoneship Age:39189,Stoneship Age:40070,False,3,False,qDom2
+Stoneship Age:39587,Stoneship Age:40070,False,2,False,qDom2
+Stoneship Age:40560,Stoneship Age:41476,False,4,False,qdomA
+Stoneship Age:40849,Stoneship Age:41476,False,3,False,qdomA
+Stoneship Age:41079,Stoneship Age:41476,False,2,False,qdomA
+Stoneship Age:41982,Stoneship Age:42593,False,3,False,qdom1
+Stoneship Age:42238,Stoneship Age:42593,False,2,False,qdom1
+Stoneship Age:42851,Stoneship Age:44006,False,4,False,qDomB
+Stoneship Age:43252,Stoneship Age:44006,False,3,False,qDomB
+Stoneship Age:43330,Stoneship Age:44006,False,2,False,qDomB
+Stoneship Age:4355,Stoneship Age:6360,False,4,False,qlig
+Stoneship Age:4355,Stoneship Age:8776,False,3,False,qbow;qbow left
+Stoneship Age:44466,Stoneship Age:7846,False,3,False,qste4
+Stoneship Age:4785,Stoneship Age:12033,False,4,False,qpum
+Stoneship Age:5066,Stoneship Age:17526,False,4,False,qdad1
+Stoneship Age:5269,Stoneship Age:6360,False,3,False,qlig
+Stoneship Age:5411,Stoneship Age:6360,False,2,False,qlig
+Stoneship Age:6623,Stoneship Age:4785,False,3,False,qste3
+Stoneship Age:6838,Stoneship Age:4785,False,2,False,qste3;qste3
+Stoneship Age:8154,Stoneship Age:29531,False,8,False,qSirD
+Stoneship Age:8776,Stoneship Age:11193,False,7,False,qtel
+Stoneship Age:9010,Stoneship Age:7846,False,2,False,qste4
+Stoneship Age:9375,Stoneship Age:34261,False,8,False,qAchD
+Stoneship Age:9713,Stoneship Age:11193,False,6,False,qtel
+Stoneship Age:9774,Stoneship Age:11193,False,5,False,qtel

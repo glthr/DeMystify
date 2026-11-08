@@ -14,7 +14,7 @@ const (
 	ContainsRedPage
 	ContainsWhitePage
 	IsIsolated // node with no incoming edges nor outgoing edges
-	IsSource   // node with no incoming edges (source)
+	IsSource   // node with no incoming edges from other nodes (source)
 	IsSink     // node with no outgoing edges (sink)
 )
 
