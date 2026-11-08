@@ -60,9 +60,34 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	return nil, nil
 }
 
+// findCommandMatch ignores command-like text inside HyperTalk string literals.
+func findCommandMatch(pattern *regexp.Regexp, command string) []string {
+	quoted := false
+	previous := 0
+	for _, indexes := range pattern.FindAllStringSubmatchIndex(command, -1) {
+		for i := previous; i < indexes[0]; i++ {
+			if command[i] == '"' {
+				quoted = !quoted
+			}
+		}
+		previous = indexes[0]
+		if quoted {
+			continue
+		}
+		matches := make([]string, len(indexes)/2)
+		for i := range matches {
+			if indexes[2*i] >= 0 {
+				matches[i] = command[indexes[2*i]:indexes[2*i+1]]
+			}
+		}
+		return matches
+	}
+	return nil
+}
+
 func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card "{card name}" of stack "{stack name}"`
-	matches := goToNamedCardOfStackPattern.FindStringSubmatch(command)
+	matches := findCommandMatch(goToNamedCardOfStackPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -93,7 +118,7 @@ func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperC
 
 func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {card id} of stack "{stack name}"`
-	matches := goToCardOfStackPattern.FindStringSubmatch(command)
+	matches := findCommandMatch(goToCardOfStackPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -128,7 +153,7 @@ func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLi
 
 func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {id}`
-	matches := goToCardPattern.FindStringSubmatch(command)
+	matches := findCommandMatch(goToCardPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -173,7 +198,7 @@ func (p *Parser) handlePopCard(source any, command string) bool {
 		return false
 	}
 	// `pop card"`
-	if matches := popCardPattern.FindStringSubmatch(command); matches != nil {
+	if matches := findCommandMatch(popCardPattern, command); matches != nil {
 		card.IsPopCard = true
 		return true
 	}
@@ -186,17 +211,17 @@ func (p *Parser) handlePagePatterns(source any, command string) bool {
 		return false
 	}
 
-	if matches := bluePagePattern.FindStringSubmatch(command); matches != nil {
+	if matches := findCommandMatch(bluePagePattern, command); matches != nil {
 		card.HasBluePage = true
 		return true
 	}
 
-	if matches := redPagePattern.FindStringSubmatch(command); matches != nil {
+	if matches := findCommandMatch(redPagePattern, command); matches != nil {
 		card.HasRedPage = true
 		return true
 	}
 
-	if matches := whitePagePattern.FindStringSubmatch(command); matches != nil {
+	if matches := findCommandMatch(whitePagePattern, command); matches != nil {
 		card.HasWhitePage = true
 		return true
 	}
@@ -206,7 +231,7 @@ func (p *Parser) handlePagePatterns(source any, command string) bool {
 
 func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `push card id {card id} of stack "{stack name}"`
-	matches := pushCardOfStackPattern.FindStringSubmatch(command)
+	matches := findCommandMatch(pushCardOfStackPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
@@ -245,7 +270,7 @@ func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLi
 
 func (p *Parser) handlePushCard(source any, command string) bool {
 	// `push card`
-	if matches := pushCardPattern.FindStringSubmatch(command); matches != nil {
+	if matches := findCommandMatch(pushCardPattern, command); matches != nil {
 		switch s := source.(type) {
 		case *HyperCardStack:
 			s.IsPushStack = true

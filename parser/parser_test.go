@@ -59,6 +59,25 @@ func TestCardCommandsRejectOverflowingIDs(t *testing.T) {
 	}
 }
 
+func TestCardCommandsIgnoreStringLiterals(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	for _, command := range []string{
+		`put "go card id 2" into text`,
+		`put "pop card" into text`,
+		`put "push card" into text`,
+	} {
+		card := testCard(stack, 1)
+		p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{card, testCard(stack, 2)}}
+		link, err := p.parseCardCommand(card, command)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if link != nil || card.IsPushCard || card.IsPopCard {
+			t.Errorf("non-command %q changed card navigation: link=%+v card=%+v", command, link, card)
+		}
+	}
+}
+
 func TestCreateVirtualCardUsesCanonicalStackName(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	p := &Parser{stacks: []*HyperCardStack{stack}}
