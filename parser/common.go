@@ -144,39 +144,12 @@ func (p *Parser) identifyLinks() error {
 
 	for i, card := range p.cards {
 		for _, script := range card.Scripts {
-			var (
-				goToCards []*HyperCardCard
-				links     []*HyperCardLink
-			)
-			for _, line := range script.lines {
-				if link, err := p.parseCardCommand(card, line.Line); err != nil {
-					return fmt.Errorf("cannot get HyperCardLink: %w", err)
-				} else if link != nil {
-					if link.TransitivityRank == common.DefaultTransitivity {
-						goToCards = append(goToCards, link.Target.(*HyperCardCard))
-					}
-					link.IsDisabled = line.IsDisabled
-					links = append(links, link)
-				}
+			id := int64(i)
+			links, err := p.identifyScriptLinks(card, script, &id)
+			if err != nil {
+				return err
 			}
-
-			// identify transitive cards
-			var filteredLinks []*HyperCardLink
-			for j, link := range links {
-				if link.TransitivityRank != common.DefaultTransitivity {
-					// split link into two
-
-					// source to transitive card
-					filteredLinks = append(filteredLinks, makeTransitiveLink(link, link.Source, goToCards[j], common.Tail, int64(i)))
-
-					// transitive card to target
-					filteredLinks = append(filteredLinks, makeTransitiveLink(link, goToCards[j], link.Target, common.Head, int64(i)))
-				} else {
-					filteredLinks = append(filteredLinks, link)
-				}
-			}
-
-			p.links = append(p.links, filteredLinks...)
+			p.links = append(p.links, links...)
 		}
 	}
 
@@ -235,6 +208,42 @@ func (p *Parser) identifyLinks() error {
 	}
 
 	return nil
+}
+
+func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityID *int64) ([]*HyperCardLink, error) {
+	var (
+		goToCards []*HyperCardCard
+		links     []*HyperCardLink
+	)
+	for _, line := range script.lines {
+		if link, err := p.parseCardCommand(source, line.Line); err != nil {
+			return nil, fmt.Errorf("cannot get HyperCardLink: %w", err)
+		} else if link != nil {
+			if link.TransitivityRank == common.DefaultTransitivity {
+				goToCards = append(goToCards, link.Target.(*HyperCardCard))
+			}
+			link.IsDisabled = line.IsDisabled
+			links = append(links, link)
+		}
+	}
+
+	// identify transitive cards
+	var filteredLinks []*HyperCardLink
+	for j, link := range links {
+		if link.TransitivityRank != common.DefaultTransitivity {
+			// split link into two
+
+			// source to transitive card
+			filteredLinks = append(filteredLinks, makeTransitiveLink(link, link.Source, goToCards[j], common.Tail, *transitivityID))
+
+			// transitive card to target
+			filteredLinks = append(filteredLinks, makeTransitiveLink(link, goToCards[j], link.Target, common.Head, *transitivityID))
+		} else {
+			filteredLinks = append(filteredLinks, link)
+		}
+	}
+
+	return filteredLinks, nil
 }
 
 func makeTransitiveLink(link *HyperCardLink, source, target any, rank common.TransitivityRank, id int64) *HyperCardLink {
