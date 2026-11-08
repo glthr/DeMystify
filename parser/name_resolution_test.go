@@ -18,3 +18,19 @@ func TestScriptNamesDoNotResolveGeneratedGraphAliases(t *testing.T) {
 		t.Fatal("public lookup must keep its generated-name compatibility")
 	}
 }
+
+func TestQuotedCardPositionsAreNotMistakenForNames(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source, second, named := testCard(stack, 1), testCard(stack, 7), testCard(stack, 42)
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, second, named}}
+	for _, name := range []string{"2", "0002", "999999999999999999999999999999"} {
+		named.OriginalName = &name
+		for _, scope := range []string{"", ` of stack "Example"`} {
+			command := `go card "` + name + `"` + scope
+			link, err := p.parseCardCommand(source, command)
+			if err != nil || link != nil {
+				t.Errorf("unsupported ordinal %q was treated as a card name: link=%+v, err=%v", command, link, err)
+			}
+		}
+	}
+}

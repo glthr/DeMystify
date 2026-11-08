@@ -19,6 +19,7 @@ type ScriptLine struct {
 }
 
 var (
+	numericCardPositionPattern  = regexp.MustCompile(`^[0-9]+$`)
 	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"\s+of\s+stack\s+"([^"]+)"`)
 	goToCardOfStackPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
 	goToNamedCardPattern        = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"`)
@@ -121,6 +122,10 @@ func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperC
 	if matches == nil {
 		return nil, nil
 	}
+	// Quoted integers denote card positions, which need stack-order resolution.
+	if numericCardPositionPattern.MatchString(strings.TrimSpace(matches[2])) {
+		return nil, nil
+	}
 
 	cardName := matches[2]
 	stackName := matches[3]
@@ -189,6 +194,11 @@ func (p *Parser) handleGoToNamedCard(source any, command string) (*HyperCardLink
 	if matches == nil {
 		return nil, nil
 	}
+	// Quoted integers denote card positions, which need stack-order resolution.
+	if numericCardPositionPattern.MatchString(strings.TrimSpace(matches[2])) {
+		return nil, nil
+	}
+
 	var stackName string
 	switch src := source.(type) {
 	case *HyperCardCard:
