@@ -75,33 +75,13 @@ func (na *nodesAnalyzer) findNodeWithMostOutgoingEdges() common.NodeDegreeInfo {
 func (na *nodesAnalyzer) findNodesWithNoIncomingEdges() []common.NodeInfo {
 	var result []common.NodeInfo
 
-	nodes := na.g.Graph.Nodes()
-	for nodes.Next() {
-		node := nodes.Node()
-		id := node.ID()
-
+	for _, id := range na.g.traverser.getAllNodeIDs() {
 		to := na.g.To(id)
 		if !to.Next() {
-			// no incoming edges in the graph structure, but we need to check
-			// if there are any backtracking edges
-			hasBacktrackingEdge := false
-
-			// check all edges where this node is the target
-			for _, edge := range na.g.Metadata.Edges {
-				if edge.Target.GraphID == id && edge.IsOfType(common.Backtracking) {
-					hasBacktrackingEdge = true
-					break
-				}
-			}
-
-			// only consider as source if there are no incoming edges and no backtracking edges
-			if !hasBacktrackingEdge {
-				na.g.addNodeAttribute(id, common.IsSource)
-				result = append(result, common.NodeInfo{
-					ID:   id,
-					Name: na.g.GetNameForID(id),
-				})
-			}
+			na.g.addNodeAttribute(id, common.IsSource)
+			result = append(result, common.NodeInfo{
+				ID: id, Name: na.g.GetNameForID(id),
+			})
 		}
 	}
 
@@ -129,31 +109,14 @@ func (na *nodesAnalyzer) findNodesWithNoOutgoingEdges() []common.NodeInfo {
 func (na *nodesAnalyzer) findIsolatedNodes() []common.NodeInfo {
 	var result []common.NodeInfo
 
-	nodes := na.g.Graph.Nodes()
-	for nodes.Next() {
-		node := nodes.Node()
-		id := node.ID()
-
+	for _, id := range na.g.traverser.getAllNodeIDs() {
 		to := na.g.To(id)
 		from := na.g.From(id)
 		if !to.Next() && !from.Next() {
-			hasBacktrackingEdge := false
-			for _, edge := range na.g.Metadata.Edges {
-				if (edge.Source.GraphID == id || edge.Target.GraphID == id) &&
-					edge.IsOfType(common.Backtracking) {
-					hasBacktrackingEdge = true
-					break
-				}
-			}
-
-			// only consider as isolated if there are no backtracking edges
-			if !hasBacktrackingEdge {
-				na.g.addNodeAttribute(id, common.IsIsolated)
-				result = append(result, common.NodeInfo{
-					ID:   id,
-					Name: na.g.GetNameForID(id),
-				})
-			}
+			na.g.addNodeAttribute(id, common.IsIsolated)
+			result = append(result, common.NodeInfo{
+				ID: id, Name: na.g.GetNameForID(id),
+			})
 		}
 	}
 

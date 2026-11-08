@@ -318,3 +318,23 @@ func TestIncomingBacktrackingEdgeDoesNotHideSink(t *testing.T) {
 		t.Fatalf("sinks = %+v; want B", sinks)
 	}
 }
+
+func TestDisabledBacktrackingEdgesDoNotAffectNodeDegrees(t *testing.T) {
+	nodes := []*common.Node{{Name: "A"}, {Name: "B"}}
+	g, err := NewGraph(&common.Metadata{
+		Nodes: nodes,
+		Edges: []*common.Edge{{Source: nodes[0], Target: nodes[1], Attributes: []common.EdgeAttribute{common.Backtracking, common.Disabled}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := g.FindIsolatedNodes(); len(got) != 2 {
+		t.Fatalf("isolated nodes = %+v; want both nodes", got)
+	}
+	if got := g.FindNodesWithNoIncomingEdges(); len(got) != 2 {
+		t.Fatalf("source nodes = %+v; want both nodes", got)
+	}
+	if got := g.FindNodesWithNoOutgoingEdges(); len(got) != 2 {
+		t.Fatalf("sink nodes = %+v; want both nodes", got)
+	}
+}
