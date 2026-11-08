@@ -62,7 +62,7 @@ func (pa *pathAnalyzer) computeShortestPaths() map[int64]map[int64]common.Shorte
 		result[src] = make(map[int64]common.ShortestPathInfo)
 
 		// use Dijkstra's algorithm from Gonum
-		p := path.DijkstraFrom(pa.g.Node(src), pa.g)
+		p := path.DijkstraFrom(pa.g.Node(src), orderedPathGraph{pa.g})
 
 		// for each destination node...
 		for _, dst := range nodeIDs {
@@ -74,7 +74,7 @@ func (pa *pathAnalyzer) computeShortestPaths() map[int64]map[int64]common.Shorte
 			pathNodes, weight := p.To(dst)
 
 			// check if there is a path
-			if len(pathNodes) == 0 {
+			if len(pathNodes) == 0 || math.IsInf(weight, 1) {
 				// no path found, this could be due to disabled or backtracking edges
 				continue
 			}
@@ -90,26 +90,7 @@ func (pa *pathAnalyzer) computeShortestPaths() map[int64]map[int64]common.Shorte
 				pathInfo.Path = append(pathInfo.Path, node.ID())
 			}
 
-			// validation: check that no backtracking or disabled edge exists in this path
-			valid := true
-			for i := 0; i < len(pathInfo.Path)-1; i++ {
-				fromID := pathInfo.Path[i]
-				toID := pathInfo.Path[i+1]
-
-				// check if this edge is backtracking or disabled
-				if edges, exists := pa.g.GetAllEdges(fromID, toID); exists {
-					for _, edge := range edges {
-						if edge.IsOfType(common.Backtracking) || edge.IsOfType(common.Disabled) {
-							valid = false
-							break
-						}
-					}
-				}
-			}
-
-			if valid {
-				result[src][dst] = pathInfo
-			}
+			result[src][dst] = pathInfo
 		}
 	}
 

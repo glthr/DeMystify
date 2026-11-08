@@ -123,3 +123,56 @@ func TestBacktrackingOnlyPathIsUnreachable(t *testing.T) {
 		t.Fatal("backtracking-only route included in all shortest paths")
 	}
 }
+
+func TestShortestPathsExcludeBacktracking(t *testing.T) {
+	g, nodes := newTestGraph(t, 3)
+	for _, e := range []*common.Edge{
+		{Source: nodes[0], Target: nodes[2], Attributes: []common.EdgeAttribute{common.Backtracking}},
+		{Source: nodes[0], Target: nodes[1]},
+		{Source: nodes[1], Target: nodes[2]},
+	} {
+		if err := g.addEdgeWithAttributes(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := g.ComputeShortestPath(0, 2, nil)
+	if err != nil || got.Distance != 2 || !reflect.DeepEqual(got.Path, []int64{0, 1, 2}) {
+		t.Fatalf("shortest path = %+v, %v; want A -> B -> C, distance 2", got, err)
+	}
+	all := g.ComputeAllShortestPaths()
+	if path, ok := all[0][2]; !ok || path.Distance != 2 {
+		t.Fatalf("all shortest paths lost the valid alternative route: %+v", all)
+	}
+	separated := g.FindMostSeparatedNodes()
+	if separated.Distance != 2 || !reflect.DeepEqual(separated.Path, []int64{0, 1, 2}) {
+		t.Fatalf("most separated = %+v; want A -> B -> C, distance 2", separated)
+	}
+}
+
+func TestParallelEdgesDoNotHideUsableRoutes(t *testing.T) {
+	for _, attrs := range []common.EdgeAttribute{common.Backtracking, common.Disabled} {
+		for _, reverse := range []bool{false, true} {
+			g, nodes := newTestGraph(t, 3)
+			edges := []*common.Edge{
+				{Source: nodes[0], Target: nodes[1]},
+				{Source: nodes[0], Target: nodes[1], Attributes: []common.EdgeAttribute{attrs}},
+			}
+			if reverse {
+				edges[0], edges[1] = edges[1], edges[0]
+			}
+			edges = append(edges, &common.Edge{Source: nodes[1], Target: nodes[2]})
+			for _, e := range edges {
+				if err := g.addEdgeWithAttributes(e); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := g.ComputeShortestPath(0, 2, nil)
+			if err != nil || got.Distance != 2 {
+				t.Fatalf("attribute %v, reverse %v: got %+v, %v; want distance 2", attrs, reverse, got, err)
+			}
+			if _, ok := g.ComputeAllShortestPaths()[0][2]; !ok {
+				t.Fatalf("attribute %v, reverse %v: valid parallel route excluded", attrs, reverse)
+			}
+		}
+	}
+}
