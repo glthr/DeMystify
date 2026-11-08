@@ -117,7 +117,7 @@ func ComputeShortestPath(
 
 	to, err := p.GetCardByStackAndID(toStack, toID)
 	if err != nil {
-		log.Fatalf("error while getting card: %v", err)
+		return nil, err
 	}
 
 	toNode, ok := g.GetNodeID(to.Name)
