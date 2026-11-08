@@ -47,7 +47,12 @@ func (p *Parser) Process() (*common.Metadata, error) {
 	}
 
 	// create edges
-	edgeExists := make(map[string]bool)
+	type edgeKey struct {
+		source, target *common.Node
+		attributes     string
+		transitivityID int64
+	}
+	edgeExists := make(map[edgeKey]bool)
 	for _, link := range p.links {
 		sourceNode, sourceStack := findNodeStack(metadata.Nodes, link.Source)
 		targetNode, targetStack := findNodeStack(metadata.Nodes, link.Target)
@@ -79,7 +84,7 @@ func (p *Parser) Process() (*common.Metadata, error) {
 			TransitivityID: link.TransitivityID,
 		}
 
-		key := fmt.Sprintf("%s-%s:%v:%d", edge.Source.Name, edge.Target.Name, edge.Attributes, edge.TransitivityID)
+		key := edgeKey{edge.Source, edge.Target, fmt.Sprint(edge.Attributes), edge.TransitivityID}
 		if !edgeExists[key] {
 			// only record an edge once, as an identical link can appear multiple time in a script
 			metadata.Edges = append(metadata.Edges, edge)
