@@ -44,6 +44,7 @@ def frame_graph(source, destination, updated, subtitle):
     framed = writer.add_blank_page(width=page_width, height=page_height)
     framed.merge_translated_page(graph, width * 0.02, height * 0.02)
     framed.merge_page(PdfReader(overlay).pages[0])
+    framed.compress_content_streams()
     writer.add_metadata({"/Title": "The Myst Graph", "/Author": "Guillaume Lethuillier"})
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
