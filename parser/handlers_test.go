@@ -71,3 +71,43 @@ func TestStackHandlerProjectionKeepsCallerReturnContext(t *testing.T) {
 		t.Fatal("shared close-up is missing an actual caller")
 	}
 }
+
+func TestStackHandlerProjectionRejectsUnprovenContexts(t *testing.T) {
+	for name, edit := range map[string]struct{ stack, caller, local, background string }{
+		"card override":            {local: "on openDetail which\nend openDetail"},
+		"part override":            {caller: detailCaller + "\non openDetail which\nend openDetail"},
+		"primitive override":       {local: "on push what\nend push"},
+		"background override":      {background: "<background><script>on openDetail which\nend openDetail</script></background>"},
+		"background part override": {background: "<background><part><script>on openDetail which\nend openDetail</script></part></background>"},
+		"unverified background":    {background: "MISSING"},
+		"malformed background":     {background: "<background>"},
+		"dynamic argument":         {caller: "on mouseUp\nopenDetail variable\nend mouseUp"},
+		"computed argument":        {caller: "on mouseUp\nopenDetail 2 + offset\nend mouseUp"},
+		"commented caller":         {caller: "--on mouseUp\nopenDetail 7\nend mouseUp"},
+		"conditional navigation":   {stack: "on openDetail which\nif which is 7 then\npush card\ngo card id 2\nend if\nend openDetail"},
+		"parameter target":         {stack: "on openDetail which\npush card\ngo card id which\nend openDetail"},
+		"nested call":              {stack: strings.Replace(detailHandler, "push card", "anotherHandler which\npush card", 1)},
+		"two moves":                {stack: strings.Replace(detailHandler, "end openDetail", "go card id 4\nend openDetail", 1)},
+		"duplicate declaration":    {stack: detailHandler + "\n" + detailHandler},
+		"commented declaration":    {stack: "--" + detailHandler},
+		"primitive stack override": {stack: detailHandler + "\non push what\nend push"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if edit.stack == "" {
+				edit.stack = detailHandler
+			}
+			if edit.caller == "" {
+				edit.caller = detailCaller
+			}
+			if edit.background == "" {
+				edit.background = "<background/>"
+			}
+			p := handlerFixture(t, edit.stack, edit.caller, edit.local, edit.background)
+			for _, link := range p.links {
+				if source, ok := link.Source.(*HyperCardCard); ok && source.ID == 1 && link.Target.(*HyperCardCard).ID == 2 {
+					t.Fatal("unproven call acquired an entry edge")
+				}
+			}
+		})
+	}
+}
