@@ -212,12 +212,31 @@ func (p *Parser) identifyLinks() error {
 
 func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityID *int64) ([]*HyperCardLink, error) {
 	var links []*HyperCardLink
+	var handlers []int
+	handlerID := 0
+	handlerName := ""
 	for _, line := range script.lines {
+		// Handler declarations delimit independent sequences of commands.
+		// Nested `end if`/`end repeat` statements do not end a handler.
+		fields := strings.Fields(line.Line)
+		if !line.IsDisabled && len(fields) >= 2 {
+			switch strings.ToLower(fields[0]) {
+			case "on", "function":
+				handlerID++
+				handlerName = fields[1]
+			case "end":
+				if handlerName != "" && strings.EqualFold(fields[1], handlerName) {
+					handlerID++
+					handlerName = ""
+				}
+			}
+		}
 		if link, err := p.parseCardCommand(source, line.Line); err != nil {
 			return nil, fmt.Errorf("cannot get HyperCardLink: %w", err)
 		} else if link != nil {
 			link.IsDisabled = line.IsDisabled
 			links = append(links, link)
+			handlers = append(handlers, handlerID)
 		}
 	}
 
@@ -226,7 +245,11 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 	for j, link := range links {
 		if link.TransitivityRank != common.DefaultTransitivity {
 			var goLink *HyperCardLink
-			for _, candidate := range links[j+1:] {
+			for k := j + 1; k < len(links); k++ {
+				if handlers[k] != handlers[j] {
+					break
+				}
+				candidate := links[k]
 				if candidate.TransitivityRank == common.DefaultTransitivity && candidate.IsDisabled == link.IsDisabled {
 					goLink = candidate
 					break

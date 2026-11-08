@@ -78,6 +78,17 @@ func TestIdentifyLinksRejectsPushWithoutGo(t *testing.T) {
 	}
 }
 
+func TestIdentifyLinksDoesNotPairAcrossHandlers(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	for _, declaration := range []string{"on", "function"} {
+		source := testCard(stack, 1, declaration+" first\npush card id 2 of stack \"Example\"\nend first\n"+declaration+" second\ngo card id 3\nend second")
+		p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2), testCard(stack, 3)}}
+		if err := p.identifyLinks(); err == nil {
+			t.Errorf("%s handlers: want an error instead of a return path through a different handler", declaration)
+		}
+	}
+}
+
 func TestIdentifyLinksPromotesAllDuplicateRestrictedLinks(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	source := testCard(stack, 1, "go card id 2", "go card id 2", "push card id 3 of stack \"Example\"\ngo card id 2")
