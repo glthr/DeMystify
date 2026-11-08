@@ -325,6 +325,16 @@ func (p *Parser) GetCardByStackAndName(stackName, cardName string) (*HyperCardCa
 	return nil, fmt.Errorf("card with name %s and stack %s not found", cardName, stackName)
 }
 
+// Script names refer to original HyperCard names, not generated graph labels.
+func (p *Parser) getScriptCardByName(stackName, cardName string) (*HyperCardCard, error) {
+	for _, card := range p.cards {
+		if card.OriginalName != nil && strings.EqualFold(*card.OriginalName, cardName) && strings.EqualFold(card.Stack.Name, stackName) {
+			return card, nil
+		}
+	}
+	return nil, fmt.Errorf("card with name %s and stack %s not found", cardName, stackName)
+}
+
 func (p *Parser) GetCardByStackAndID(stackName string, ID int) (*HyperCardCard, error) {
 	for _, card := range p.cards {
 		if card.ID == ID && strings.EqualFold(card.Stack.Name, stackName) {

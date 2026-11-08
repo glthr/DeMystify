@@ -124,7 +124,7 @@ func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperC
 
 	cardName := matches[2]
 	stackName := matches[3]
-	target, err := p.GetCardByStackAndName(stackName, cardName)
+	target, err := p.getScriptCardByName(stackName, cardName)
 	if err != nil {
 		target, err = p.createVirtualCard(stackName, cardName)
 		if err != nil {
@@ -193,7 +193,7 @@ func (p *Parser) handleGoToNamedCard(source any, command string) (*HyperCardLink
 	case *HyperCardStack:
 		stackName = src.Name
 	}
-	target, err := p.GetCardByStackAndName(stackName, matches[2])
+	target, err := p.getScriptCardByName(stackName, matches[2])
 	notImplemented := err != nil
 	if notImplemented {
 		target, err = p.createVirtualCard(stackName, matches[2])
