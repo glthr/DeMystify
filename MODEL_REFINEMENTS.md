@@ -64,7 +64,7 @@ The 17 additions are **17 extracted self-reference pairs**, from 19 uncommented 
 
 The illustrated catalogue identifies all 17 original base PICTs and 33 related variants/patches by bank, resource ID and name, and pairs each case with its command, location and relationship. Original pixels are decoded; scenes are not synthesized or reconstructed into assumed runtime states. The assets and full game scripts remain outside Git.
 
-## Distances, input provenance and validation
+## Distances, comparison and validation
 
 Article 3 states: “As a result, backtracking edges are de facto excluded.” ([Path analysis](https://glthr.com/myst-graph-3).) The original weighted adapter failed to enforce that policy. Myst:28679 (Library1-NW) to 44018 (LibraryUp) is still one up-button action; 14 is the solver's alternative after excluding that direct saved-return interaction, not a required player walk. The PDF now explains this distinction with the original quote and button commands.
 
