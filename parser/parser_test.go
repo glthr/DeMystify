@@ -252,6 +252,26 @@ func TestCardCommandsResolveQuotedLocalNames(t *testing.T) {
 	}
 }
 
+func TestCardCommandsResolveExplicitCurrentCard(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1, "go this card\n-- go to this card")
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source}}
+	if err := p.identifyLinks(); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.links) != 2 {
+		t.Fatalf("got %d self-reference links, want active and disabled links", len(p.links))
+	}
+	for i, link := range p.links {
+		if link.Source != source || link.Target != source || link.IsDisabled != (i == 1) || link.IsCrossAges || link.IsNotImplemented {
+			t.Errorf("incorrect self-reference: %+v", link)
+		}
+	}
+	if link, err := p.parseCardCommand(stack, "go this card"); err != nil || link != nil {
+		t.Fatalf("a stack's runtime current card must not be guessed: got %+v, %v", link, err)
+	}
+}
+
 func TestCreateVirtualCardUsesCanonicalStackName(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	p := &Parser{stacks: []*HyperCardStack{stack}}

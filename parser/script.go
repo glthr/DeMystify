@@ -22,6 +22,7 @@ var (
 	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"\s+of\s+stack\s+"([^"]+)"`)
 	goToCardOfStackPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
 	goToNamedCardPattern        = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"`)
+	goToCurrentCardPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+this\s+card\b`)
 	goToCardPattern             = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)`)
 	popCardPattern              = regexp.MustCompile(`(?i)\bpop\s+card\b`)
 	bluePagePattern             = regexp.MustCompile(`(?i)\bput\s+"(\d+),A,0"\s+into\s+ALL_Page\b`)
@@ -56,6 +57,9 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	}
 	if link, err := p.handleGoToNamedCard(source, command); link != nil || err != nil {
 		return link, err
+	}
+	if link := p.handleGoToCurrentCard(source, command); link != nil {
+		return link, nil
 	}
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
 		return link, err
@@ -193,6 +197,15 @@ func (p *Parser) handleGoToNamedCard(source any, command string) (*HyperCardLink
 	return &HyperCardLink{Source: source, Target: target, IsNotImplemented: notImplemented}, nil
 }
 
+func (p *Parser) handleGoToCurrentCard(source any, command string) *HyperCardLink {
+	card, ok := source.(*HyperCardCard)
+	if !ok || findCommandMatch(goToCurrentCardPattern, command) == nil {
+		// A stack handler's current card is determined at runtime.
+		return nil
+	}
+	return &HyperCardLink{Source: card, Target: card}
+}
+
 func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {id}`
 	matches := findCommandMatch(goToCardPattern, command)
@@ -252,7 +265,6 @@ func (p *Parser) handlePagePatterns(source any, command string) bool {
 	if !ok {
 		return false
 	}
-
 	if matches := findCommandMatch(bluePagePattern, command); matches != nil {
 		card.HasBluePage = true
 		return true
