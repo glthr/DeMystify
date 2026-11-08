@@ -63,14 +63,21 @@ func (na *nodesAnalyzer) findNodeWithMostOutgoingEdges() common.NodeDegreeInfo {
 	return maxNode
 }
 
-// findNodesWithNoIncomingEdges identifies all source nodes
+// findNodesWithNoIncomingEdges identifies nodes with no incoming edge from another node.
 func (na *nodesAnalyzer) findNodesWithNoIncomingEdges() []common.NodeInfo {
 	na.g.clearNodeAttribute(common.IsSource)
 	var result []common.NodeInfo
 
 	for _, id := range na.g.traverser.getAllNodeIDs() {
 		to := na.g.To(id)
-		if !to.Next() {
+		hasExternalIncoming := false
+		for to.Next() {
+			if to.Node().ID() != id {
+				hasExternalIncoming = true
+				break
+			}
+		}
+		if !hasExternalIncoming {
 			na.g.addNodeAttribute(id, common.IsSource)
 			result = append(result, common.NodeInfo{
 				ID: id, Name: na.g.GetNameForID(id),
@@ -148,6 +155,7 @@ func (g *MystGraph) FindNodeWithMostOutgoingEdges() common.NodeDegreeInfo {
 	return result
 }
 
+// FindNodesWithNoIncomingEdges returns sources, ignoring self-loops as incoming edges.
 func (g *MystGraph) FindNodesWithNoIncomingEdges() []common.NodeInfo {
 	return g.nodeAnalyzer.findNodesWithNoIncomingEdges()
 }
