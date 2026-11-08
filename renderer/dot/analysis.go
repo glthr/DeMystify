@@ -24,6 +24,9 @@ func (g *Generator) applyAnalysisStyles() error {
 		}
 
 		name := g.getDisplayName(*nodeObj)
+		if !g.config.UseNodeNames {
+			name = fmt.Sprint(id)
+		}
 		secondaryName := nodeObj.SecondaryName
 		if secondaryName != nil {
 			background := *secondaryName

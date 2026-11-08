@@ -115,6 +115,9 @@ func (g *Generator) getNodeStyle(id int64, node common.Node) nodeStyle {
 
 		// add secondary name (if available)
 		name := g.getDisplayName(node)
+		if !g.config.UseNodeNames {
+			name = fmt.Sprint(id)
+		}
 		if node.SecondaryName != nil {
 			style.label = fmt.Sprintf("%s\n%s", name, *node.SecondaryName)
 		}
