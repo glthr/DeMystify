@@ -2,6 +2,7 @@ package graph
 
 import (
 	"github.com/glthr/DeMystify/common"
+	"math"
 	"reflect"
 	"testing"
 )
@@ -48,5 +49,31 @@ func TestShortestPathDoesNotEnumerateEqualRoutes(t *testing.T) {
 	got, err := g.ComputeShortestPath(0, int64(len(nodes)-1), nil)
 	if err != nil || got.Distance != layers+1 || !reflect.DeepEqual(got.Path, want) {
 		t.Fatalf("layered shortest path = %+v, %v; want %v", got, err, want)
+	}
+}
+
+func TestGraphRejectsInvalidInput(t *testing.T) {
+	for _, metadata := range []*common.Metadata{
+		{Nodes: []*common.Node{nil}},
+		{Edges: []*common.Edge{nil}},
+		{Nodes: []*common.Node{{Name: "A"}}, Edges: []*common.Edge{{Source: &common.Node{Name: "A"}}}},
+		{Nodes: []*common.Node{{Name: "A"}}, Edges: []*common.Edge{{Source: &common.Node{Name: "A"}, Target: &common.Node{Name: "unknown"}}}},
+	} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("invalid metadata panicked instead of returning an error: %v", r)
+				}
+			}()
+			if _, err := NewGraph(metadata); err == nil {
+				t.Error("invalid metadata accepted")
+			}
+		}()
+	}
+	g, nodes := newTestGraph(t, 2)
+	for _, weight := range []float64{-1, math.NaN(), math.Inf(-1)} {
+		if err := g.AddEdge(&common.Edge{Source: nodes[0], Target: nodes[1]}, weight); err == nil {
+			t.Errorf("invalid weight %v accepted", weight)
+		}
 	}
 }

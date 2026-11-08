@@ -19,6 +19,9 @@ func (g *MystGraph) GetNodeFromID(ID int64) (*common.Node, error) {
 
 // AddNode adds a new node to the graph
 func (g *MystGraph) AddNode(node *common.Node) error {
+	if node == nil {
+		return fmt.Errorf("node cannot be nil")
+	}
 	// check if a node already exists
 	if _, exists := g.NodeMap[node.Name]; exists {
 		return common.NodeAlreadyExistsErr

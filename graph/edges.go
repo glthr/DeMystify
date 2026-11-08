@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"fmt"
+	"math"
 	"slices"
 
 	"github.com/glthr/DeMystify/common"
@@ -9,6 +11,12 @@ import (
 )
 
 func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
+	if err := g.validateEdge(edge); err != nil {
+		return err
+	}
+	if math.IsNaN(weight) || weight < 0 {
+		return fmt.Errorf("edge weight must be non-negative, got %v", weight)
+	}
 	// NOTE: using multi.WeightedLine as it notably supports self-loops
 	g.Graph.SetWeightedLine(multi.WeightedLine{
 		F: multi.Node(edge.Source.GraphID),
@@ -180,4 +188,17 @@ func (g *MystGraph) HasEdge(fromName, toName string) bool {
 	}
 
 	return false
+}
+
+func (g *MystGraph) validateEdge(edge *common.Edge) error {
+	if edge == nil || edge.Source == nil || edge.Target == nil {
+		return fmt.Errorf("edge and its source and target cannot be nil")
+	}
+	for _, endpoint := range []*common.Node{edge.Source, edge.Target} {
+		node, ok := g.NodeMap[endpoint.Name]
+		if !ok || node.GraphID != endpoint.GraphID {
+			return fmt.Errorf("edge endpoint %q is not in the graph", endpoint.Name)
+		}
+	}
+	return nil
 }

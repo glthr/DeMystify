@@ -64,6 +64,9 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 
 // addEdgeWithAttributes adds an edge to the graph based on its attributes
 func (g *MystGraph) addEdgeWithAttributes(edge *common.Edge) error {
+	if err := g.validateEdge(edge); err != nil {
+		return err
+	}
 	switch {
 	case edge.IsOfType(common.Disabled):
 		return g.addDisabledEdge(edge)
