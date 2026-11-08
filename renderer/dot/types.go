@@ -11,7 +11,6 @@ type Generator struct {
 	config      Config
 	metadata    *common.Metadata
 	nodeStyles  map[int64]nodeStyle
-	edgeStyles  map[string]edgeStyle
 	stackColors map[string]nodeColors
 	customPath  []int64
 	// from -> to -> edges
