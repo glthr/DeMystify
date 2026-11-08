@@ -122,61 +122,6 @@ func (t *traverser) bfsComponent(startID int64, nodeIDs []int64) []common.NodeIn
 	return component
 }
 
-// findComponents identifies all connected components in the graph
-func (t *traverser) findComponents() [][]common.NodeInfo {
-	nodeIDs := t.getAllNodeIDs()
-
-	maxID := int64(0)
-	for _, id := range nodeIDs {
-		if id > maxID {
-			maxID = id
-		}
-	}
-	visited := make([]bool, maxID+1)
-
-	var components [][]common.NodeInfo
-
-	for _, id := range nodeIDs {
-		if id < int64(len(visited)) && !visited[id] {
-			component := t.bfsComponent(id, nodeIDs)
-
-			for _, node := range component {
-				if node.ID < int64(len(visited)) {
-					visited[node.ID] = true
-				}
-			}
-
-			components = append(components, component)
-		}
-	}
-
-	// sort the components deterministically:
-	// 1. by size (largest first)
-	// 2. for equal sizes, by the smallest node ID in each component
-	sort.Slice(components, func(i, j int) bool {
-		if len(components[i]) != len(components[j]) {
-			return len(components[i]) > len(components[j])
-		}
-
-		minLen := len(components[i])
-		if len(components[j]) < minLen {
-			minLen = len(components[j])
-		}
-
-		for k := 0; k < minLen; k++ {
-			if components[i][k].ID != components[j][k].ID {
-				return components[i][k].ID < components[j][k].ID
-			}
-		}
-
-		// if all nodes are the same up to the minimum length,
-		// the shortest component comes first
-		return len(components[i]) < len(components[j])
-	})
-
-	return components
-}
-
 // formatPathAsNames converts a path of IDs to a path of names
 func (t *traverser) formatPathAsNames(path []int64) []string {
 	var result []string
