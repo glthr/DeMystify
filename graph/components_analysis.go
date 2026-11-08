@@ -99,16 +99,7 @@ func (g *MystGraph) FindConnectedComponents() [][]int64 {
 			current := queue[0]
 			queue = queue[1:]
 
-			outNeighbors := make([]int64, 0)
-			from := g.From(current)
-			for from.Next() {
-				outNeighbors = append(outNeighbors, from.Node().ID())
-			}
-
-			// sort neighbors for deterministic processing
-			sort.Slice(outNeighbors, func(i, j int) bool {
-				return outNeighbors[i] < outNeighbors[j]
-			})
+			outNeighbors := g.traverser.getSortedNeighbors(current, true)
 
 			for _, neighbor := range outNeighbors {
 				if !visited[neighbor] {
@@ -118,16 +109,7 @@ func (g *MystGraph) FindConnectedComponents() [][]int64 {
 				}
 			}
 
-			inNeighbors := make([]int64, 0)
-			to := g.To(current)
-			for to.Next() {
-				inNeighbors = append(inNeighbors, to.Node().ID())
-			}
-
-			// sort neighbors for deterministic processing
-			sort.Slice(inNeighbors, func(i, j int) bool {
-				return inNeighbors[i] < inNeighbors[j]
-			})
+			inNeighbors := g.traverser.getSortedNeighbors(current, false)
 
 			for _, neighbor := range inNeighbors {
 				if !visited[neighbor] {
