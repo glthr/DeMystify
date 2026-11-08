@@ -250,11 +250,15 @@ func (p *Parser) createVirtualCard(stackName string, cardID any) (*HyperCardCard
 		return nil, err
 	}
 
-	return &HyperCardCard{
+	card := &HyperCardCard{
 		Name: fmt.Sprintf("%s:%s",
-			stackName,
+			stack.Name,
 			cardName,
 		),
 		Stack: stack,
-	}, nil
+	}
+	if id, ok := cardID.(int); ok {
+		card.ID = id
+	}
+	return card, nil
 }

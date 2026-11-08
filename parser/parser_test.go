@@ -35,6 +35,18 @@ func TestCardCommandsRejectOverflowingIDs(t *testing.T) {
 	}
 }
 
+func TestCreateVirtualCardUsesCanonicalStackName(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	p := &Parser{stacks: []*HyperCardStack{stack}}
+	card, err := p.createVirtualCard("example", 42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if card.Name != "Example:42" || card.ID != 42 {
+		t.Fatalf("got virtual card %+v, want canonical name and ID", card)
+	}
+}
+
 func TestSplitScriptSupportsClassicMacLineEndings(t *testing.T) {
 	if got := splitScript("one\rtwo\r\nthree\nfour"); len(got) != 4 {
 		t.Fatalf("got %q, want four script lines", got)
