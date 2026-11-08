@@ -229,59 +229,62 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 				}
 			}
 		}
-		if link, err := p.parseCardCommand(source, line.Line); err != nil {
-			return nil, fmt.Errorf("cannot get HyperCardLink: %w", err)
-		} else if link != nil {
+		link, err := p.parseCardCommand(source, line.Line)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse command %q: %w", line.Line, err)
+		}
+		if link != nil {
 			link.IsDisabled = line.IsDisabled
 			links = append(links, link)
 			handlers = append(handlers, handlerID)
 		}
 	}
 
-	// identify transitive cards
-	var filteredLinks []*HyperCardLink
-	for j, link := range links {
-		if link.TransitivityRank != common.DefaultTransitivity {
-			var goLink *HyperCardLink
-			for k := j + 1; k < len(links); k++ {
-				if handlers[k] != handlers[j] {
-					break
-				}
-				candidate := links[k]
-				if candidate.TransitivityRank == common.DefaultTransitivity && candidate.IsDisabled == link.IsDisabled {
-					goLink = candidate
-					break
-				}
-			}
-			if goLink == nil {
-				return nil, fmt.Errorf("push card command has no following go card command")
-			}
-			// split link into two
-
-			// source to transitive card
-			filteredLinks = append(filteredLinks, makeTransitiveLink(goLink, link.Source, goLink.Target, common.Tail, *transitivityID))
-
-			// transitive card to target
-			filteredLinks = append(filteredLinks, makeTransitiveLink(link, goLink.Target, link.Target, common.Head, *transitivityID))
-			(*transitivityID)++
-		} else {
-			filteredLinks = append(filteredLinks, link)
+	var result []*HyperCardLink
+	for i, link := range links {
+		if link.TransitivityRank == common.DefaultTransitivity {
+			result = append(result, link)
+			continue
 		}
-	}
 
-	return filteredLinks, nil
-}
+		// A pushed return card is reached through the following go command.
+		// Indexing a separate list of go targets loses their positions when a
+		// script contains several pushes or ordinary go commands.
+		var goLink *HyperCardLink
+		for j := i + 1; j < len(links); j++ {
+			if handlers[j] != handlers[i] {
+				break
+			}
+			candidate := links[j]
+			if candidate.TransitivityRank == common.DefaultTransitivity && candidate.IsDisabled == link.IsDisabled {
+				goLink = candidate
+				break
+			}
+		}
+		if goLink == nil {
+			return nil, fmt.Errorf("push card command has no following go card command")
+		}
 
-func makeTransitiveLink(link *HyperCardLink, source, target any, rank common.TransitivityRank, id int64) *HyperCardLink {
-	return &HyperCardLink{
-		Source:           source,
-		Target:           target,
-		TransitivityRank: rank,
-		TransitivityID:   id,
-		IsCrossAges:      link.IsCrossAges,
-		IsNotImplemented: link.IsNotImplemented,
-		IsDisabled:       link.IsDisabled,
+		result = append(result, &HyperCardLink{
+			Source:           link.Source,
+			Target:           goLink.Target,
+			TransitivityRank: common.Tail,
+			TransitivityID:   *transitivityID,
+			IsCrossAges:      goLink.IsCrossAges,
+			IsNotImplemented: goLink.IsNotImplemented,
+			IsDisabled:       link.IsDisabled,
+		}, &HyperCardLink{
+			Source:           goLink.Target,
+			Target:           link.Target,
+			TransitivityRank: common.Head,
+			TransitivityID:   *transitivityID,
+			IsCrossAges:      link.IsCrossAges,
+			IsNotImplemented: link.IsNotImplemented,
+			IsDisabled:       link.IsDisabled,
+		})
+		(*transitivityID)++
 	}
+	return result, nil
 }
 
 func splitScript(script string) []string {
