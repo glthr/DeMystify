@@ -136,7 +136,6 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 
 			// append the path, excluding the last node to avoid duplication
 			path = append(path, tempPath.Path[:len(tempPath.Path)-1]...)
-			shortestPath.Distance += tempPath.Distance
 			curSource = node.GraphID
 		}
 
@@ -153,8 +152,13 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 
 		// append the final path
 		path = append(path, finalPath.Path...)
-		shortestPath.Distance += finalPath.Distance
 		shortestPath.Path = path
+		// Sum the complete route so mandatory segmentation does not change
+		// floating-point rounding.
+		for i := 1; i < len(path); i++ {
+			weight, _ := pa.g.Weight(path[i-1], path[i])
+			shortestPath.Distance += weight
+		}
 
 		return &shortestPath, nil
 	}

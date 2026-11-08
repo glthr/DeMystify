@@ -38,3 +38,23 @@ func TestShortestPathHandlesRoundingInducedTightCycles(t *testing.T) {
 		t.Fatalf("rounding cycle path: %+v, %v", got, err)
 	}
 }
+
+func TestRound2MandatoryNodesDoNotChangeCostOfSameRoute(t *testing.T) {
+	g, nodes := newTestGraph(t, 4)
+	for i, w := range []float64{1e16, 1, 1} {
+		if err := g.AddEdge(&common.Edge{Source: nodes[i], Target: nodes[i+1]}, w); err != nil {
+			t.Fatal(err)
+		}
+	}
+	single, err := g.ComputeShortestPath(0, 3, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mandatory, err := g.ComputeShortestPath(0, 3, []common.Node{*nodes[1]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(single.Path, mandatory.Path) || g.ComputeAllShortestPaths()[0][3].Distance != mandatory.Distance {
+		t.Fatalf("same route changed cost: %+v vs %+v", single, mandatory)
+	}
+}
