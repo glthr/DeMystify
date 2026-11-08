@@ -75,3 +75,20 @@ func TestRound2AddedBacktrackingEdgeRespectsPolicy(t *testing.T) {
 		t.Fatalf("Backtracking attribute ignored: %+v", p)
 	}
 }
+
+func TestRound2AnalysisClearsObsoleteNodeFlags(t *testing.T) {
+	g, nodes := newTestGraph(t, 2)
+	g.Process()
+	if err := g.AddEdge(&common.Edge{Source: nodes[0], Target: nodes[1]}, 1); err != nil {
+		t.Fatal(err)
+	}
+	g.Process()
+	for i, n := range nodes {
+		if n.IsOfType(common.IsIsolated) || g.NodeMap[n.Name].IsOfType(common.IsIsolated) {
+			t.Errorf("connected node%d remains isolated", i)
+		}
+	}
+	if nodes[0].IsOfType(common.IsSink) || nodes[1].IsOfType(common.IsSource) {
+		t.Fatal("outdated sink/source flags survived reanalysis")
+	}
+}

@@ -151,3 +151,15 @@ func (g *MystGraph) GetPredecessors(name string) ([]string, error) {
 
 	return predecessors, nil
 }
+
+// clearNodeAttribute removes an obsolete analysis result before recomputing it.
+func (g *MystGraph) clearNodeAttribute(attribute common.NodeAttribute) {
+	for _, node := range g.Metadata.Nodes {
+		if slices.Contains(node.Attributes, attribute) {
+			node.Attributes = slices.DeleteFunc(slices.Clone(node.Attributes), func(a common.NodeAttribute) bool { return a == attribute })
+		}
+		stored := g.NodeMap[node.Name]
+		stored.Attributes = slices.Clone(node.Attributes)
+		g.NodeMap[node.Name] = stored
+	}
+}

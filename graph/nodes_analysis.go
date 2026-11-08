@@ -65,6 +65,7 @@ func (na *nodesAnalyzer) findNodeWithMostOutgoingEdges() common.NodeDegreeInfo {
 
 // findNodesWithNoIncomingEdges identifies all source nodes
 func (na *nodesAnalyzer) findNodesWithNoIncomingEdges() []common.NodeInfo {
+	na.g.clearNodeAttribute(common.IsSource)
 	var result []common.NodeInfo
 
 	for _, id := range na.g.traverser.getAllNodeIDs() {
@@ -82,6 +83,7 @@ func (na *nodesAnalyzer) findNodesWithNoIncomingEdges() []common.NodeInfo {
 
 // findNodesWithNoOutgoingEdges identifies all sink nodes
 func (na *nodesAnalyzer) findNodesWithNoOutgoingEdges() []common.NodeInfo {
+	na.g.clearNodeAttribute(common.IsSink)
 	var result []common.NodeInfo
 
 	for _, id := range na.g.traverser.getAllNodeIDs() {
@@ -99,6 +101,7 @@ func (na *nodesAnalyzer) findNodesWithNoOutgoingEdges() []common.NodeInfo {
 
 // findIsolatedNodes identifies nodes that have no incoming or outgoing edges
 func (na *nodesAnalyzer) findIsolatedNodes() []common.NodeInfo {
+	na.g.clearNodeAttribute(common.IsIsolated)
 	var result []common.NodeInfo
 
 	for _, id := range na.g.traverser.getAllNodeIDs() {
