@@ -232,6 +232,26 @@ func TestCardCommandsMatchOutsideStringLiterals(t *testing.T) {
 	}
 }
 
+func TestCardCommandsResolveQuotedLocalNames(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source, target := testCard(stack, 1), testCard(stack, 2)
+	name := "Transition"
+	target.OriginalName = &name
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, target}}
+	for _, origin := range []any{source, stack} {
+		for _, command := range []string{`go card "Transition"`, `go to card "transition"`} {
+			link, err := p.parseCardCommand(origin, command)
+			if err != nil || link == nil || link.Target != target || link.IsCrossAges || link.IsNotImplemented {
+				t.Errorf("%q from %T: got %+v, %v; want local card %s", command, origin, link, err, target.Name)
+			}
+		}
+	}
+	link, err := p.parseCardCommand(source, `go to card "Unavailable"`)
+	if err != nil || link == nil || !link.IsNotImplemented || link.Target.(*HyperCardCard).Name != "Example:Unavailable" {
+		t.Fatalf("unknown local name: got %+v, %v; want an unimplemented virtual target", link, err)
+	}
+}
+
 func TestCreateVirtualCardUsesCanonicalStackName(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	p := &Parser{stacks: []*HyperCardStack{stack}}

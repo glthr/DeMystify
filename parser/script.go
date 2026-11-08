@@ -21,6 +21,7 @@ type ScriptLine struct {
 var (
 	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"\s+of\s+stack\s+"([^"]+)"`)
 	goToCardOfStackPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
+	goToNamedCardPattern        = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"`)
 	goToCardPattern             = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)`)
 	popCardPattern              = regexp.MustCompile(`(?i)\bpop\s+card\b`)
 	bluePagePattern             = regexp.MustCompile(`(?i)\bput\s+"(\d+),A,0"\s+into\s+ALL_Page\b`)
@@ -51,6 +52,9 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 		return link, err
 	}
 	if link, err := p.handleGoToCardOfStack(source, command); link != nil || err != nil {
+		return link, err
+	}
+	if link, err := p.handleGoToNamedCard(source, command); link != nil || err != nil {
 		return link, err
 	}
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
@@ -164,6 +168,29 @@ func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLi
 		IsCrossAges:      true,
 		IsNotImplemented: false,
 	}, nil
+}
+
+func (p *Parser) handleGoToNamedCard(source any, command string) (*HyperCardLink, error) {
+	matches := findCommandMatch(goToNamedCardPattern, command)
+	if matches == nil {
+		return nil, nil
+	}
+	var stackName string
+	switch src := source.(type) {
+	case *HyperCardCard:
+		stackName = src.Stack.Name
+	case *HyperCardStack:
+		stackName = src.Name
+	}
+	target, err := p.GetCardByStackAndName(stackName, matches[2])
+	notImplemented := err != nil
+	if notImplemented {
+		target, err = p.createVirtualCard(stackName, matches[2])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &HyperCardLink{Source: source, Target: target, IsNotImplemented: notImplemented}, nil
 }
 
 func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, error) {
