@@ -3,11 +3,9 @@ package graph
 import (
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/glthr/DeMystify/common"
 
-	gograph "gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/path"
 )
 
@@ -181,90 +179,6 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 	}
 
 	return pa.computeSimpleShortestPath(from, to)
-}
-
-// findAllShortestPaths finds all possible shortest paths between two nodes with a given target weight
-func (pa *pathAnalyzer) findAllShortestPaths(from, to int64, targetWeight float64) [][]int64 {
-	allPaths := [][]int64{}
-
-	var explore func(current int64, visited map[int64]bool, path []int64, currentWeight float64)
-	explore = func(current int64, visited map[int64]bool, path []int64, currentWeight float64) {
-		// if we reached the target...
-		if current == to {
-			// ... and this is a shortest path (weight matches target)...
-			if math.Abs(currentWeight-targetWeight) < 1e-9 {
-				// ... make a copy of the path to avoid reference issues
-				pathCopy := make([]int64, len(path))
-				copy(pathCopy, path)
-				allPaths = append(allPaths, pathCopy)
-			}
-			return
-		}
-
-		// if we have exceeded the target weight, stop exploring this path
-		if currentWeight > targetWeight {
-			return
-		}
-
-		// mark the current node as visited
-		visited[current] = true
-
-		// explore all neighbors
-		neighbors := pa.g.From(current)
-
-		var sortedNeighbors []struct {
-			id     int64
-			weight float64
-		}
-
-		for neighbors.Next() {
-			neighbor := neighbors.Node()
-			neighborID := neighbor.ID()
-
-			if visited[neighborID] {
-				continue
-			}
-
-			// get the edge weight
-			edge := pa.g.Edge(current, neighborID)
-
-			// skip backtracking and disabled edges
-			if pa.g.IsBacktrackingEdge(current, neighborID) || pa.g.IsDisabledEdge(current, neighborID) {
-				continue
-			}
-
-			// check if this edge would stay within the target weight
-			edgeWeight := edge.(gograph.WeightedEdge).Weight()
-			if currentWeight+edgeWeight <= targetWeight+1e-9 {
-				sortedNeighbors = append(sortedNeighbors, struct {
-					id     int64
-					weight float64
-				}{neighborID, edgeWeight})
-			}
-		}
-
-		sort.Slice(sortedNeighbors, func(i, j int) bool {
-			return sortedNeighbors[i].id < sortedNeighbors[j].id
-		})
-
-		for _, neighbor := range sortedNeighbors {
-			newPath := append(path, neighbor.id)
-			newVisited := make(map[int64]bool)
-			for k, v := range visited {
-				newVisited[k] = v
-			}
-
-			// continue exploration
-			explore(neighbor.id, newVisited, newPath, currentWeight+neighbor.weight)
-		}
-	}
-
-	// start exploration from the origin node
-	initialPath := []int64{from}
-	initialVisited := make(map[int64]bool)
-	explore(from, initialVisited, initialPath, 0)
-
-	return allPaths
 }
 
 // findMostSeparatedNodes identifies the pair of connected nodes with the longest shortest path
