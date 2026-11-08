@@ -189,3 +189,25 @@ func TestStackHandlerProjectionRejectsDuplicateBackgroundDeclarations(t *testing
 		}
 	}
 }
+
+func FuzzStackHandlerProjection(f *testing.F) {
+	for _, text := range []string{detailHandler, detailCaller, "--" + detailCaller, "on event\nif flag then\nopenDetail 7\nend if\nend event"} {
+		f.Add(text)
+	}
+	f.Fuzz(func(t *testing.T, text string) {
+		if len(text) > 4096 {
+			t.Skip()
+		}
+		stack := &HyperCardStack{Name: "Example"}
+		card, target := testCard(stack, 1, text), testCard(stack, 2)
+		p := &Parser{stackHandlers: map[*HyperCardStack]map[string]stackHandlerSummary{stack: {"opendetail": {parameters: 1, target: target}}}}
+		for _, handler := range scriptHandlers(card.Scripts[0]) {
+			summarizeHandler(handler)
+		}
+		for _, link := range p.projectHandlerCalls(card, card.Scripts[0]) {
+			if link.Source != card || link.Target != target || !p.pushedLinks[link] {
+				t.Fatal("projection lost its calling-card context")
+			}
+		}
+	})
+}
