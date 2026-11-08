@@ -6,6 +6,7 @@ import (
 	"github.com/glthr/DeMystify/graph"
 	"math"
 	"math/rand"
+	"slices"
 	"testing"
 )
 
@@ -58,4 +59,44 @@ func buildReferenceGraph(t *testing.T, rng *rand.Rand) (*graph.MystGraph, refere
 		}
 	}
 	return g, costs
+}
+
+func referenceDistances(costs referenceCosts) referenceCosts {
+	const size = referenceSize
+	distances := costs
+	for i := 0; i < size; i++ {
+		distances[i][i] = 0
+	}
+	for k := 0; k < size; k++ {
+		for i := 0; i < size; i++ {
+			for j := 0; j < size; j++ {
+				distances[i][j] = math.Min(distances[i][j], distances[i][k]+distances[k][j])
+			}
+		}
+	}
+	return distances
+}
+
+func referenceRoute(costs referenceCosts, from, to int, target float64) []int64 {
+	const size = referenceSize
+	var expected []int64
+	var search func(int, float64, []int64, uint) bool
+	search = func(current int, cost float64, route []int64, visited uint) bool {
+		if current == to {
+			if cost == target {
+				expected = slices.Clone(route)
+				return true
+			}
+			return false
+		}
+		for next := 0; next < size; next++ {
+			if visited&(1<<next) == 0 && !math.IsInf(costs[current][next], 1) &&
+				search(next, cost+costs[current][next], append(route, int64(next)), visited|1<<next) {
+				return true
+			}
+		}
+		return false
+	}
+	search(from, 0, []int64{int64(from)}, 1<<from)
+	return expected
 }
