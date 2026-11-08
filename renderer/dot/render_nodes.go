@@ -30,12 +30,7 @@ func (g *Generator) writeNodes(buf *bytes.Buffer) {
 
 	// process nodes in sorted order
 	for _, id := range nodeIDs {
-		name, exists := g.graph.GetNodeName(id)
-		if !exists {
-			continue
-		}
-
-		nodeObj, nodeExists := g.graph.NodeMap[name]
+		nodeObj, nodeExists := g.nodeByID(id)
 		if !nodeExists {
 			continue
 		}
@@ -56,6 +51,20 @@ func (g *Generator) writeNodes(buf *bytes.Buffer) {
 		}
 		buf.WriteString(fmt.Sprintf("  \"%d\" [%s];\n", id, g.buildNodeStyleString(style)))
 	}
+}
+
+// Optional name mappings must not hide or replace canonical graph records.
+func (g *Generator) nodeByID(id int64) (common.Node, bool) {
+	if name, exists := g.graph.GetNodeName(id); exists {
+		if node, found := g.graph.NodeMap[name]; found && node.GraphID == id {
+			return node, true
+		}
+	}
+	node, err := g.graph.GetNodeFromID(id)
+	if err != nil {
+		return common.Node{}, false
+	}
+	return *node, true
 }
 
 // getDisplayName creates a readable display name for a node

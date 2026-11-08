@@ -69,13 +69,7 @@ func (g *Generator) assignStackColors() {
 	for nodes.Next() {
 		node := nodes.Node()
 		id := node.ID()
-		name, exists := g.graph.GetNodeName(id)
-
-		if !exists {
-			continue
-		}
-
-		nodeObj, nodeExists := g.graph.NodeMap[name]
+		nodeObj, nodeExists := g.nodeByID(id)
 		if !nodeExists {
 			continue
 		}
