@@ -14,69 +14,6 @@ func (g *Generator) writeEdges(buf *bytes.Buffer) {
 	g.renderMetadataEdges(buf)
 }
 
-// processRegularEdges processes regular (non-matched bidirectional, non-self-loop) edges
-// skipCustomPath determines whether to skip edges that are part of the custom path
-func (g *Generator) processRegularEdges(buf *bytes.Buffer, processedPairs, renderedNodePairs, transitiveEdgesProcessed map[string]bool, skipCustomPath bool) {
-	// get sorted source IDs
-	sourceIDs := g.getSortedNodeIDs(g.edgesMap)
-
-	for _, fromID := range sourceIDs {
-		// get sorted target IDs
-		targetIDs := g.getSortedTargetIDs(g.edgesMap[fromID], fromID, false)
-
-		for _, toID := range targetIDs {
-			// skip self-loops (already processed)
-			if fromID == toID {
-				continue
-			}
-
-			nodePairID := g.getNodePairID(fromID, toID)
-
-			if processedPairs[nodePairID] {
-				continue
-			}
-
-			// skip custom path edges if requested
-			if skipCustomPath && g.customPathEdgeSet[nodePairID] {
-				processedPairs[nodePairID] = true
-				continue
-			}
-
-			// sort edges for deterministic order
-			edges := g.sortEdges(g.edgesMap[fromID][toID])
-
-			for _, edge := range edges {
-				isTransitive := edge.IsOfType(common.RestrictiveTransitivityTail) || edge.IsOfType(common.RestrictiveTransitivityHead)
-				isBacktracking := edge.IsOfType(common.Backtracking)
-				isDisabled := edge.IsOfType(common.Disabled)
-
-				// for restrictive transitivity edges, create a unique key including the transitivity ID
-				if isTransitive {
-					transitiveKey := g.getTransitiveEdgeKey(nodePairID, &edge)
-
-					if transitiveEdgesProcessed[transitiveKey] {
-						continue
-					}
-					transitiveEdgesProcessed[transitiveKey] = true
-				} else if !isBacktracking && !isDisabled {
-					if renderedNodePairs[nodePairID] {
-						continue
-					}
-				}
-
-				// render the edge (not on the custom path)
-				g.renderEdge(buf, fromID, toID, &edge, false)
-
-				if !isTransitive && !isBacktracking && !isDisabled {
-					renderedNodePairs[nodePairID] = true
-				}
-			}
-
-			processedPairs[nodePairID] = true
-		}
-	}
-}
-
 func (g *Generator) writeCustomPathInfo(buf *bytes.Buffer) {
 	buf.WriteString("  // Custom path: ")
 	for i, id := range g.customPath {
@@ -228,15 +165,6 @@ func (g *Generator) sortEdges(edges []common.Edge) []common.Edge {
 	})
 
 	return sortedEdges
-}
-
-// getTransitiveEdgeKey creates a unique key for a transitive edge
-func (g *Generator) getTransitiveEdgeKey(nodePairID string, edge *common.Edge) string {
-	typeStr := "One"
-	if edge.IsOfType(common.RestrictiveTransitivityHead) {
-		typeStr = "Two"
-	}
-	return fmt.Sprintf("%s:trans%s:%d", nodePairID, typeStr, edge.TransitivityID)
 }
 
 // renderEdge renders an edge to the buffer
