@@ -92,7 +92,10 @@ func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLi
 		return nil, nil
 	}
 
-	cardID, _ := strconv.Atoi(matches[2])
+	cardID, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid card ID %q: %w", matches[2], err)
+	}
 	stackName := matches[3]
 
 	target, err := p.GetCardByStackAndID(stackName, cardID)
@@ -124,7 +127,10 @@ func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, err
 		return nil, nil
 	}
 
-	cardID, _ := strconv.Atoi(matches[2])
+	cardID, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid card ID %q: %w", matches[2], err)
+	}
 	var stackName string
 	switch src := source.(type) {
 	case *HyperCardCard:
@@ -191,7 +197,10 @@ func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLi
 		return nil, nil
 	}
 
-	cardID, _ := strconv.Atoi(matches[1])
+	cardID, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid card ID %q: %w", matches[1], err)
+	}
 	stackName := matches[2]
 
 	target, err := p.GetCardByStackAndID(stackName, cardID)
