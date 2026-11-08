@@ -54,10 +54,17 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 	// Each metadata edge has a stable line ID within this source/target pair.
 	// Re-adding an identical edge updates its weight; distinct parallel edges
 	// retain separate lines rather than overwriting line zero.
-	g.Graph.SetWeightedLine(multi.WeightedLine{
-		F: g.Node(edge.Source.GraphID), T: g.Node(edge.Target.GraphID),
-		W: weight, UID: int64(lineID),
-	})
+	if edge.IsOfType(common.Disabled) {
+		g.Graph.RemoveLine(edge.Source.GraphID, edge.Target.GraphID, int64(lineID))
+	} else {
+		if edge.IsOfType(common.Backtracking) {
+			weight = math.Inf(1)
+		}
+		g.Graph.SetWeightedLine(multi.WeightedLine{
+			F: g.Node(edge.Source.GraphID), T: g.Node(edge.Target.GraphID),
+			W: weight, UID: int64(lineID),
+		})
+	}
 	if lineID == len(g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID]) {
 		newEdge := common.Edge{
 			Attributes:     slices.Clone(edge.Attributes),

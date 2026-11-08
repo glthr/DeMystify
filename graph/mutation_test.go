@@ -49,3 +49,29 @@ func TestRound2DisabledMutationUpdatesTotal(t *testing.T) {
 		t.Fatalf("disabled edge still counted: %d", g.Metadata.TotalEdges)
 	}
 }
+
+func TestRound2ReaddingDisabledEdgeDoesNotEnableIt(t *testing.T) {
+	nodes := []*common.Node{{Name: "A"}, {Name: "B"}}
+	edge := &common.Edge{Source: nodes[0], Target: nodes[1]}
+	g, err := NewGraph(&common.Metadata{Nodes: nodes, Edges: []*common.Edge{edge}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.AddEdgeAttribute(0, 1, common.Disabled)
+	if err := g.AddEdge(edge, 1); err != nil {
+		t.Fatal(err)
+	}
+	if g.HasEdgeFromTo(0, 1) {
+		t.Fatal("readding disabled metadata resurrected the physical line")
+	}
+}
+
+func TestRound2AddedBacktrackingEdgeRespectsPolicy(t *testing.T) {
+	g, nodes := newTestGraph(t, 2)
+	if err := g.AddEdge(&common.Edge{Source: nodes[0], Target: nodes[1], Attributes: []common.EdgeAttribute{common.Backtracking}}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := g.ComputeShortestPath(0, 1, nil); err == nil {
+		t.Fatalf("Backtracking attribute ignored: %+v", p)
+	}
+}
