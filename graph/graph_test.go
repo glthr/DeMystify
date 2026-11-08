@@ -248,3 +248,14 @@ func TestShortestPathDistinguishesNearbyCosts(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeStackAndAttributesStayInSync(t *testing.T) {
+	g, nodes := newTestGraph(t, 1)
+	if stack, ok := g.GetNodeStack(0); !ok || stack != "Test Age" {
+		t.Fatalf("node stack = %q, %v; want Test Age", stack, ok)
+	}
+	g.FindIsolatedNodes()
+	if !g.NodeMap[nodes[0].Name].IsOfType(common.IsIsolated) {
+		t.Fatal("analysis attribute missing from NodeMap used by renderer")
+	}
+}

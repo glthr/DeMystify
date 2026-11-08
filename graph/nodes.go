@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/glthr/DeMystify/common"
 	"gonum.org/v1/gonum/graph/multi"
+	"slices"
 )
 
 // GetNodeFromID returns the node with the given ID
@@ -33,6 +34,7 @@ func (g *MystGraph) AddNode(node *common.Node) error {
 
 	g.NodeMap[node.Name] = *node
 	g.IdNameMap[node.GraphID] = node.Name
+	g.IdStackMap[node.GraphID] = node.StackName
 
 	return nil
 }
@@ -87,6 +89,9 @@ func (g *MystGraph) addNodeAttribute(id int64, attribute common.NodeAttribute) {
 			}
 
 			g.Metadata.Nodes[i].Attributes = append(g.Metadata.Nodes[i].Attributes, attribute)
+			node := g.NodeMap[g.Metadata.Nodes[i].Name]
+			node.Attributes = slices.Clone(g.Metadata.Nodes[i].Attributes)
+			g.NodeMap[node.Name] = node
 			break
 		}
 	}
