@@ -67,9 +67,10 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 			if existingEdge.IsOfType(common.RestrictiveTransitivityTail) &&
 				existingEdge.TransitivityID == edge.TransitivityID {
 				// found matching restrictive transitivity tail: inherit its style
-				g.applyBaseEdgeStyle(existingEdge, &style)
-
+				g.applyCrossAgeStyle(existingEdge, &style)
 				style.arrowhead = "normal"
+				g.applyEdgeStateStyle(edge, &style)
+				completeRestrictiveStyle(existingEdge.TransitivityID, &style)
 
 				enrichTransitiveEdgeIDTooltip(&style.tooltip, edge)
 
@@ -99,12 +100,20 @@ func completeRestrictiveStyle(transitivityID int64, style *edgeStyle) {
 
 // applyBaseEdgeStyle applies basic styling to an edge
 func (g *Generator) applyBaseEdgeStyle(edge *common.Edge, style *edgeStyle) {
+	g.applyCrossAgeStyle(edge, style)
+	g.applyEdgeStateStyle(edge, style)
+}
+
+func (g *Generator) applyCrossAgeStyle(edge *common.Edge, style *edgeStyle) {
 	if edge.IsOfType(common.CrossAge) {
 		style.color = g.stackColors[edge.Source.StackName].borderColor
 		style.tooltip = "CrossAge connection"
 		style.penWidth = 3.0
 	}
 
+}
+
+func (g *Generator) applyEdgeStateStyle(edge *common.Edge, style *edgeStyle) {
 	if edge.IsOfType(common.Backtracking) {
 		style.arrowtail = "inv"
 		style.arrowhead = "inv"
