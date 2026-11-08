@@ -186,3 +186,65 @@ func TestZeroCostMostSeparatedPath(t *testing.T) {
 		t.Fatalf("zero-cost most separated path = %v, %v", got, ok)
 	}
 }
+
+func TestShortestPathWithZeroWeightCycle(t *testing.T) {
+	g, nodes := newTestGraph(t, 4)
+	for _, e := range []struct {
+		from, to int
+		weight   float64
+	}{
+		{0, 1, 0}, {1, 0, 0}, {1, 2, 0}, {2, 1, 0}, {0, 3, 1}, {2, 3, 1},
+	} {
+		if err := g.AddEdge(&common.Edge{Source: nodes[e.from], Target: nodes[e.to]}, e.weight); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := g.ComputeShortestPath(0, 3, nil)
+	if err != nil || got.Distance != 1 || !reflect.DeepEqual(got.Path, []int64{0, 1, 2, 3}) {
+		t.Fatalf("zero-cycle shortest path = %+v, %v", got, err)
+	}
+	got, err = g.ComputeShortestPath(0, 0, nil)
+	if err != nil || got.Distance != 0 || !reflect.DeepEqual(got.Path, []int64{0}) {
+		t.Fatalf("self shortest path = %+v, %v", got, err)
+	}
+}
+
+func TestShortestPathMandatoryNodes(t *testing.T) {
+	g, nodes := newTestGraph(t, 4)
+	for _, e := range []struct{ from, to int }{{0, 1}, {1, 2}, {2, 3}, {0, 3}} {
+		if err := g.AddEdge(&common.Edge{Source: nodes[e.from], Target: nodes[e.to]}, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := g.ComputeShortestPath(0, 3, []common.Node{*nodes[0], *nodes[2], *nodes[3]})
+	if err != nil || got.Distance != 3 || !reflect.DeepEqual(got.Path, []int64{0, 1, 2, 3}) {
+		t.Fatalf("mandatory shortest path = %+v, %v", got, err)
+	}
+	if _, err := g.ComputeShortestPath(0, 3, []common.Node{{GraphID: 10}}); err == nil {
+		t.Fatal("missing mandatory node was accepted")
+	}
+	if _, err := g.ComputeShortestPath(3, 0, []common.Node{*nodes[1]}); err == nil {
+		t.Fatal("unreachable mandatory node was accepted")
+	}
+}
+
+func TestShortestPathDistinguishesNearbyCosts(t *testing.T) {
+	for _, scale := range []float64{1e-12, 1e9} {
+		g, nodes := newTestGraph(t, 4)
+		for _, e := range []struct {
+			from, to int
+			weight   float64
+		}{
+			{0, 1, scale / 2}, {1, 3, scale/2 + scale*1e-10},
+			{0, 2, scale / 2}, {2, 3, scale / 2},
+		} {
+			if err := g.AddEdge(&common.Edge{Source: nodes[e.from], Target: nodes[e.to]}, e.weight); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := g.ComputeShortestPath(0, 3, nil)
+		if err != nil || got.Distance != scale || !reflect.DeepEqual(got.Path, []int64{0, 2, 3}) {
+			t.Fatalf("scale %g: shortest path = %+v, %v; want cheaper route through C", scale, got, err)
+		}
+	}
+}
