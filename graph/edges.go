@@ -124,6 +124,9 @@ func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.
 			}
 		}
 	}
+	if changed {
+		g.Metadata.TotalEdges = uint(g.Graph.Edges().Len())
+	}
 	return changed
 }
 

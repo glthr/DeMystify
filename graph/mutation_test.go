@@ -36,3 +36,16 @@ func TestRound2AddedEdgeUpdatesMetadata(t *testing.T) {
 		t.Fatal("duplicate edge changed metadata counts")
 	}
 }
+
+func TestRound2DisabledMutationUpdatesTotal(t *testing.T) {
+	nodes := []*common.Node{{Name: "A"}, {Name: "B"}}
+	edge := &common.Edge{Source: nodes[0], Target: nodes[1]}
+	g, err := NewGraph(&common.Metadata{Nodes: nodes, Edges: []*common.Edge{edge}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.AddEdgeAttribute(0, 1, common.Disabled)
+	if g.Metadata.TotalEdges != 0 {
+		t.Fatalf("disabled edge still counted: %d", g.Metadata.TotalEdges)
+	}
+}
