@@ -144,6 +144,17 @@ func TestIdentifyLinksHandlesSeveralPushesInOneScript(t *testing.T) {
 	}
 }
 
+func TestIdentifyLinksPreservesDisabledStackCommands(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example", Script: []HyperTalk{{lines: []ScriptLine{{Line: "-- go card id 1", IsDisabled: true}}}}}
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{testCard(stack, 1)}}
+	if err := p.identifyLinks(); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.links) != 1 || !p.links[0].IsDisabled {
+		t.Fatalf("commented stack command must produce a disabled link: %+v", p.links)
+	}
+}
+
 func TestStackCardOnlyCommandsDoNotPanic(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	p := &Parser{stacks: []*HyperCardStack{stack}}

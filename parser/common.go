@@ -133,13 +133,11 @@ func (p *Parser) identifyLinks() error {
 	var transitivityID int64
 	for _, stack := range p.stacks {
 		for _, script := range stack.Script {
-			for _, line := range script.lines {
-				if link, err := p.parseCardCommand(stack, line.Line); err != nil {
-					return fmt.Errorf("cannot get HyperCardLink: %w", err)
-				} else if link != nil {
-					p.links = append(p.links, link)
-				}
+			links, err := p.identifyScriptLinks(stack, script, &transitivityID)
+			if err != nil {
+				return fmt.Errorf("stack %s: %w", stack.Name, err)
 			}
+			p.links = append(p.links, links...)
 		}
 	}
 
@@ -147,7 +145,7 @@ func (p *Parser) identifyLinks() error {
 		for _, script := range card.Scripts {
 			links, err := p.identifyScriptLinks(card, script, &transitivityID)
 			if err != nil {
-				return err
+				return fmt.Errorf("card %s: %w", card.Name, err)
 			}
 			p.links = append(p.links, links...)
 		}
