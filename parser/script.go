@@ -157,6 +157,9 @@ func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLi
 	if err != nil {
 		return nil, fmt.Errorf("invalid card ID %q: %w", matches[2], err)
 	}
+	if cardID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d: expected a positive integer", cardID)
+	}
 	stackName := matches[3]
 
 	target, err := p.GetCardByStackAndID(stackName, cardID)
@@ -223,6 +226,9 @@ func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, err
 	cardID, err := strconv.Atoi(matches[2])
 	if err != nil {
 		return nil, fmt.Errorf("invalid card ID %q: %w", matches[2], err)
+	}
+	if cardID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d: expected a positive integer", cardID)
 	}
 	var stackName string
 	switch src := source.(type) {
@@ -300,6 +306,9 @@ func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLi
 	cardID, err := strconv.Atoi(matches[1])
 	if err != nil {
 		return nil, fmt.Errorf("invalid card ID %q: %w", matches[1], err)
+	}
+	if cardID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d: expected a positive integer", cardID)
 	}
 	stackName := matches[2]
 

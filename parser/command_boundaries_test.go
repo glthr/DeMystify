@@ -26,3 +26,14 @@ func TestCommandsDoNotInventLiteralTargetsFromExpressions(t *testing.T) {
 		}
 	}
 }
+
+func TestCommandsRejectZeroCardIDs(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1)
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source}}
+	for _, command := range []string{"go card id 0", `go card id 0 of stack "Example"`, `push card id 0 of stack "Example"`} {
+		if _, err := p.parseCardCommand(source, command); err == nil {
+			t.Errorf("accepted nonpositive card ID in %q", command)
+		}
+	}
+}
