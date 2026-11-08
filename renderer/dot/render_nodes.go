@@ -45,7 +45,7 @@ func (g *Generator) writeNodes(buf *bytes.Buffer) {
 
 		style := g.getNodeStyle(id, nodeObj)
 		if isOnCustomPath {
-			style = g.applyPathStyle(style, nodeObj)
+			style = g.applyCustomPathStylingToNode(style, nodeObj)
 		}
 		if style.label == "" {
 			if g.config.UseNodeNames {
@@ -127,63 +127,18 @@ func (g *Generator) getNodeStyle(id int64, node common.Node) nodeStyle {
 	return style
 }
 
-// applyCustomPathStylingToNode enhances style for nodes on the custom path
-func (g *Generator) applyCustomPathStylingToNode(baseStyleStr string, nodeObj common.Node, isOnCustomPath bool) string {
-	if !isOnCustomPath {
-		return baseStyleStr
-	}
-
-	styleMap := make(map[string]string)
-
-	parts := strings.Split(baseStyleStr, ", ")
-	for _, part := range parts {
-		keyValue := strings.SplitN(part, "=", 2)
-		if len(keyValue) == 2 {
-			key := strings.TrimSpace(keyValue[0])
-			value := strings.TrimSpace(keyValue[1])
-			styleMap[key] = value
-		}
-	}
-
-	// force the required styling for nodes on custom path
-	styleMap["fillcolor"] = "\"#E74C3C\"" // red background
-	styleMap["fontcolor"] = "\"#FFFFFF\"" // white text
-
-	// special page nodes keep their border styling
+// applyCustomPathStylingToNode keeps style values structured until DOT encoding.
+// Parsing a style string on commas would corrupt commas inside quoted labels.
+func (g *Generator) applyCustomPathStylingToNode(style nodeStyle, nodeObj common.Node) nodeStyle {
+	style.fillColor = "#E74C3C"
+	style.fontColor = "#FFFFFF"
 	if !nodeObj.IsOfType(common.ContainsBluePage) &&
 		!nodeObj.IsOfType(common.ContainsRedPage) &&
 		!nodeObj.IsOfType(common.ContainsWhitePage) {
-		// for regular nodes, add a darker red border for contrast
-		styleMap["penwidth"] = "2.0"
-		styleMap["color"] = "\"#B71C1C\"" // darker red border
+		style.penWidth = 2.0
+		style.borderColor = "#B71C1C"
 	}
-
-	// convert the map back to a style string
-	var newStyleParts []string
-	for key, value := range styleMap {
-		newStyleParts = append(newStyleParts, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	sort.Strings(newStyleParts)
-
-	return strings.Join(newStyleParts, ", ")
-}
-
-// ensureNodeLabel makes sure the node has a label attribute
-func (g *Generator) ensureNodeLabel(styleStr string, nodeObj common.Node, id int64) string {
-	if strings.Contains(styleStr, "label=") {
-		return styleStr
-	}
-
-	// get the display name for the node
-	var label string
-	if g.config.UseNodeNames {
-		label = g.getDisplayName(nodeObj)
-	} else {
-		label = fmt.Sprintf("%d", id)
-	}
-
-	return styleStr + fmt.Sprintf(", label=\"%s\"", label)
+	return style
 }
 
 // buildNodeStyleString converts a nodeStyle to a DOT style attribute
@@ -225,18 +180,4 @@ func escapeForDOT(input string) string {
 	// escape quotes
 	result = strings.ReplaceAll(result, "\"", "\\\"")
 	return result
-}
-
-// applyPathStyle keeps style values structured until DOT encoding.
-// Parsing a style string on commas would corrupt commas inside quoted labels.
-func (g *Generator) applyPathStyle(style nodeStyle, nodeObj common.Node) nodeStyle {
-	style.fillColor = "#E74C3C"
-	style.fontColor = "#FFFFFF"
-	if !nodeObj.IsOfType(common.ContainsBluePage) &&
-		!nodeObj.IsOfType(common.ContainsRedPage) &&
-		!nodeObj.IsOfType(common.ContainsWhitePage) {
-		style.penWidth = 2.0
-		style.borderColor = "#B71C1C"
-	}
-	return style
 }
