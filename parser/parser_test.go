@@ -20,6 +20,30 @@ func testCard(stack *HyperCardStack, id int, scripts ...string) *HyperCardCard {
 	return card
 }
 
+func TestStackCardOnlyCommandsDoNotPanic(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	p := &Parser{stacks: []*HyperCardStack{stack}}
+	for _, command := range []string{"pop card", `put "1,A,0" into ALL_Page`, `put "1,S,0" into ALL_Page`, `put "Atrus" into ALL_Page`} {
+		if _, err := p.parseCardCommand(stack, command); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestDisabledCommandsDoNotSetCardProperties(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	card := testCard(stack, 1)
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{card}}
+	for _, command := range []string{"-- push card", "-- pop card", `-- put "1,A,0" into ALL_Page`, `-- put "1,S,0" into ALL_Page`, `-- put "Atrus" into ALL_Page`} {
+		if _, err := p.parseCardCommand(card, command); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if card.IsPushCard || card.IsPopCard || card.HasBluePage || card.HasRedPage || card.HasWhitePage {
+		t.Fatalf("commented commands changed card properties: %+v", card)
+	}
+}
+
 func TestCardCommandsRejectOverflowingIDs(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	card := testCard(stack, 1)

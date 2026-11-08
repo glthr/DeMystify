@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/glthr/DeMystify/common"
 )
@@ -30,6 +31,7 @@ var (
 )
 
 func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, error) {
+	disabled := strings.HasPrefix(strings.TrimSpace(command), "--")
 	if link, err := p.handleGoToNamedCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
@@ -39,17 +41,21 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
 		return link, err
 	}
-	if handled := p.handlePopCard(source, command); handled {
-		return nil, nil
-	}
-	if handled := p.handlePagePatterns(source, command); handled {
-		return nil, nil
+	if !disabled {
+		if handled := p.handlePopCard(source, command); handled {
+			return nil, nil
+		}
+		if handled := p.handlePagePatterns(source, command); handled {
+			return nil, nil
+		}
 	}
 	if link, err := p.handlePushCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
-	if handled := p.handlePushCard(source, command); handled {
-		return nil, nil
+	if !disabled {
+		if handled := p.handlePushCard(source, command); handled {
+			return nil, nil
+		}
 	}
 	return nil, nil
 }
@@ -162,28 +168,36 @@ func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, err
 }
 
 func (p *Parser) handlePopCard(source any, command string) bool {
+	card, ok := source.(*HyperCardCard)
+	if !ok {
+		return false
+	}
 	// `pop card"`
 	if matches := popCardPattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).IsPopCard = true
+		card.IsPopCard = true
 		return true
 	}
 	return false
 }
 
 func (p *Parser) handlePagePatterns(source any, command string) bool {
+	card, ok := source.(*HyperCardCard)
+	if !ok {
+		return false
+	}
 
 	if matches := bluePagePattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).HasBluePage = true
+		card.HasBluePage = true
 		return true
 	}
 
 	if matches := redPagePattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).HasRedPage = true
+		card.HasRedPage = true
 		return true
 	}
 
 	if matches := whitePagePattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).HasWhitePage = true
+		card.HasWhitePage = true
 		return true
 	}
 
