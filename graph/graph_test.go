@@ -288,3 +288,19 @@ func TestEdgeAttributeUpdatesAllParallelMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestTraversalAttributesUpdateRoutes(t *testing.T) {
+	for _, attribute := range []common.EdgeAttribute{common.Disabled, common.Backtracking} {
+		nodes := []*common.Node{{Name: "A"}, {Name: "B"}}
+		g, err := NewGraph(&common.Metadata{Nodes: nodes, Edges: []*common.Edge{{Source: nodes[0], Target: nodes[1]}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !g.AddEdgeAttribute(0, 1, attribute) {
+			t.Fatal("attribute was not added")
+		}
+		if got, err := g.ComputeShortestPath(0, 1, nil); err == nil {
+			t.Fatalf("attribute %v left forbidden route traversable: %+v", attribute, got)
+		}
+	}
+}

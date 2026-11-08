@@ -105,7 +105,19 @@ func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.
 			changed = true
 		}
 	}
-
+	if changed && (attribute == common.Disabled || attribute == common.Backtracking) {
+		lines := g.Graph.WeightedLines(sourceID, targetID)
+		for lines.Next() {
+			line := lines.WeightedLine()
+			if attribute == common.Disabled {
+				g.Graph.RemoveLine(sourceID, targetID, line.ID())
+			} else {
+				g.Graph.SetWeightedLine(multi.WeightedLine{
+					F: line.From(), T: line.To(), W: math.Inf(1), UID: line.ID(),
+				})
+			}
+		}
+	}
 	return changed
 }
 
