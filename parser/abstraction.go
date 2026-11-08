@@ -62,6 +62,7 @@ func (p *Parser) Process() (*common.Metadata, error) {
 				}
 
 				metadata.Nodes = append(metadata.Nodes, targetNode)
+				targetStack = cardTarget.Stack
 			} else {
 				return nil, errors.New("target node not found")
 			}
@@ -96,11 +97,11 @@ func findNodeStack(nodes []*common.Node, nodeObj any) (*common.Node, *HyperCardS
 	for _, node := range nodes {
 		switch v := nodeObj.(type) {
 		case *HyperCardStack:
-			if v.Name == node.StackName {
+			if node.IsOfType(common.IsStack) && v.Name == node.Name {
 				return node, v
 			}
 		case *HyperCardCard:
-			if v.Name == node.Name {
+			if node.IsOfType(common.IsCard) && v.Name == node.Name {
 				return node, v.Stack
 			}
 		}
@@ -118,7 +119,8 @@ func getEdgeAttributes(
 		edgeTypes = append(edgeTypes, common.Disabled)
 	}
 
-	if link.IsCrossAges {
+	if sourceStack != nil && targetStack != nil && sourceStack != targetStack ||
+		(sourceStack == nil || targetStack == nil) && link.IsCrossAges {
 		edgeTypes = append(edgeTypes, common.CrossAge)
 	} else {
 		edgeTypes = append(edgeTypes, common.IntraAge)

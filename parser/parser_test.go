@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/glthr/DeMystify/common"
 )
 
 func testCard(stack *HyperCardStack, id int, scripts ...string) *HyperCardCard {
@@ -18,6 +20,32 @@ func testCard(stack *HyperCardStack, id int, scripts ...string) *HyperCardCard {
 		card.Scripts = append(card.Scripts, script)
 	}
 	return card
+}
+
+func TestProcessResolvesStackLinkToStackNode(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	card := testCard(stack, 1)
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{card}, links: []*HyperCardLink{{Source: stack, Target: card}}}
+	metadata, err := p.Process()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := metadata.Edges[0].Source; !got.IsOfType(common.IsStack) || got.Name != stack.Name {
+		t.Fatalf("stack link starts at %+v, want the stack node", got)
+	}
+}
+
+func TestProcessClassifiesEdgesByActualStacks(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	from, to := testCard(stack, 1), testCard(stack, 2)
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{from, to}, links: []*HyperCardLink{{Source: from, Target: to, IsCrossAges: true}}}
+	metadata, err := p.Process()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if edge := metadata.Edges[0]; !edge.IsOfType(common.IntraAge) || edge.IsOfType(common.CrossAge) {
+		t.Fatalf("an explicit reference to the same stack is not cross-age: %+v", edge)
+	}
 }
 
 func TestStackCardOnlyCommandsDoNotPanic(t *testing.T) {
