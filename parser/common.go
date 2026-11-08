@@ -151,47 +151,6 @@ func (p *Parser) identifyLinks() error {
 		}
 	}
 
-	// remove duplicates
-	getName := func(item any) string {
-		switch s := item.(type) {
-		case *HyperCardCard:
-			return s.Name
-		case *HyperCardStack:
-			return s.Name
-		}
-		return ""
-	}
-
-	// add transitivity property to existing links
-	for i, linkA := range p.links {
-		if linkA.TransitivityRank != common.DefaultTransitivity {
-			continue
-		}
-
-		sourceAName := getName(linkA.Source)
-		targetAName := getName(linkA.Target)
-
-		for j, linkB := range p.links {
-			if i == j || linkB.TransitivityRank == common.DefaultTransitivity || linkA.IsDisabled != linkB.IsDisabled {
-				continue
-			}
-
-			sourceBName := getName(linkB.Source)
-			if sourceAName != sourceBName {
-				continue
-			}
-
-			targetBName := getName(linkB.Target)
-			if targetAName != targetBName {
-				continue
-			}
-
-			p.links[i].TransitivityRank = linkB.TransitivityRank
-			p.links[i].TransitivityID = linkB.TransitivityID
-			break
-		}
-	}
-
 	// identify backtracking
 	for _, card := range p.cards {
 		if card.IsPushCard {
@@ -241,9 +200,12 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 	}
 
 	var result []*HyperCardLink
+	consumed := make(map[*HyperCardLink]bool)
 	for i, link := range links {
 		if link.TransitivityRank == common.DefaultTransitivity {
-			result = append(result, link)
+			if !consumed[link] {
+				result = append(result, link)
+			}
 			continue
 		}
 
@@ -265,6 +227,7 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 			return nil, fmt.Errorf("push card command has no following go card command")
 		}
 
+		consumed[goLink] = true
 		result = append(result, &HyperCardLink{
 			Source:           link.Source,
 			Target:           goLink.Target,

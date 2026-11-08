@@ -89,17 +89,21 @@ func TestIdentifyLinksDoesNotPairAcrossHandlers(t *testing.T) {
 	}
 }
 
-func TestIdentifyLinksPromotesAllDuplicateRestrictedLinks(t *testing.T) {
+func TestIdentifyLinksPreservesIndependentUnrestrictedLinks(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	source := testCard(stack, 1, "go card id 2", "go card id 2", "push card id 3 of stack \"Example\"\ngo card id 2")
 	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2), testCard(stack, 3)}}
 	if err := p.identifyLinks(); err != nil {
 		t.Fatal(err)
 	}
+	plain := 0
 	for _, link := range p.links {
-		if link.Source == source && link.Target == p.cards[1] && link.TransitivityRank != common.Tail {
-			t.Fatalf("duplicate go bypasses restricted link: %+v", link)
+		if link.Source == source && link.Target == p.cards[1] && link.TransitivityRank == common.DefaultTransitivity {
+			plain++
 		}
+	}
+	if plain != 2 {
+		t.Fatalf("got %d independent unrestricted links, want 2", plain)
 	}
 }
 
