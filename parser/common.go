@@ -130,6 +130,7 @@ func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
 }
 
 func (p *Parser) identifyLinks() error {
+	var transitivityID int64
 	for _, stack := range p.stacks {
 		for _, script := range stack.Script {
 			for _, line := range script.lines {
@@ -142,10 +143,9 @@ func (p *Parser) identifyLinks() error {
 		}
 	}
 
-	for i, card := range p.cards {
+	for _, card := range p.cards {
 		for _, script := range card.Scripts {
-			id := int64(i)
-			links, err := p.identifyScriptLinks(card, script, &id)
+			links, err := p.identifyScriptLinks(card, script, &transitivityID)
 			if err != nil {
 				return err
 			}
@@ -242,6 +242,7 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 
 			// transitive card to target
 			filteredLinks = append(filteredLinks, makeTransitiveLink(link, goLink.Target, link.Target, common.Head, *transitivityID))
+			(*transitivityID)++
 		} else {
 			filteredLinks = append(filteredLinks, link)
 		}

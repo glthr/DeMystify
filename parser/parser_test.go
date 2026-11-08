@@ -78,6 +78,24 @@ func TestIdentifyLinksRejectsPushWithoutGo(t *testing.T) {
 	}
 }
 
+func TestIdentifyLinksAssignsDistinctTransitivityIDs(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1, "push card id 3 of stack \"Example\"\ngo card id 2", "push card id 5 of stack \"Example\"\ngo card id 4")
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2), testCard(stack, 3), testCard(stack, 4), testCard(stack, 5)}}
+	if err := p.identifyLinks(); err != nil {
+		t.Fatal(err)
+	}
+	ids := make(map[int64]bool)
+	for _, link := range p.links {
+		if link.TransitivityRank == common.Tail {
+			ids[link.TransitivityID] = true
+		}
+	}
+	if len(ids) != 2 {
+		t.Fatalf("got %d distinct restricted pair IDs, want 2", len(ids))
+	}
+}
+
 func TestIdentifyLinksHandlesSeveralPushesInOneScript(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	source := testCard(stack, 1, "push card id 3 of stack \"Example\"\ngo card id 2\npush card id 5 of stack \"Example\"\ngo card id 4")
