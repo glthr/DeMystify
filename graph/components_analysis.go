@@ -3,8 +3,6 @@ package graph
 import (
 	"sort"
 
-	"github.com/glthr/DeMystify/common"
-
 	gograph "gonum.org/v1/gonum/graph"
 )
 
@@ -53,73 +51,6 @@ func (t *traverser) getSortedNeighbors(nodeID int64, outgoing bool) []int64 {
 	})
 
 	return neighbors
-}
-
-// bfsComponent performs BFS from a start node
-// NOTE: uses slices instead of maps for deterministic behavior
-func (t *traverser) bfsComponent(startID int64, nodeIDs []int64) []common.NodeInfo {
-	idMap := make(map[int64]int)
-	for i, id := range nodeIDs {
-		idMap[id] = i
-	}
-
-	maxID := 0
-	for _, id := range nodeIDs {
-		if int(id) > maxID {
-			maxID = int(id)
-		}
-	}
-	visited := make([]bool, maxID+1)
-
-	var component []common.NodeInfo
-	queue := []int64{startID}
-	visited[startID] = true
-	component = append(component, common.NodeInfo{
-		ID:   startID,
-		Name: t.g.GetNameForID(startID),
-	})
-
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-
-		// get sorted outgoing neighbors
-		outNeighbors := t.getSortedNeighbors(current, true)
-
-		// process outgoing neighbors in sorted order
-		for _, neighborID := range outNeighbors {
-			if neighborID < int64(len(visited)) && !visited[neighborID] {
-				visited[neighborID] = true
-				component = append(component, common.NodeInfo{
-					ID:   neighborID,
-					Name: t.g.GetNameForID(neighborID),
-				})
-				queue = append(queue, neighborID)
-			}
-		}
-
-		// get sorted incoming neighbors
-		inNeighbors := t.getSortedNeighbors(current, false)
-
-		// process incoming neighbors in sorted order
-		for _, neighborID := range inNeighbors {
-			if neighborID < int64(len(visited)) && !visited[neighborID] {
-				visited[neighborID] = true
-				component = append(component, common.NodeInfo{
-					ID:   neighborID,
-					Name: t.g.GetNameForID(neighborID),
-				})
-				queue = append(queue, neighborID)
-			}
-		}
-	}
-
-	// ensure deterministic ordering by sorting the final component
-	sort.Slice(component, func(i, j int) bool {
-		return component[i].ID < component[j].ID
-	})
-
-	return component
 }
 
 // formatPathAsNames converts a path of IDs to a path of names
