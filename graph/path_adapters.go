@@ -16,17 +16,3 @@ func (g orderedPathGraph) From(id int64) gograph.Nodes {
 	}
 	return iterator.NewOrderedNodes(nodes)
 }
-
-type reversedPathGraph struct{ g *MystGraph }
-
-func (g reversedPathGraph) From(id int64) gograph.Nodes { return g.g.To(id) }
-
-func (g reversedPathGraph) Edge(from, to int64) gograph.Edge {
-	edge := g.g.Edge(to, from)
-	if edge == nil {
-		return nil
-	}
-	return edge.ReversedEdge()
-}
-
-func (g reversedPathGraph) Weight(from, to int64) (float64, bool) { return g.g.Weight(to, from) }

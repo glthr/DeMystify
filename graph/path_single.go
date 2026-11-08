@@ -12,11 +12,11 @@ func (pa *pathAnalyzer) computeSimpleShortestPath(from, to int64) (*common.Short
 		return &common.ShortestPathInfo{From: from, To: to, Path: []int64{from}}, nil
 	}
 
-	// Distances to the target identify the edges that can belong to a
+	// Forward distances identify the edges that can belong to a
 	// shortest path. Select the smallest viable next node instead of
 	// enumerating every equal-cost route (there can be exponentially many).
-	distances := path.DijkstraFrom(pa.g.Node(to), reversedPathGraph{pa.g})
-	weight := distances.WeightTo(from)
+	distances := path.DijkstraFrom(pa.g.Node(from), orderedPathGraph{pa.g})
+	weight := distances.WeightTo(to)
 	info := &common.ShortestPathInfo{From: from, To: to, Distance: weight}
 	if math.IsInf(weight, 1) {
 		return info, fmt.Errorf("no valid path exists from %d to %d without backtracking", from, to)
@@ -32,7 +32,7 @@ func (pa *pathAnalyzer) computeSimpleShortestPath(from, to int64) (*common.Short
 		for _, next := range pa.g.traverser.getSortedNeighbors(current, true) {
 			w, ok := pa.g.Weight(current, next)
 			if ok && !visited[next] && reachable[next] &&
-				equalDistance(w+distances.WeightTo(next), distances.WeightTo(current)) {
+				equalDistance(distances.WeightTo(current)+w, distances.WeightTo(next)) {
 				info.Path = append(info.Path, next)
 				visited[next] = true
 				current = next
