@@ -59,12 +59,14 @@ func TestCardCommandsRejectOverflowingIDs(t *testing.T) {
 	}
 }
 
-func TestCardCommandsIgnoreStringLiterals(t *testing.T) {
+func TestCardCommandsIgnoreStringLiteralsAndInlineComments(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	for _, command := range []string{
 		`put "go card id 2" into text`,
 		`put "pop card" into text`,
 		`put "push card" into text`,
+		`doSomething -- go card id 2`,
+		`logo card id 2`,
 	} {
 		card := testCard(stack, 1)
 		p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{card, testCard(stack, 2)}}
@@ -74,6 +76,23 @@ func TestCardCommandsIgnoreStringLiterals(t *testing.T) {
 		}
 		if link != nil || card.IsPushCard || card.IsPopCard {
 			t.Errorf("non-command %q changed card navigation: link=%+v card=%+v", command, link, card)
+		}
+	}
+}
+
+func TestCardCommandsMatchOutsideStringLiterals(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	card := testCard(stack, 1)
+	target := testCard(stack, 2)
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{card, target}}
+	for _, command := range []string{
+		`if value is "go card id 1" then go card id 2`,
+		"go\tto\tcard\tid\t2",
+		`go card id 2 -- a comment containing "go card id 1"`,
+	} {
+		link, err := p.parseCardCommand(card, command)
+		if err != nil || link == nil || link.Target != target {
+			t.Errorf("command %q: got %+v, %v; want target %s", command, link, err, target.Name)
 		}
 	}
 }

@@ -19,19 +19,34 @@ type ScriptLine struct {
 }
 
 var (
-	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)go( to)? card "([^"]+)" of stack "([^"]+)"`)
-	goToCardOfStackPattern      = regexp.MustCompile(`(?i)go( to)? card id (\d+) of stack "([^"]+)"`)
-	goToCardPattern             = regexp.MustCompile(`(?i)go( to)? card id (\d+)`)
-	popCardPattern              = regexp.MustCompile(`(?i)pop card`)
-	bluePagePattern             = regexp.MustCompile(`(?i)put "(\d+),A,0" into ALL_Page`)
-	redPagePattern              = regexp.MustCompile(`(?i)put "(\d+),S,0" into ALL_Page`)
-	whitePagePattern            = regexp.MustCompile(`(?i)put "Atrus" into ALL_Page`)
-	pushCardOfStackPattern      = regexp.MustCompile(`(?i)push card id (\d+) of stack "([^"]+)"`)
-	pushCardPattern             = regexp.MustCompile(`(?i)push card`)
+	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"\s+of\s+stack\s+"([^"]+)"`)
+	goToCardOfStackPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
+	goToCardPattern             = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)`)
+	popCardPattern              = regexp.MustCompile(`(?i)\bpop\s+card\b`)
+	bluePagePattern             = regexp.MustCompile(`(?i)\bput\s+"(\d+),A,0"\s+into\s+ALL_Page\b`)
+	redPagePattern              = regexp.MustCompile(`(?i)\bput\s+"(\d+),S,0"\s+into\s+ALL_Page\b`)
+	whitePagePattern            = regexp.MustCompile(`(?i)\bput\s+"Atrus"\s+into\s+ALL_Page\b`)
+	pushCardOfStackPattern      = regexp.MustCompile(`(?i)\bpush\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
+	pushCardPattern             = regexp.MustCompile(`(?i)\bpush\s+card\b`)
 )
 
 func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, error) {
-	disabled := strings.HasPrefix(strings.TrimSpace(command), "--")
+	command = strings.TrimSpace(command)
+	disabled := strings.HasPrefix(command, "--")
+	if disabled {
+		command = strings.TrimSpace(strings.TrimPrefix(command, "--"))
+	}
+	// Keep whole-line commented navigation as disabled links, but do not
+	// mistake text in trailing comments for executable commands.
+	quoted := false
+	for i := 0; i < len(command); i++ {
+		if command[i] == '"' {
+			quoted = !quoted
+		} else if !quoted && strings.HasPrefix(command[i:], "--") {
+			command = command[:i]
+			break
+		}
+	}
 	if link, err := p.handleGoToNamedCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
