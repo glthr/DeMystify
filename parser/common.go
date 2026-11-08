@@ -167,28 +167,10 @@ func (p *Parser) identifyLinks() error {
 					// split link into two
 
 					// source to transitive card
-					filteredLinks = append(filteredLinks, &HyperCardLink{
-						Source:           link.Source,
-						Target:           goToCards[j],
-						TransitivityRank: common.Tail,
-						TransitivityID:   int64(i),
-						IsCrossAges:      link.IsCrossAges,
-						IsNotImplemented: link.IsNotImplemented,
-						IsDisabled:       link.IsDisabled,
-						IsBacktracking:   false,
-					})
+					filteredLinks = append(filteredLinks, makeTransitiveLink(link, link.Source, goToCards[j], common.Tail, int64(i)))
 
 					// transitive card to target
-					filteredLinks = append(filteredLinks, &HyperCardLink{
-						Source:           goToCards[j],
-						Target:           link.Target,
-						TransitivityRank: common.Head,
-						TransitivityID:   int64(i),
-						IsCrossAges:      link.IsCrossAges,
-						IsNotImplemented: link.IsNotImplemented,
-						IsDisabled:       link.IsDisabled,
-						IsBacktracking:   false,
-					})
+					filteredLinks = append(filteredLinks, makeTransitiveLink(link, goToCards[j], link.Target, common.Head, int64(i)))
 				} else {
 					filteredLinks = append(filteredLinks, link)
 				}
@@ -253,6 +235,18 @@ func (p *Parser) identifyLinks() error {
 	}
 
 	return nil
+}
+
+func makeTransitiveLink(link *HyperCardLink, source, target any, rank common.TransitivityRank, id int64) *HyperCardLink {
+	return &HyperCardLink{
+		Source:           source,
+		Target:           target,
+		TransitivityRank: rank,
+		TransitivityID:   id,
+		IsCrossAges:      link.IsCrossAges,
+		IsNotImplemented: link.IsNotImplemented,
+		IsDisabled:       link.IsDisabled,
+	}
 }
 
 func splitScript(script string) []string {
