@@ -54,6 +54,18 @@ The Myst game uses HyperCard files, which need to be converted into a format tha
 3.  **Wait:** The graph generation process takes several minutes.
 4.  **The Myst Graph is generated:** The generated DOT and PDF files will be saved in the `generated` subdirectory.
 
+### Add the publication border, header and footer
+
+The app generates the raw vector graph in `generated/graph.pdf`. To reproduce the original publication layout around it:
+
+```bash
+python3 -m venv /tmp/demystify-pdf
+/tmp/demystify-pdf/bin/python -m pip install -r scripts/requirements-pdf.txt
+/tmp/demystify-pdf/bin/python scripts/frame_graph_pdf.py generated/graph.pdf generated/myst_graph.pdf
+```
+
+The optional formatter preserves the graph at its native size and adds the original margins, Times-Roman heading, border and clickable `glthr.com` footer. Use `--date YYYY-MM-DD` to set the footer date, or `--subtitle "..."` for a path-specific graph. The raw PDF and DOT remain unchanged.
+
 ## Stay Up-to-Date
 
 *   [The Myst Graph: A New Perspective on Myst](https://glthr.com/myst-graph-1)
