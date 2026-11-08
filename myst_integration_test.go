@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/xml"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/glthr/DeMystify/graph"
@@ -26,7 +28,8 @@ func TestOriginalMystImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != 3214 || len(metadata.Edges) != 3227 {
+	wantPairs, wantRecords, fresh := mystInputProfile(t, p)
+	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
 	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 36 || sinks != 62 || isolated != 18 {
@@ -49,6 +52,10 @@ func TestOriginalMystImport(t *testing.T) {
 			t.Errorf("missing named-card transition %s -> %s", pair[0], pair[1])
 		}
 	}
+	localDistance := float64(3)
+	if fresh {
+		localDistance = 1
+	}
 	for _, tc := range []struct {
 		fromStack, toStack string
 		from, to           int
@@ -58,6 +65,7 @@ func TestOriginalMystImport(t *testing.T) {
 		{"Myst", "Dunny Age", 8336, 11088, 24, true},
 		{"Myst", "Myst", 28679, 44018, 14, true},
 		{"Dunny Age", "Dunny Age", 7365, 11283, 0, false},
+		{"Dunny Age", "Dunny Age", 5200, 5119, localDistance, true},
 	} {
 		path, err := ComputeShortestPath(p, g, tc.fromStack, tc.from, tc.toStack, tc.to)
 		if (err == nil) != tc.reachable {
@@ -66,4 +74,39 @@ func TestOriginalMystImport(t *testing.T) {
 			t.Errorf("%s:%d -> %s:%d: got %+v, want distance %v", tc.fromStack, tc.from, tc.toStack, tc.to, path, tc.distance)
 		}
 	}
+}
+
+// Identify the two verified input snapshots from XML, independently of graph output.
+func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
+	t.Helper()
+	card, err := p.GetCardByStackAndID("Dunny Age", 5200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(card.Filepath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw struct {
+		Parts []struct {
+			ID     int    `xml:"id"`
+			Script string `xml:"script"`
+		} `xml:"part"`
+	}
+	if err := xml.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range raw.Parts {
+		if part.ID != 2 {
+			continue
+		}
+		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
+		case "on mouseup 5119 end mouseup":
+			return 3214, 3227, false
+		case "on mouseup go to card id 5119 end mouseup":
+			return 3215, 3228, true
+		}
+	}
+	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")
+	return 0, 0, false
 }
