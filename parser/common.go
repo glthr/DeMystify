@@ -14,10 +14,11 @@ import (
 const stackFileName = "stack_-1.xml"
 
 type Parser struct {
-	stacksDir string
-	stacks    []*HyperCardStack
-	cards     []*HyperCardCard
-	links     []*HyperCardLink
+	stacksDir   string
+	stacks      []*HyperCardStack
+	cards       []*HyperCardCard
+	links       []*HyperCardLink
+	pushedLinks map[*HyperCardLink]bool
 }
 
 type HyperCardLink struct {
@@ -62,11 +63,22 @@ type Paths struct {
 func (p *Parser) getPaths() ([]Paths, error) {
 	var results []Paths
 
-	err := filepath.Walk(p.stacksDir, func(path string, info os.FileInfo, err error) error {
+	root, err := filepath.EvalSymlinks(p.stacksDir)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("stack input must be a directory: %s", p.stacksDir)
+	}
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == p.stacksDir || !info.IsDir() {
+		if !info.IsDir() {
 			return nil
 		}
 
@@ -86,6 +98,9 @@ func (p *Parser) getPaths() ([]Paths, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no %s files found in %s", stackFileName, p.stacksDir)
 	}
 
 	return results, nil
@@ -115,13 +130,21 @@ func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
 		if err != nil {
 			return err
 		}
+		if _, err := p.GetStackByName(stack.Name); err == nil {
+			return fmt.Errorf("duplicate stack name %q", stack.Name)
+		}
 		p.stacks = append(p.stacks, stack)
 
+		seenCards := make(map[int]bool, len(stackPath.cardsFilepaths))
 		for _, cardPath := range stackPath.cardsFilepaths {
 			card, parseErr := ParseSimpleCard(stack, cardPath, cardIdNameMap)
 			if parseErr != nil {
 				return parseErr
 			}
+			if seenCards[card.ID] {
+				return fmt.Errorf("duplicate card ID %d in stack %q", card.ID, stack.Name)
+			}
+			seenCards[card.ID] = true
 
 			p.cards = append(p.cards, card)
 		}
@@ -130,112 +153,24 @@ func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
 }
 
 func (p *Parser) identifyLinks() error {
+	var transitivityID int64
 	for _, stack := range p.stacks {
 		for _, script := range stack.Script {
-			for _, line := range script.lines {
-				if link, err := p.parseCardCommand(stack, line.Line); err != nil {
-					return fmt.Errorf("cannot get HyperCardLink: %w", err)
-				} else if link != nil {
-					p.links = append(p.links, link)
-				}
+			links, err := p.identifyScriptLinks(stack, script, &transitivityID)
+			if err != nil {
+				return fmt.Errorf("stack %s: %w", stack.Name, err)
 			}
+			p.links = append(p.links, links...)
 		}
 	}
 
-	for i, card := range p.cards {
+	for _, card := range p.cards {
 		for _, script := range card.Scripts {
-			var (
-				goToCards []*HyperCardCard
-				links     []*HyperCardLink
-			)
-			for _, line := range script.lines {
-				if link, err := p.parseCardCommand(card, line.Line); err != nil {
-					return fmt.Errorf("cannot get HyperCardLink: %w", err)
-				} else if link != nil {
-					if link.TransitivityRank == common.DefaultTransitivity {
-						goToCards = append(goToCards, link.Target.(*HyperCardCard))
-					}
-					link.IsDisabled = line.IsDisabled
-					links = append(links, link)
-				}
+			links, err := p.identifyScriptLinks(card, script, &transitivityID)
+			if err != nil {
+				return fmt.Errorf("card %s: %w", card.Name, err)
 			}
-
-			// identify transitive cards
-			var filteredLinks []*HyperCardLink
-			for j, link := range links {
-				if link.TransitivityRank != common.DefaultTransitivity {
-					// split link into two
-
-					// source to transitive card
-					filteredLinks = append(filteredLinks, &HyperCardLink{
-						Source:           link.Source,
-						Target:           goToCards[j],
-						TransitivityRank: common.Tail,
-						TransitivityID:   int64(i),
-						IsCrossAges:      link.IsCrossAges,
-						IsNotImplemented: link.IsNotImplemented,
-						IsDisabled:       link.IsDisabled,
-						IsBacktracking:   false,
-					})
-
-					// transitive card to target
-					filteredLinks = append(filteredLinks, &HyperCardLink{
-						Source:           goToCards[j],
-						Target:           link.Target,
-						TransitivityRank: common.Head,
-						TransitivityID:   int64(i),
-						IsCrossAges:      link.IsCrossAges,
-						IsNotImplemented: link.IsNotImplemented,
-						IsDisabled:       link.IsDisabled,
-						IsBacktracking:   false,
-					})
-				} else {
-					filteredLinks = append(filteredLinks, link)
-				}
-			}
-
-			p.links = append(p.links, filteredLinks...)
-		}
-	}
-
-	// remove duplicates
-	getName := func(item any) string {
-		switch s := item.(type) {
-		case *HyperCardCard:
-			return s.Name
-		case *HyperCardStack:
-			return s.Name
-		}
-		return ""
-	}
-
-	// add transitivity property to existing links
-	for i, linkA := range p.links {
-		if linkA.TransitivityRank != common.DefaultTransitivity {
-			continue
-		}
-
-		sourceAName := getName(linkA.Source)
-		targetAName := getName(linkA.Target)
-
-		for j, linkB := range p.links {
-			if i == j {
-				continue
-			}
-
-			sourceBName := getName(linkB.Source)
-			if sourceAName != sourceBName {
-				continue
-			}
-
-			targetBName := getName(linkB.Target)
-			if targetAName != targetBName {
-				continue
-			}
-
-			p.links[i].TransitivityRank = linkB.TransitivityRank
-			p.links[i].TransitivityID = linkB.TransitivityID
-			break
+			p.links = append(p.links, links...)
 		}
 	}
 
@@ -243,7 +178,7 @@ func (p *Parser) identifyLinks() error {
 	for _, card := range p.cards {
 		if card.IsPushCard {
 			for _, link := range p.links {
-				if link.Source == card && link.Target != nil && link.TransitivityRank == common.DefaultTransitivity {
+				if link.Source == card && p.pushedLinks[link] && link.Target != nil && link.TransitivityRank == common.DefaultTransitivity {
 					if link.Target.(*HyperCardCard).IsPopCard {
 						link.IsBacktracking = true
 					}
@@ -255,11 +190,108 @@ func (p *Parser) identifyLinks() error {
 	return nil
 }
 
+func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityID *int64) ([]*HyperCardLink, error) {
+	if p.pushedLinks == nil {
+		p.pushedLinks = make(map[*HyperCardLink]bool)
+	}
+	var links []*HyperCardLink
+	var handlers []int
+	handlerID := 0
+	handlerName := ""
+	pushed := false
+	for _, line := range script.lines {
+		// Handler declarations delimit independent sequences of commands.
+		// Nested `end if`/`end repeat` statements do not end a handler.
+		fields := strings.Fields(line.Line)
+		if !line.IsDisabled && len(fields) >= 2 {
+			switch strings.ToLower(fields[0]) {
+			case "on", "function":
+				handlerID++
+				pushed = false
+				handlerName = fields[1]
+			case "end":
+				if handlerName != "" && strings.EqualFold(fields[1], handlerName) {
+					handlerID++
+					pushed = false
+					handlerName = ""
+				}
+			}
+		}
+		command, disabled := normalizeCommand(line.Line)
+		if !disabled && !line.IsDisabled && findCommandMatch(pushCardPattern, command) != nil {
+			pushed = true
+		}
+		link, err := p.parseCardCommand(source, line.Line)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse command %q: %w", line.Line, err)
+		}
+		if link != nil {
+			link.IsDisabled = line.IsDisabled
+			if pushed && !link.IsDisabled {
+				p.pushedLinks[link] = true
+			}
+			links = append(links, link)
+			handlers = append(handlers, handlerID)
+		}
+	}
+
+	var result []*HyperCardLink
+	consumed := make(map[*HyperCardLink]bool)
+	for i, link := range links {
+		if link.TransitivityRank == common.DefaultTransitivity {
+			if !consumed[link] {
+				result = append(result, link)
+			}
+			continue
+		}
+
+		// A pushed return card is reached through the following go command.
+		// Indexing a separate list of go targets loses their positions when a
+		// script contains several pushes or ordinary go commands.
+		var goLink *HyperCardLink
+		for j := i + 1; j < len(links); j++ {
+			if handlers[j] != handlers[i] {
+				break
+			}
+			candidate := links[j]
+			if candidate.TransitivityRank == common.DefaultTransitivity && candidate.IsDisabled == link.IsDisabled {
+				goLink = candidate
+				break
+			}
+		}
+		if goLink == nil {
+			return nil, fmt.Errorf("push card command has no following go card command")
+		}
+
+		consumed[goLink] = true
+		result = append(result, &HyperCardLink{
+			Source:           link.Source,
+			Target:           goLink.Target,
+			TransitivityRank: common.Tail,
+			TransitivityID:   *transitivityID,
+			IsCrossAges:      goLink.IsCrossAges,
+			IsNotImplemented: goLink.IsNotImplemented,
+			IsDisabled:       link.IsDisabled,
+		}, &HyperCardLink{
+			Source:           goLink.Target,
+			Target:           link.Target,
+			TransitivityRank: common.Head,
+			TransitivityID:   *transitivityID,
+			IsCrossAges:      link.IsCrossAges,
+			IsNotImplemented: link.IsNotImplemented,
+			IsDisabled:       link.IsDisabled,
+		})
+		(*transitivityID)++
+	}
+	return result, nil
+}
+
 func splitScript(script string) []string {
 	if script == "" {
 		return []string{}
 	}
-	return strings.Split(strings.ReplaceAll(script, "\r\n", "\n"), "\n")
+	script = strings.ReplaceAll(script, "\r\n", "\n")
+	return strings.Split(strings.ReplaceAll(script, "\r", "\n"), "\n")
 }
 
 func (p *Parser) GetAllStacks() []*HyperCardStack {
@@ -286,6 +318,16 @@ func (p *Parser) GetCardByStackAndName(stackName, cardName string) (*HyperCardCa
 			return card, nil
 		}
 
+		if card.OriginalName != nil && strings.EqualFold(*card.OriginalName, cardName) && strings.EqualFold(card.Stack.Name, stackName) {
+			return card, nil
+		}
+	}
+	return nil, fmt.Errorf("card with name %s and stack %s not found", cardName, stackName)
+}
+
+// Script names refer to original HyperCard names, not generated graph labels.
+func (p *Parser) getScriptCardByName(stackName, cardName string) (*HyperCardCard, error) {
+	for _, card := range p.cards {
 		if card.OriginalName != nil && strings.EqualFold(*card.OriginalName, cardName) && strings.EqualFold(card.Stack.Name, stackName) {
 			return card, nil
 		}

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"encoding/xml"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -58,6 +59,10 @@ func ParseStackFile(filepath string) (*HyperCardStack, map[int]string, error) {
 		return nil, nil, err
 	}
 
+	if strings.TrimSpace(s.Name) == "" {
+		return nil, nil, fmt.Errorf("stack in %s requires a name", filepath)
+	}
+
 	// process script for each part
 	scripts := make([]HyperTalk, 0, len(s.ScriptRaw))
 	var script HyperTalk
@@ -74,7 +79,12 @@ func ParseStackFile(filepath string) (*HyperCardStack, map[int]string, error) {
 	// create a map associating the cards IDs with their names,
 	// as HyperCard cards do not contain their own names
 	cardsIdNameMap := make(map[int]string, len(s.CardsInfo))
+	seenCards := make(map[int]bool, len(s.CardsInfo))
 	for _, c := range s.CardsInfo {
+		if c.ID <= 0 || seenCards[c.ID] {
+			return nil, nil, fmt.Errorf("invalid or repeated card ID %d in stack %q", c.ID, s.Name)
+		}
+		seenCards[c.ID] = true
 		if c.Name != "" {
 			cardsIdNameMap[c.ID] = c.Name
 		}

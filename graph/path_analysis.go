@@ -3,11 +3,9 @@ package graph
 import (
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/glthr/DeMystify/common"
 
-	gograph "gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/path"
 )
 
@@ -42,7 +40,7 @@ func (g *MystGraph) GetMostSeparatedNodePath() ([]int64, bool) {
 	mostSeparated := g.FindMostSeparatedNodes()
 
 	// if no path found (either nodes are disconnected or no valid path exists)
-	if mostSeparated.Path == nil || len(mostSeparated.Path) == 0 || mostSeparated.Distance <= 0 {
+	if len(mostSeparated.Path) == 0 {
 		return nil, false
 	}
 
@@ -64,7 +62,7 @@ func (pa *pathAnalyzer) computeShortestPaths() map[int64]map[int64]common.Shorte
 		result[src] = make(map[int64]common.ShortestPathInfo)
 
 		// use Dijkstra's algorithm from Gonum
-		p := path.DijkstraFrom(pa.g.Node(src), pa.g)
+		p := path.DijkstraFrom(pa.g.Node(src), orderedPathGraph{pa.g})
 
 		// for each destination node...
 		for _, dst := range nodeIDs {
@@ -76,7 +74,7 @@ func (pa *pathAnalyzer) computeShortestPaths() map[int64]map[int64]common.Shorte
 			pathNodes, weight := p.To(dst)
 
 			// check if there is a path
-			if len(pathNodes) == 0 {
+			if len(pathNodes) == 0 || math.IsInf(weight, 1) {
 				// no path found, this could be due to disabled or backtracking edges
 				continue
 			}
@@ -92,26 +90,7 @@ func (pa *pathAnalyzer) computeShortestPaths() map[int64]map[int64]common.Shorte
 				pathInfo.Path = append(pathInfo.Path, node.ID())
 			}
 
-			// validation: check that no backtracking or disabled edge exists in this path
-			valid := true
-			for i := 0; i < len(pathInfo.Path)-1; i++ {
-				fromID := pathInfo.Path[i]
-				toID := pathInfo.Path[i+1]
-
-				// check if this edge is backtracking or disabled
-				if edges, exists := pa.g.GetAllEdges(fromID, toID); exists {
-					for _, edge := range edges {
-						if edge.IsOfType(common.Backtracking) || edge.IsOfType(common.Disabled) {
-							valid = false
-							break
-						}
-					}
-				}
-			}
-
-			if valid {
-				result[src][dst] = pathInfo
-			}
+			result[src][dst] = pathInfo
 		}
 	}
 
@@ -157,7 +136,6 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 
 			// append the path, excluding the last node to avoid duplication
 			path = append(path, tempPath.Path[:len(tempPath.Path)-1]...)
-			shortestPath.Distance += tempPath.Distance
 			curSource = node.GraphID
 		}
 
@@ -174,141 +152,18 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 
 		// append the final path
 		path = append(path, finalPath.Path...)
-		shortestPath.Distance += finalPath.Distance
 		shortestPath.Path = path
+		// Sum the complete route so mandatory segmentation does not change
+		// floating-point rounding.
+		for i := 1; i < len(path); i++ {
+			weight, _ := pa.g.Weight(path[i-1], path[i])
+			shortestPath.Distance += weight
+		}
 
 		return &shortestPath, nil
 	}
 
-	p := path.DijkstraFrom(pa.g.Node(from), pa.g)
-	pathNodes, weight := p.To(to)
-
-	pathInfo := common.ShortestPathInfo{
-		From:     from,
-		To:       to,
-		Distance: weight,
-		Path:     []int64{},
-	}
-
-	if len(pathNodes) > 0 {
-		for _, node := range pathNodes {
-			pathInfo.Path = append(pathInfo.Path, node.ID())
-		}
-	} else {
-		return &pathInfo, fmt.Errorf("no path exists from %d to %d", from, to)
-	}
-
-	// check if the path uses backtracking
-	if weight >= math.Inf(1) {
-		return &pathInfo, fmt.Errorf("no valid path exists from %d to %d without backtracking", from, to)
-	}
-
-	// if there are multiple possible shortest paths with the same weight,
-	// we need to ensure a deterministic selection.
-	if len(pathInfo.Path) > 2 { // only needed for paths with intermediate nodes
-		alternativePaths := pa.findAllShortestPaths(from, to, weight)
-		if len(alternativePaths) > 1 {
-			// sort the paths lexicographically to ensure deterministic selection
-			sort.Slice(alternativePaths, func(i, j int) bool {
-				// compare paths lexicographically
-				for k := 0; k < len(alternativePaths[i]) && k < len(alternativePaths[j]); k++ {
-					if alternativePaths[i][k] != alternativePaths[j][k] {
-						return alternativePaths[i][k] < alternativePaths[j][k]
-					}
-				}
-				// if one path is a prefix of the other, the shorter one comes first
-				return len(alternativePaths[i]) < len(alternativePaths[j])
-			})
-			// replace with the lexicographically smallest path
-			pathInfo.Path = alternativePaths[0]
-		}
-	}
-
-	return &pathInfo, nil
-}
-
-// findAllShortestPaths finds all possible shortest paths between two nodes with a given target weight
-func (pa *pathAnalyzer) findAllShortestPaths(from, to int64, targetWeight float64) [][]int64 {
-	allPaths := [][]int64{}
-
-	var explore func(current int64, visited map[int64]bool, path []int64, currentWeight float64)
-	explore = func(current int64, visited map[int64]bool, path []int64, currentWeight float64) {
-		// if we reached the target...
-		if current == to {
-			// ... and this is a shortest path (weight matches target)...
-			if math.Abs(currentWeight-targetWeight) < 1e-9 {
-				// ... make a copy of the path to avoid reference issues
-				pathCopy := make([]int64, len(path))
-				copy(pathCopy, path)
-				allPaths = append(allPaths, pathCopy)
-			}
-			return
-		}
-
-		// if we have exceeded the target weight, stop exploring this path
-		if currentWeight > targetWeight {
-			return
-		}
-
-		// mark the current node as visited
-		visited[current] = true
-
-		// explore all neighbors
-		neighbors := pa.g.From(current)
-
-		var sortedNeighbors []struct {
-			id     int64
-			weight float64
-		}
-
-		for neighbors.Next() {
-			neighbor := neighbors.Node()
-			neighborID := neighbor.ID()
-
-			if visited[neighborID] {
-				continue
-			}
-
-			// get the edge weight
-			edge := pa.g.Edge(current, neighborID)
-
-			// skip backtracking and disabled edges
-			if pa.g.IsBacktrackingEdge(current, neighborID) || pa.g.IsDisabledEdge(current, neighborID) {
-				continue
-			}
-
-			// check if this edge would stay within the target weight
-			edgeWeight := edge.(gograph.WeightedEdge).Weight()
-			if currentWeight+edgeWeight <= targetWeight+1e-9 {
-				sortedNeighbors = append(sortedNeighbors, struct {
-					id     int64
-					weight float64
-				}{neighborID, edgeWeight})
-			}
-		}
-
-		sort.Slice(sortedNeighbors, func(i, j int) bool {
-			return sortedNeighbors[i].id < sortedNeighbors[j].id
-		})
-
-		for _, neighbor := range sortedNeighbors {
-			newPath := append(path, neighbor.id)
-			newVisited := make(map[int64]bool)
-			for k, v := range visited {
-				newVisited[k] = v
-			}
-
-			// continue exploration
-			explore(neighbor.id, newVisited, newPath, currentWeight+neighbor.weight)
-		}
-	}
-
-	// start exploration from the origin node
-	initialPath := []int64{from}
-	initialVisited := make(map[int64]bool)
-	explore(from, initialVisited, initialPath, 0)
-
-	return allPaths
+	return pa.computeSimpleShortestPath(from, to)
 }
 
 // findMostSeparatedNodes identifies the pair of connected nodes with the longest shortest path
@@ -336,7 +191,7 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 	// check all pairs of nodes
 	for _, src := range nodeIDs {
 		// calculate the shortest paths from this source
-		p := path.DijkstraFrom(pa.g.Node(src), pa.g)
+		p := path.DijkstraFrom(pa.g.Node(src), orderedPathGraph{pa.g})
 
 		for _, dst := range nodeIDs {
 			if src == dst {
@@ -378,6 +233,9 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 
 	if len(candidates) == 1 {
 		candidate := candidates[0]
+		if shortest, err := pa.computeShortestPath(candidate.source, candidate.target, nil); err == nil {
+			candidate.path = shortest.Path
+		}
 		return common.NodePairInfo{
 			Source: common.NodeInfo{
 				ID:   candidate.source,
@@ -422,6 +280,10 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 			bestPeripheralScore = currentScore
 			bestCandidate = candidate
 		}
+	}
+
+	if shortest, err := pa.computeShortestPath(bestCandidate.source, bestCandidate.target, nil); err == nil {
+		bestCandidate.path = shortest.Path
 	}
 
 	result = common.NodePairInfo{

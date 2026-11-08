@@ -16,18 +16,24 @@ func (g *Generator) applyAnalysisStyles() error {
 			return err
 		}
 
-		style := nodeStyle{
-			fillColor:   fillColor,
-			borderColor: borderColor,
-			penWidth:    penWidth,
-			tooltip:     tooltip,
+		style := g.getBaseNodeStyle(id, *nodeObj)
+		style.fillColor = fillColor
+		style.tooltip = tooltip
+		if !nodeObj.IsOfType(common.ContainsBluePage) &&
+			!nodeObj.IsOfType(common.ContainsRedPage) &&
+			!nodeObj.IsOfType(common.ContainsWhitePage) {
+			style.borderColor = borderColor
+			style.penWidth = penWidth
 		}
 
 		name := g.getDisplayName(*nodeObj)
+		if !g.config.UseNodeNames {
+			name = fmt.Sprint(id)
+		}
 		secondaryName := nodeObj.SecondaryName
 		if secondaryName != nil {
-			background := escapeForDOT(*secondaryName)
-			style.label = fmt.Sprintf("%s\\n%s", name, background)
+			background := *secondaryName
+			style.label = fmt.Sprintf("%s\n%s", name, background)
 		}
 
 		g.nodeStyles[id] = style
@@ -39,11 +45,11 @@ func (g *Generator) applyAnalysisStyles() error {
 			if err := applyStyle(node.GraphID, "#FFFF99", "", "Isolated node", 0); err != nil {
 				return err
 			}
-		} else if node.IsOfType(common.IsSink) {
+		} else if node.IsOfType(common.IsSink) && g.config.HighlightSinks {
 			if err := applyStyle(node.GraphID, "#FFA07A", "#FF4500", "Sink node (no outgoing connections)", 1.5); err != nil {
 				return err
 			}
-		} else if node.IsOfType(common.IsSource) {
+		} else if node.IsOfType(common.IsSource) && g.config.HighlightSources {
 			if err := applyStyle(node.GraphID, "#98FB98", "#228B22", "Source node (no incoming connections)", 1.5); err != nil {
 				return err
 			}
@@ -63,13 +69,7 @@ func (g *Generator) assignStackColors() {
 	for nodes.Next() {
 		node := nodes.Node()
 		id := node.ID()
-		name, exists := g.graph.GetNodeName(id)
-
-		if !exists {
-			continue
-		}
-
-		nodeObj, nodeExists := g.graph.NodeMap[name]
+		nodeObj, nodeExists := g.nodeByID(id)
 		if !nodeExists {
 			continue
 		}

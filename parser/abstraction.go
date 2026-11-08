@@ -47,7 +47,12 @@ func (p *Parser) Process() (*common.Metadata, error) {
 	}
 
 	// create edges
-	edgeExists := make(map[string]bool)
+	type edgeKey struct {
+		source, target *common.Node
+		attributes     string
+		transitivityID int64
+	}
+	edgeExists := make(map[edgeKey]bool)
 	for _, link := range p.links {
 		sourceNode, sourceStack := findNodeStack(metadata.Nodes, link.Source)
 		targetNode, targetStack := findNodeStack(metadata.Nodes, link.Target)
@@ -62,6 +67,7 @@ func (p *Parser) Process() (*common.Metadata, error) {
 				}
 
 				metadata.Nodes = append(metadata.Nodes, targetNode)
+				targetStack = cardTarget.Stack
 			} else {
 				return nil, errors.New("target node not found")
 			}
@@ -78,7 +84,7 @@ func (p *Parser) Process() (*common.Metadata, error) {
 			TransitivityID: link.TransitivityID,
 		}
 
-		key := fmt.Sprintf("%s-%s:%v:%d", edge.Source.Name, edge.Target.Name, edge.Attributes, edge.TransitivityID)
+		key := edgeKey{edge.Source, edge.Target, fmt.Sprint(edge.Attributes), edge.TransitivityID}
 		if !edgeExists[key] {
 			// only record an edge once, as an identical link can appear multiple time in a script
 			metadata.Edges = append(metadata.Edges, edge)
@@ -96,11 +102,11 @@ func findNodeStack(nodes []*common.Node, nodeObj any) (*common.Node, *HyperCardS
 	for _, node := range nodes {
 		switch v := nodeObj.(type) {
 		case *HyperCardStack:
-			if v.Name == node.StackName {
+			if node.IsOfType(common.IsStack) && v.Name == node.Name {
 				return node, v
 			}
 		case *HyperCardCard:
-			if v.Name == node.Name {
+			if node.IsOfType(common.IsCard) && v.Name == node.Name {
 				return node, v.Stack
 			}
 		}
@@ -118,7 +124,8 @@ func getEdgeAttributes(
 		edgeTypes = append(edgeTypes, common.Disabled)
 	}
 
-	if link.IsCrossAges {
+	if sourceStack != nil && targetStack != nil && sourceStack != targetStack ||
+		(sourceStack == nil || targetStack == nil) && link.IsCrossAges {
 		edgeTypes = append(edgeTypes, common.CrossAge)
 	} else {
 		edgeTypes = append(edgeTypes, common.IntraAge)

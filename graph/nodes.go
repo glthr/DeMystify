@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/glthr/DeMystify/common"
 	"gonum.org/v1/gonum/graph/multi"
+	"slices"
 )
 
 // GetNodeFromID returns the node with the given ID
@@ -19,6 +20,9 @@ func (g *MystGraph) GetNodeFromID(ID int64) (*common.Node, error) {
 
 // AddNode adds a new node to the graph
 func (g *MystGraph) AddNode(node *common.Node) error {
+	if node == nil {
+		return fmt.Errorf("node cannot be nil")
+	}
 	// check if a node already exists
 	if _, exists := g.NodeMap[node.Name]; exists {
 		return common.NodeAlreadyExistsErr
@@ -30,6 +34,11 @@ func (g *MystGraph) AddNode(node *common.Node) error {
 
 	g.NodeMap[node.Name] = *node
 	g.IdNameMap[node.GraphID] = node.Name
+	g.IdStackMap[node.GraphID] = node.StackName
+	if !g.building {
+		g.Metadata.Nodes = append(g.Metadata.Nodes, node)
+		g.Metadata.TotalNodes = uint(g.Graph.Nodes().Len())
+	}
 
 	return nil
 }
@@ -84,6 +93,9 @@ func (g *MystGraph) addNodeAttribute(id int64, attribute common.NodeAttribute) {
 			}
 
 			g.Metadata.Nodes[i].Attributes = append(g.Metadata.Nodes[i].Attributes, attribute)
+			node := g.NodeMap[g.Metadata.Nodes[i].Name]
+			node.Attributes = slices.Clone(g.Metadata.Nodes[i].Attributes)
+			g.NodeMap[node.Name] = node
 			break
 		}
 	}
@@ -138,4 +150,16 @@ func (g *MystGraph) GetPredecessors(name string) ([]string, error) {
 	}
 
 	return predecessors, nil
+}
+
+// clearNodeAttribute removes an obsolete analysis result before recomputing it.
+func (g *MystGraph) clearNodeAttribute(attribute common.NodeAttribute) {
+	for _, node := range g.Metadata.Nodes {
+		if slices.Contains(node.Attributes, attribute) {
+			node.Attributes = slices.DeleteFunc(slices.Clone(node.Attributes), func(a common.NodeAttribute) bool { return a == attribute })
+		}
+		stored := g.NodeMap[node.Name]
+		stored.Attributes = slices.Clone(node.Attributes)
+		g.NodeMap[node.Name] = stored
+	}
 }

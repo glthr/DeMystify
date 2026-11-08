@@ -4,7 +4,7 @@ We welcome your involvement in developing this project. Please follow these step
 
 ## Report Bugs
 
-We use [GitHub issues](https://github.com/gkthr/DeMystify/issues) to track public bugs. Report a bug by opening a new issue.
+We use [GitHub issues](https://github.com/glthr/DeMystify/issues) to track public bugs. Report a bug by opening a new issue.
 
 ## Open Pull Requests
 
@@ -18,6 +18,19 @@ To propose modifications to the codebase, submit pull requests following these g
 4. Lint your code.
 5. New contributor? Do not forget to add your name to `AUTHORS.md`
 6. Provide clear commit messages: Write descriptive commit messages explaining each change's purpose. They should comply with the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
+
+## Validation
+
+Run these checks before opening a pull request:
+
+```bash
+go test -race ./...
+go vet ./...
+```
+
+To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the converted stack directory. The test accepts the two verified conversion profiles described in [the second audit](AUDIT_ROUND_2.md), selecting expected counts from the input script rather than the graph output. The game data is optional and must not be added to the repository.
+
+Format changed Go files with `gofmt`. The tests use synthetic stack and card data, so they do not require a Myst CD-ROM. When Graphviz is installed, the integration tests also validate generated DOT with `neato`; those checks are skipped when it is unavailable.
 
 ## License
 

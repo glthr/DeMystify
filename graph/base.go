@@ -17,6 +17,8 @@ type MystGraph struct {
 	IdNameMap  map[int64]string
 	IdStackMap map[int64]string
 
+	building bool // Constructor inputs already belong to Metadata.
+
 	traverser    *traverser
 	nodeAnalyzer *nodesAnalyzer
 	pathAnalyzer *pathAnalyzer
@@ -28,12 +30,26 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 	}
 
 	g := &MystGraph{
+		building:   true,
 		Graph:      multi.NewWeightedDirectedGraph(),
 		Metadata:   metadata,
 		NodeMap:    make(map[string]common.Node, len(metadata.Nodes)),
 		EdgeMap:    make(map[int64]map[int64][]common.Edge),
 		IdNameMap:  make(map[int64]string, len(metadata.Nodes)),
 		IdStackMap: make(map[int64]string, len(metadata.Nodes)),
+	}
+
+	// Parallel lines are alternative ways to make the same move. Their cost
+	// is the cheapest available line, rather than Gonum's default sum.
+	g.Graph.EdgeWeightFunc = func(lines gograph.WeightedLines) float64 {
+		weight := math.Inf(1)
+		if lines != nil {
+			defer lines.Reset()
+			for lines.Next() {
+				weight = math.Min(weight, lines.WeightedLine().Weight())
+			}
+		}
+		return weight
 	}
 
 	// add nodes
@@ -50,6 +66,8 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 		}
 	}
 
+	g.building = false
+
 	// initialize analyzers
 	g.traverser = newTraverser(g)
 	g.nodeAnalyzer = newNodeAnalyzer(g)
@@ -64,6 +82,9 @@ func NewGraph(metadata *common.Metadata) (*MystGraph, error) {
 
 // addEdgeWithAttributes adds an edge to the graph based on its attributes
 func (g *MystGraph) addEdgeWithAttributes(edge *common.Edge) error {
+	if err := g.validateEdge(edge); err != nil {
+		return err
+	}
 	switch {
 	case edge.IsOfType(common.Disabled):
 		return g.addDisabledEdge(edge)
@@ -121,3 +142,16 @@ func (g *MystGraph) HasEdgeFromTo(uid, vid int64) bool {
 func (g *MystGraph) Edge(uid, vid int64) gograph.Edge {
 	return g.Graph.Edge(uid, vid)
 }
+
+func (g *MystGraph) Weight(uid, vid int64) (float64, bool) {
+	if uid == vid {
+		return 0, g.Node(uid) != nil
+	}
+	return g.Graph.Weight(uid, vid)
+}
+
+func (g *MystGraph) WeightedEdge(uid, vid int64) gograph.WeightedEdge {
+	return g.Graph.WeightedEdge(uid, vid)
+}
+
+var _ gograph.WeightedDirected = (*MystGraph)(nil)

@@ -56,17 +56,8 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 
 		enrichTransitiveEdgeIDTooltip(&style.tooltip, edge)
 
-		// set colors based on transitivity ID
-		if style.color == "" {
-			colorIndex := int(edge.TransitivityID) % len(nodesColors)
-			style.color = darkenColor(nodesColors[colorIndex])
-		}
-
+		completeRestrictiveStyle(edge.TransitivityID, &style)
 		style.arrowhead = "none"
-
-		if style.penWidth == 0 {
-			style.penWidth = 1.2
-		}
 
 		return style
 	}
@@ -76,9 +67,10 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 			if existingEdge.IsOfType(common.RestrictiveTransitivityTail) &&
 				existingEdge.TransitivityID == edge.TransitivityID {
 				// found matching restrictive transitivity tail: inherit its style
-				g.applyBaseEdgeStyle(existingEdge, &style)
-
+				g.applyCrossAgeStyle(existingEdge, &style)
 				style.arrowhead = "normal"
+				g.applyEdgeStateStyle(edge, &style)
+				completeRestrictiveStyle(existingEdge.TransitivityID, &style)
 
 				enrichTransitiveEdgeIDTooltip(&style.tooltip, edge)
 
@@ -92,14 +84,36 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 	return style
 }
 
+// completeRestrictiveStyle supplies the appearance shared by both edge halves.
+func completeRestrictiveStyle(transitivityID int64, style *edgeStyle) {
+	if style.color == "" {
+		colorIndex := int(transitivityID % int64(len(nodesColors)))
+		if colorIndex < 0 {
+			colorIndex += len(nodesColors)
+		}
+		style.color = darkenColor(nodesColors[colorIndex])
+	}
+	if style.penWidth == 0 {
+		style.penWidth = 1.2
+	}
+}
+
 // applyBaseEdgeStyle applies basic styling to an edge
 func (g *Generator) applyBaseEdgeStyle(edge *common.Edge, style *edgeStyle) {
+	g.applyCrossAgeStyle(edge, style)
+	g.applyEdgeStateStyle(edge, style)
+}
+
+func (g *Generator) applyCrossAgeStyle(edge *common.Edge, style *edgeStyle) {
 	if edge.IsOfType(common.CrossAge) {
 		style.color = g.stackColors[edge.Source.StackName].borderColor
 		style.tooltip = "CrossAge connection"
 		style.penWidth = 3.0
 	}
 
+}
+
+func (g *Generator) applyEdgeStateStyle(edge *common.Edge, style *edgeStyle) {
 	if edge.IsOfType(common.Backtracking) {
 		style.arrowtail = "inv"
 		style.arrowhead = "inv"
@@ -157,16 +171,17 @@ func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
 		return false
 	}
 
-	attrMap1 := make(map[common.EdgeAttribute]bool, len(edge1.Attributes))
+	attrMap1 := make(map[common.EdgeAttribute]int, len(edge1.Attributes))
 	for _, attr := range edge1.Attributes {
-		attrMap1[attr] = true
+		attrMap1[attr]++
 	}
 
 	// ensure that all attributes match
 	for _, attr := range edge2.Attributes {
-		if !attrMap1[attr] {
+		if attrMap1[attr] == 0 {
 			return false
 		}
+		attrMap1[attr]--
 	}
 
 	return true
@@ -174,11 +189,4 @@ func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
 
 func (g *Generator) getNodePairID(fromID, toID int64) string {
 	return fmt.Sprintf("%d->%d", fromID, toID)
-}
-
-func (g *Generator) getBidirectionalPairID(id1, id2 int64) string {
-	if id1 < id2 {
-		return fmt.Sprintf("%d<->%d", id1, id2)
-	}
-	return fmt.Sprintf("%d<->%d", id2, id1)
 }

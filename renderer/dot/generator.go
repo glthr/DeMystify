@@ -33,7 +33,6 @@ func NewGenerator(graph *graph.MystGraph, metadata *common.Metadata) *Generator 
 		metadata:          metadata,
 		config:            DefaultConfig(),
 		nodeStyles:        make(map[int64]nodeStyle),
-		edgeStyles:        make(map[string]edgeStyle),
 		stackColors:       make(map[string]nodeColors),
 		customPathEdgeSet: make(map[string]bool),
 	}
@@ -83,12 +82,13 @@ func (g *Generator) initializeCustomPath() {
 // Generate creates a DOT representation of the Myst Graph
 // NOTE: it would be preferable to use a library instead of performing string manipulations
 func (g *Generator) Generate(path []int64) (string, error) {
-	if path != nil {
-		g.customPath = path
-		g.initializeCustomPath()
-	}
+	g.customPath = append([]int64(nil), path...)
+	g.initializeCustomPath()
+	g.initializeEdgesMap()
+	g.nodeStyles = make(map[int64]nodeStyle)
 
-	if g.config.ColorByStack && len(g.stackColors) == 0 {
+	g.stackColors = make(map[string]nodeColors)
+	if g.config.ColorByStack {
 		g.assignStackColors()
 	}
 

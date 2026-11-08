@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/glthr/DeMystify/common"
 )
@@ -17,42 +18,118 @@ type ScriptLine struct {
 	IsDisabled bool
 }
 
+var (
+	numericCardPositionPattern  = regexp.MustCompile(`^[0-9]+$`)
+	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"\s+of\s+stack\s+"([^"]+)"`)
+	goToCardOfStackPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
+	goToNamedCardPattern        = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"`)
+	goToCurrentCardPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+this\s+card\b`)
+	goToCardPattern             = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)`)
+	popCardPattern              = regexp.MustCompile(`(?i)\bpop\s+card\b`)
+	bluePagePattern             = regexp.MustCompile(`(?i)\bput\s+"(\d+),A,0"\s+into\s+ALL_Page\b`)
+	redPagePattern              = regexp.MustCompile(`(?i)\bput\s+"(\d+),S,0"\s+into\s+ALL_Page\b`)
+	whitePagePattern            = regexp.MustCompile(`(?i)\bput\s+"Atrus"\s+into\s+ALL_Page\b`)
+	pushCardOfStackPattern      = regexp.MustCompile(`(?i)\bpush\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
+	pushCardPattern             = regexp.MustCompile(`(?i)\bpush\s+card\b`)
+)
+
+func normalizeCommand(command string) (string, bool) {
+	command = strings.TrimSpace(command)
+	disabled := strings.HasPrefix(command, "--")
+	if disabled {
+		command = strings.TrimSpace(strings.TrimPrefix(command, "--"))
+	}
+	// Keep whole-line commented navigation as disabled links, but do not
+	// mistake text in trailing comments for executable commands.
+	quoted := false
+	for i := 0; i < len(command); i++ {
+		if command[i] == '"' {
+			quoted = !quoted
+		} else if !quoted && strings.HasPrefix(command[i:], "--") {
+			command = command[:i]
+			break
+		}
+	}
+	return command, disabled
+}
+
 func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, error) {
+	command, disabled := normalizeCommand(command)
 	if link, err := p.handleGoToNamedCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
 	if link, err := p.handleGoToCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
+	if link, err := p.handleGoToNamedCard(source, command); link != nil || err != nil {
+		return link, err
+	}
+	if link := p.handleGoToCurrentCard(source, command); link != nil {
+		return link, nil
+	}
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
 		return link, err
 	}
-	if handled := p.handlePopCard(source, command); handled {
-		return nil, nil
-	}
-	if handled := p.handlePagePatterns(source, command); handled {
-		return nil, nil
+	if !disabled {
+		if handled := p.handlePopCard(source, command); handled {
+			return nil, nil
+		}
+		if handled := p.handlePagePatterns(source, command); handled {
+			return nil, nil
+		}
 	}
 	if link, err := p.handlePushCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
-	if handled := p.handlePushCard(source, command); handled {
-		return nil, nil
+	if !disabled {
+		if handled := p.handlePushCard(source, command); handled {
+			return nil, nil
+		}
 	}
 	return nil, nil
 }
 
+// findCommandMatch accepts complete literal commands outside string literals.
+func findCommandMatch(pattern *regexp.Regexp, command string) []string {
+	quoted := false
+	previous := 0
+	for _, indexes := range pattern.FindAllStringSubmatchIndex(command, -1) {
+		for i := previous; i < indexes[0]; i++ {
+			if command[i] == '"' {
+				quoted = !quoted
+			}
+		}
+		previous = indexes[0]
+		// An unsupported expression or scope must not be truncated into a
+		// literal target by a shorter fallback pattern.
+		if quoted || strings.TrimSpace(command[indexes[1]:]) != "" {
+			continue
+		}
+		matches := make([]string, len(indexes)/2)
+		for i := range matches {
+			if indexes[2*i] >= 0 {
+				matches[i] = command[indexes[2*i]:indexes[2*i+1]]
+			}
+		}
+		return matches
+	}
+	return nil
+}
+
 func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card "{card name}" of stack "{stack name}"`
-	pattern := regexp.MustCompile(`(?i)go( to)? card "([^"]+)" of stack "([^"]+)"`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := findCommandMatch(goToNamedCardOfStackPattern, command)
 	if matches == nil {
+		return nil, nil
+	}
+	// Quoted integers denote card positions, which need stack-order resolution.
+	if numericCardPositionPattern.MatchString(strings.TrimSpace(matches[2])) {
 		return nil, nil
 	}
 
 	cardName := matches[2]
 	stackName := matches[3]
-	target, err := p.GetCardByStackAndName(stackName, cardName)
+	target, err := p.getScriptCardByName(stackName, cardName)
 	if err != nil {
 		target, err = p.createVirtualCard(stackName, cardName)
 		if err != nil {
@@ -76,13 +153,18 @@ func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperC
 
 func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {card id} of stack "{stack name}"`
-	pattern := regexp.MustCompile(`(?i)go( to)? card id (\d+) of stack "([^"]+)"`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := findCommandMatch(goToCardOfStackPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
 
-	cardID, _ := strconv.Atoi(matches[2])
+	cardID, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid card ID %q: %w", matches[2], err)
+	}
+	if cardID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d: expected a positive integer", cardID)
+	}
 	stackName := matches[3]
 
 	target, err := p.GetCardByStackAndID(stackName, cardID)
@@ -107,15 +189,57 @@ func (p *Parser) handleGoToCardOfStack(source any, command string) (*HyperCardLi
 	}, nil
 }
 
+func (p *Parser) handleGoToNamedCard(source any, command string) (*HyperCardLink, error) {
+	matches := findCommandMatch(goToNamedCardPattern, command)
+	if matches == nil {
+		return nil, nil
+	}
+	// Quoted integers denote card positions, which need stack-order resolution.
+	if numericCardPositionPattern.MatchString(strings.TrimSpace(matches[2])) {
+		return nil, nil
+	}
+
+	var stackName string
+	switch src := source.(type) {
+	case *HyperCardCard:
+		stackName = src.Stack.Name
+	case *HyperCardStack:
+		stackName = src.Name
+	}
+	target, err := p.getScriptCardByName(stackName, matches[2])
+	notImplemented := err != nil
+	if notImplemented {
+		target, err = p.createVirtualCard(stackName, matches[2])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &HyperCardLink{Source: source, Target: target, IsNotImplemented: notImplemented}, nil
+}
+
+func (p *Parser) handleGoToCurrentCard(source any, command string) *HyperCardLink {
+	card, ok := source.(*HyperCardCard)
+	if !ok || findCommandMatch(goToCurrentCardPattern, command) == nil {
+		// A stack handler's current card is determined at runtime.
+		return nil
+	}
+	return &HyperCardLink{Source: card, Target: card}
+}
+
 func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, error) {
 	// `go [to] card id {id}`
-	pattern := regexp.MustCompile(`(?i)go( to)? card id (\d+)`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := findCommandMatch(goToCardPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
 
-	cardID, _ := strconv.Atoi(matches[2])
+	cardID, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid card ID %q: %w", matches[2], err)
+	}
+	if cardID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d: expected a positive integer", cardID)
+	}
 	var stackName string
 	switch src := source.(type) {
 	case *HyperCardCard:
@@ -147,32 +271,35 @@ func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, err
 }
 
 func (p *Parser) handlePopCard(source any, command string) bool {
+	card, ok := source.(*HyperCardCard)
+	if !ok {
+		return false
+	}
 	// `pop card"`
-	pattern := regexp.MustCompile(`(?i)pop card`)
-	if matches := pattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).IsPopCard = true
+	if matches := findCommandMatch(popCardPattern, command); matches != nil {
+		card.IsPopCard = true
 		return true
 	}
 	return false
 }
 
 func (p *Parser) handlePagePatterns(source any, command string) bool {
-	bluePagePattern := regexp.MustCompile(`(?i)put "(\d+),A,0" into ALL_Page`)
-	redPagePattern := regexp.MustCompile(`(?i)put "(\d+),S,0" into ALL_Page`)
-	whitePagePattern := regexp.MustCompile(`(?i)put "Atrus" into ALL_Page`)
-
-	if matches := bluePagePattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).HasBluePage = true
+	card, ok := source.(*HyperCardCard)
+	if !ok {
+		return false
+	}
+	if matches := findCommandMatch(bluePagePattern, command); matches != nil {
+		card.HasBluePage = true
 		return true
 	}
 
-	if matches := redPagePattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).HasRedPage = true
+	if matches := findCommandMatch(redPagePattern, command); matches != nil {
+		card.HasRedPage = true
 		return true
 	}
 
-	if matches := whitePagePattern.FindStringSubmatch(command); matches != nil {
-		source.(*HyperCardCard).HasWhitePage = true
+	if matches := findCommandMatch(whitePagePattern, command); matches != nil {
+		card.HasWhitePage = true
 		return true
 	}
 
@@ -181,13 +308,18 @@ func (p *Parser) handlePagePatterns(source any, command string) bool {
 
 func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLink, error) {
 	// `push card id {card id} of stack "{stack name}"`
-	pattern := regexp.MustCompile(`(?i)push card id (\d+) of stack "([^"]+)"`)
-	matches := pattern.FindStringSubmatch(command)
+	matches := findCommandMatch(pushCardOfStackPattern, command)
 	if matches == nil {
 		return nil, nil
 	}
 
-	cardID, _ := strconv.Atoi(matches[1])
+	cardID, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid card ID %q: %w", matches[1], err)
+	}
+	if cardID <= 0 {
+		return nil, fmt.Errorf("invalid card ID %d: expected a positive integer", cardID)
+	}
 	stackName := matches[2]
 
 	target, err := p.GetCardByStackAndID(stackName, cardID)
@@ -218,8 +350,7 @@ func (p *Parser) handlePushCardOfStack(source any, command string) (*HyperCardLi
 
 func (p *Parser) handlePushCard(source any, command string) bool {
 	// `push card`
-	pattern := regexp.MustCompile(`(?i)push card`)
-	if matches := pattern.FindStringSubmatch(command); matches != nil {
+	if matches := findCommandMatch(pushCardPattern, command); matches != nil {
 		switch s := source.(type) {
 		case *HyperCardStack:
 			s.IsPushStack = true
@@ -238,11 +369,15 @@ func (p *Parser) createVirtualCard(stackName string, cardID any) (*HyperCardCard
 		return nil, err
 	}
 
-	return &HyperCardCard{
+	card := &HyperCardCard{
 		Name: fmt.Sprintf("%s:%s",
-			stackName,
+			stack.Name,
 			cardName,
 		),
 		Stack: stack,
-	}, nil
+	}
+	if id, ok := cardID.(int); ok {
+		card.ID = id
+	}
+	return card, nil
 }

@@ -6,7 +6,9 @@ DeMystify is an unofficial open-source project graph-based analysis of the class
 
 ## The Myst Graph
 
-The Myst Graph represents the game's cards as a network–a graph–showing how they are connected. This visualization helps us understand the game’s structure in a new way. It features 1,364 nodes and 3,189 directed or bidirectional edges.
+The Myst Graph represents the game's cards as a network–a graph–showing how they are connected. This visualization helps us understand the game’s structure in a new way. The corrected generator produces 1,364 nodes and 3,215 non-disabled directed connections from a fresh conversion of the original stacks (3,214 from the supplied XML snapshot), before reverse pairs are combined for display. The published visualization has 3,189 connections. [Graph changes](GRAPH_CHANGES.md) explains the first audit; [the second audit](AUDIT_ROUND_2.md) documents the raw-stack conversion, input difference and additional code fixes.
+
+The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled and backtracking edges. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
 
 ## Generate the Myst Graph
 

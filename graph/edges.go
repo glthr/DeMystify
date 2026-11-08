@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"fmt"
+	"math"
 	"slices"
 
 	"github.com/glthr/DeMystify/common"
@@ -9,12 +11,12 @@ import (
 )
 
 func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
-	// NOTE: using multi.WeightedLine as it notably supports self-loops
-	g.Graph.SetWeightedLine(multi.WeightedLine{
-		F: multi.Node(edge.Source.GraphID),
-		T: multi.Node(edge.Target.GraphID),
-		W: weight,
-	})
+	if err := g.validateEdge(edge); err != nil {
+		return err
+	}
+	if math.IsNaN(weight) || weight < 0 {
+		return fmt.Errorf("edge weight must be non-negative, got %v", weight)
+	}
 
 	if _, ok := g.EdgeMap[edge.Source.GraphID]; !ok {
 		g.EdgeMap[edge.Source.GraphID] = make(map[int64][]common.Edge)
@@ -26,43 +28,61 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 			return false
 		}
 
-		attrMap1 := make(map[common.EdgeAttribute]bool)
+		attrMap1 := make(map[common.EdgeAttribute]int)
 		for _, attr := range attrs1 {
-			attrMap1[attr] = true
+			attrMap1[attr]++
 		}
 
 		for _, attr := range attrs2 {
-			if !attrMap1[attr] {
+			if attrMap1[attr] == 0 {
 				return false
 			}
+			attrMap1[attr]--
 		}
 
 		return true
 	}
 
-	isDuplicate := false
-	if edges, ok := g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID]; ok {
-		for _, existingEdge := range edges {
-			if existingEdge.TransitivityID == edge.TransitivityID &&
-				areAttributesEqual(existingEdge.Attributes, edge.Attributes) {
-				isDuplicate = true
-				break
-			}
+	lineID := len(g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID])
+	for i, existingEdge := range g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] {
+		if existingEdge.TransitivityID == edge.TransitivityID &&
+			areAttributesEqual(existingEdge.Attributes, edge.Attributes) {
+			lineID = i
+			break
 		}
 	}
 
-	// only add to the edge map if it is not a duplicate
-	if !isDuplicate {
+	// Each metadata edge has a stable line ID within this source/target pair.
+	// Re-adding an identical edge updates its weight; distinct parallel edges
+	// retain separate lines rather than overwriting line zero.
+	if edge.IsOfType(common.Disabled) {
+		g.Graph.RemoveLine(edge.Source.GraphID, edge.Target.GraphID, int64(lineID))
+	} else {
+		if edge.IsOfType(common.Backtracking) {
+			weight = math.Inf(1)
+		}
+		g.Graph.SetWeightedLine(multi.WeightedLine{
+			F: g.Node(edge.Source.GraphID), T: g.Node(edge.Target.GraphID),
+			W: weight, UID: int64(lineID),
+		})
+	}
+	if lineID == len(g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID]) {
 		newEdge := common.Edge{
-			Attributes:     edge.Attributes,
+			Attributes:     slices.Clone(edge.Attributes),
 			Source:         edge.Source,
 			Target:         edge.Target,
 			TransitivityID: edge.TransitivityID,
 		}
 		g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] = append(
 			g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID], newEdge)
+		if !g.building {
+			g.Metadata.Edges = append(g.Metadata.Edges, &newEdge)
+		}
 	}
 
+	if !g.building {
+		g.Metadata.TotalEdges = uint(g.Graph.Edges().Len())
+	}
 	return nil
 }
 
@@ -83,47 +103,45 @@ func (g *MystGraph) GetEdgeAttributes(sourceID, targetID int64) ([]common.EdgeAt
 
 // AddEdgeAttribute adds an attribute to an edge in the metadata
 func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.EdgeAttribute) bool {
-	for i, edge := range g.Metadata.Edges {
+	changed := false
+	for _, edge := range g.Metadata.Edges {
 		if edge.Source.GraphID == sourceID && edge.Target.GraphID == targetID {
-			for _, attr := range edge.Attributes {
-				if attr == attribute {
-					return false // attribute already exists
-				}
+			if !slices.Contains(edge.Attributes, attribute) {
+				edge.Attributes = append(slices.Clone(edge.Attributes), attribute)
+				changed = true
 			}
-
-			g.Metadata.Edges[i].Attributes = append(g.Metadata.Edges[i].Attributes, attribute)
-
-			// update the edge map as well
-			if targetMap, ok := g.EdgeMap[sourceID]; ok {
-				if edges, ok := targetMap[targetID]; ok {
-					for j := range edges {
-						edges[j].Attributes = append(edges[j].Attributes, attribute)
-					}
-					targetMap[targetID] = edges
-				}
-			}
-
-			return true
 		}
 	}
-
-	return false
+	for i := range g.EdgeMap[sourceID][targetID] {
+		edge := &g.EdgeMap[sourceID][targetID][i]
+		if !slices.Contains(edge.Attributes, attribute) {
+			edge.Attributes = append(slices.Clone(edge.Attributes), attribute)
+			changed = true
+		}
+	}
+	if changed && (attribute == common.Disabled || attribute == common.Backtracking) {
+		lines := g.Graph.WeightedLines(sourceID, targetID)
+		for lines.Next() {
+			line := lines.WeightedLine()
+			if attribute == common.Disabled {
+				g.Graph.RemoveLine(sourceID, targetID, line.ID())
+			} else {
+				g.Graph.SetWeightedLine(multi.WeightedLine{
+					F: line.From(), T: line.To(), W: math.Inf(1), UID: line.ID(),
+				})
+			}
+		}
+	}
+	if changed {
+		g.Metadata.TotalEdges = uint(g.Graph.Edges().Len())
+	}
+	return changed
 }
 
 // GetAllEdges returns all edges from sourceID to targetID
 func (g *MystGraph) GetAllEdges(sourceID, targetID int64) ([]common.Edge, bool) {
 	if targetMap, ok := g.EdgeMap[sourceID]; ok {
 		if edges, ok := targetMap[targetID]; ok && len(edges) > 0 {
-
-			// sort edges by ID before returning
-			slices.SortFunc(edges, func(a, b common.Edge) int {
-				if a.Source.GraphID < b.Source.GraphID {
-					return -1
-				} else if a.Source.GraphID > b.Source.GraphID {
-					return 1
-				}
-				return 0
-			})
 			return edges, true
 		}
 	}
@@ -180,4 +198,17 @@ func (g *MystGraph) HasEdge(fromName, toName string) bool {
 	}
 
 	return false
+}
+
+func (g *MystGraph) validateEdge(edge *common.Edge) error {
+	if edge == nil || edge.Source == nil || edge.Target == nil {
+		return fmt.Errorf("edge and its source and target cannot be nil")
+	}
+	for _, endpoint := range []*common.Node{edge.Source, edge.Target} {
+		node, ok := g.NodeMap[endpoint.Name]
+		if !ok || node.GraphID != endpoint.GraphID {
+			return fmt.Errorf("edge endpoint %q is not in the graph", endpoint.Name)
+		}
+	}
+	return nil
 }

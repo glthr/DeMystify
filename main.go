@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"runtime"
+	"path/filepath"
 
 	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
@@ -17,41 +17,47 @@ import (
 const graphFilePath = "generated/graph.dot"
 
 func main() {
+	if err := run(os.Args[1:]); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: go run main.go <xml_hypercard_files_directory_path>")
+	}
+
 	// ensure that Neato is installed (to generate the PDF file)
 	// NOTE: should be refactored by using a library to create the PDF file,
 	// or render the graph in a different format
 	err := CheckNeatoInstalled()
 	if err != nil {
-		log.Fatalf("Neato is not installed: %v", err)
+		return err
 	}
 
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: go run main.go <xml_hypercard_files_directory_path>")
-	}
-
-	stacksDir := os.Args[1]
+	stacksDir := args[0]
 
 	// parser: extract information from the stacks and cards
 	fmt.Println("Parsing stacks and cards...")
 
 	p, err := parser.NewParser(stacksDir)
 	if err != nil {
-		log.Fatalf("unable to parse stacks and cards: %v", err)
+		return fmt.Errorf("unable to parse stacks and cards: %w", err)
 	}
 
 	metadata, err := p.Process()
 	if err != nil {
-		log.Fatalf("parser error: %v", err)
+		return fmt.Errorf("parser error: %w", err)
 	}
 
 	// guard clause (helpful for external contributors...)
 	// NOTE: to replace with a more robust mechanism, like hashing the files
 	if metadata.TotalStacks != 6 {
-		log.Fatalf("expected 6 stacks (Ages), got %d", metadata.TotalStacks)
+		return fmt.Errorf("expected 6 stacks (Ages), got %d", metadata.TotalStacks)
 	}
 
 	if metadata.TotalCards != 1355 {
-		log.Fatalf("expected 1355 cards, got %d", metadata.TotalCards)
+		return fmt.Errorf("expected 1355 cards, got %d", metadata.TotalCards)
 	}
 
 	fmt.Printf("Stack count: %d\n", metadata.TotalStacks)
@@ -62,7 +68,7 @@ func main() {
 
 	g, err := graph.NewGraph(metadata)
 	if err != nil {
-		log.Fatalf("error while instantiating the graph: %v", err)
+		return fmt.Errorf("error while instantiating the graph: %w", err)
 	}
 
 	g.Process()
@@ -73,7 +79,7 @@ func main() {
 	// calculate the shortest path between start (Myst:8336) and end (Dunny Age:11088) of the game
 	// shortestPath, err := ComputeShortestPath(p, g, "Myst", 8336, "Dunny Age", 11088)
 	// if err != nil {
-	// 	log.Fatalf("error while computing the shortest path: %v", err)
+	// 	return fmt.Errorf("error while computing the shortest path: %w", err)
 	// }
 
 	// graph rendering
@@ -85,17 +91,20 @@ func main() {
 	// like `metadata.Stats.MostSeparatedNodes.Path` (most separated nodes)
 	dotContent, err := dotGenerator.Generate(nil)
 	if err != nil {
-		log.Fatalf("error generating the graph rendering: %v", err)
+		return fmt.Errorf("error generating the graph rendering: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(graphFilePath), 0755); err != nil {
+		return fmt.Errorf("creating output directory: %w", err)
 	}
 
 	if err := os.WriteFile(graphFilePath, []byte(dotContent), 0644); err != nil {
-		fmt.Printf("Error saving file: %v\n", err)
-		return
+		return fmt.Errorf("saving DOT file: %w", err)
 	}
 
 	fmt.Println("Generating the PDF file...")
 
-	pdf.RenderPDF(graphFilePath)
+	return pdf.RenderPDF(graphFilePath)
 }
 
 func ComputeShortestPath(
@@ -118,7 +127,7 @@ func ComputeShortestPath(
 
 	to, err := p.GetCardByStackAndID(toStack, toID)
 	if err != nil {
-		log.Fatalf("error while getting card: %v", err)
+		return nil, err
 	}
 
 	toNode, ok := g.GetNodeID(to.Name)
@@ -130,16 +139,8 @@ func ComputeShortestPath(
 }
 
 func CheckNeatoInstalled() error {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("where", "neato")
-	} else {
-		cmd = exec.Command("which", "neato")
-	}
-
-	output, err := cmd.Output()
-	if err != nil || len(output) == 0 {
-		return fmt.Errorf("Neato is not installed")
+	if _, err := exec.LookPath("neato"); err != nil {
+		return fmt.Errorf("neato is not installed: %w", err)
 	}
 
 	return nil
