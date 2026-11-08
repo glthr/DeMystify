@@ -180,51 +180,7 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 		return &shortestPath, nil
 	}
 
-	p := path.DijkstraFrom(pa.g.Node(from), pa.g)
-	pathNodes, weight := p.To(to)
-
-	pathInfo := common.ShortestPathInfo{
-		From:     from,
-		To:       to,
-		Distance: weight,
-		Path:     []int64{},
-	}
-
-	if len(pathNodes) > 0 {
-		for _, node := range pathNodes {
-			pathInfo.Path = append(pathInfo.Path, node.ID())
-		}
-	} else {
-		return &pathInfo, fmt.Errorf("no path exists from %d to %d", from, to)
-	}
-
-	// check if the path uses backtracking
-	if weight >= math.Inf(1) {
-		return &pathInfo, fmt.Errorf("no valid path exists from %d to %d without backtracking", from, to)
-	}
-
-	// if there are multiple possible shortest paths with the same weight,
-	// we need to ensure a deterministic selection.
-	if len(pathInfo.Path) > 2 { // only needed for paths with intermediate nodes
-		alternativePaths := pa.findAllShortestPaths(from, to, weight)
-		if len(alternativePaths) > 1 {
-			// sort the paths lexicographically to ensure deterministic selection
-			sort.Slice(alternativePaths, func(i, j int) bool {
-				// compare paths lexicographically
-				for k := 0; k < len(alternativePaths[i]) && k < len(alternativePaths[j]); k++ {
-					if alternativePaths[i][k] != alternativePaths[j][k] {
-						return alternativePaths[i][k] < alternativePaths[j][k]
-					}
-				}
-				// if one path is a prefix of the other, the shorter one comes first
-				return len(alternativePaths[i]) < len(alternativePaths[j])
-			})
-			// replace with the lexicographically smallest path
-			pathInfo.Path = alternativePaths[0]
-		}
-	}
-
-	return &pathInfo, nil
+	return pa.computeSimpleShortestPath(from, to)
 }
 
 // findAllShortestPaths finds all possible shortest paths between two nodes with a given target weight

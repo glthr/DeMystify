@@ -2,6 +2,7 @@ package graph
 
 import (
 	"github.com/glthr/DeMystify/common"
+	"reflect"
 	"testing"
 )
 
@@ -16,4 +17,36 @@ func newTestGraph(t *testing.T, count int) (*MystGraph, []*common.Node) {
 		t.Fatal(err)
 	}
 	return g, nodes
+}
+
+func TestShortestPathDoesNotEnumerateEqualRoutes(t *testing.T) {
+	const layers = 30 // More than a billion equally short routes.
+	g, nodes := newTestGraph(t, 2*layers+2)
+	add := func(from, to int, weight float64) {
+		t.Helper()
+		if err := g.AddEdge(&common.Edge{Source: nodes[from], Target: nodes[to]}, weight); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add(0, 1, 1)
+	add(0, 2, 1)
+	want := []int64{0}
+	for layer := 0; layer < layers; layer++ {
+		a, b := 1+2*layer, 2+2*layer
+		want = append(want, int64(a))
+		if layer+1 == layers {
+			add(a, len(nodes)-1, 1)
+			add(b, len(nodes)-1, 1)
+		} else {
+			add(a, a+2, 1)
+			add(a, b+2, 1)
+			add(b, a+2, 1)
+			add(b, b+2, 1)
+		}
+	}
+	want = append(want, int64(len(nodes)-1))
+	got, err := g.ComputeShortestPath(0, int64(len(nodes)-1), nil)
+	if err != nil || got.Distance != layers+1 || !reflect.DeepEqual(got.Path, want) {
+		t.Fatalf("layered shortest path = %+v, %v; want %v", got, err, want)
+	}
 }
