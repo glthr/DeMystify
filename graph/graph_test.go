@@ -2,6 +2,7 @@ package graph
 
 import (
 	"github.com/glthr/DeMystify/common"
+	"gonum.org/v1/gonum/graph/multi"
 	"math"
 	"reflect"
 	"testing"
@@ -348,5 +349,21 @@ func TestDegreeTiesUseLowestNodeID(t *testing.T) {
 		if got := g.FindNodeWithMostOutgoingEdges(); got.ID != 0 {
 			t.Fatalf("outgoing degree tie chose node %d, want 0", got.ID)
 		}
+	}
+}
+
+func TestConnectedComponentsHandleSparseAndNegativeIDs(t *testing.T) {
+	g, err := NewGraph(&common.Metadata{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{-7, 5, 1000000000, 1000000001} {
+		g.Graph.AddNode(multi.Node(id))
+	}
+	g.Graph.SetWeightedLine(multi.WeightedLine{F: multi.Node(-7), T: multi.Node(1000000000), W: 1})
+	g.Graph.SetWeightedLine(multi.WeightedLine{F: multi.Node(1000000001), T: multi.Node(1000000000), W: 1})
+	want := [][]int64{{-7, 1000000000, 1000000001}, {5}}
+	if got := g.FindConnectedComponents(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("connected components = %v; want %v", got, want)
 	}
 }

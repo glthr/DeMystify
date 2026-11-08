@@ -79,20 +79,13 @@ func (g *MystGraph) FindConnectedComponents() [][]int64 {
 		return allNodeIDs[i] < allNodeIDs[j]
 	})
 
-	maxID := int64(0)
-	for _, id := range allNodeIDs {
-		if id > maxID {
-			maxID = id
-		}
-	}
-
-	visited := make([]bool, maxID+1)
+	visited := make(map[int64]bool, len(allNodeIDs))
 
 	var components [][]int64
 
 	// process nodes in deterministic order
 	for _, startID := range allNodeIDs {
-		if int(startID) >= len(visited) || visited[startID] {
+		if visited[startID] {
 			continue // skip if already visited or out of bounds
 		}
 
@@ -118,7 +111,7 @@ func (g *MystGraph) FindConnectedComponents() [][]int64 {
 			})
 
 			for _, neighbor := range outNeighbors {
-				if int(neighbor) < len(visited) && !visited[neighbor] {
+				if !visited[neighbor] {
 					visited[neighbor] = true
 					component = append(component, neighbor)
 					queue = append(queue, neighbor)
@@ -137,7 +130,7 @@ func (g *MystGraph) FindConnectedComponents() [][]int64 {
 			})
 
 			for _, neighbor := range inNeighbors {
-				if int(neighbor) < len(visited) && !visited[neighbor] {
+				if !visited[neighbor] {
 					visited[neighbor] = true
 					component = append(component, neighbor)
 					queue = append(queue, neighbor)
