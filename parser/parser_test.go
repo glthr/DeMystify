@@ -78,6 +78,20 @@ func TestIdentifyLinksRejectsPushWithoutGo(t *testing.T) {
 	}
 }
 
+func TestIdentifyLinksPromotesAllDuplicateRestrictedLinks(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1, "go card id 2", "go card id 2", "push card id 3 of stack \"Example\"\ngo card id 2")
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2), testCard(stack, 3)}}
+	if err := p.identifyLinks(); err != nil {
+		t.Fatal(err)
+	}
+	for _, link := range p.links {
+		if link.Source == source && link.Target == p.cards[1] && link.TransitivityRank != common.Tail {
+			t.Fatalf("duplicate go bypasses restricted link: %+v", link)
+		}
+	}
+}
+
 func TestIdentifyLinksAssignsDistinctTransitivityIDs(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	source := testCard(stack, 1, "push card id 3 of stack \"Example\"\ngo card id 2", "push card id 5 of stack \"Example\"\ngo card id 4")

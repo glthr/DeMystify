@@ -174,7 +174,7 @@ func (p *Parser) identifyLinks() error {
 		targetAName := getName(linkA.Target)
 
 		for j, linkB := range p.links {
-			if i == j {
+			if i == j || linkB.TransitivityRank == common.DefaultTransitivity || linkA.IsDisabled != linkB.IsDisabled {
 				continue
 			}
 
