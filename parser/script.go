@@ -83,7 +83,7 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	return nil, nil
 }
 
-// findCommandMatch ignores command-like text inside HyperTalk string literals.
+// findCommandMatch accepts complete literal commands outside string literals.
 func findCommandMatch(pattern *regexp.Regexp, command string) []string {
 	quoted := false
 	previous := 0
@@ -94,7 +94,9 @@ func findCommandMatch(pattern *regexp.Regexp, command string) []string {
 			}
 		}
 		previous = indexes[0]
-		if quoted {
+		// An unsupported expression or scope must not be truncated into a
+		// literal target by a shorter fallback pattern.
+		if quoted || strings.TrimSpace(command[indexes[1]:]) != "" {
 			continue
 		}
 		matches := make([]string, len(indexes)/2)
