@@ -48,6 +48,59 @@ func TestProcessClassifiesEdgesByActualStacks(t *testing.T) {
 	}
 }
 
+func TestIdentifyLinksPairsPushWithFollowingGo(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1, "go card id 2\npush card id 4 of stack \"Example\"\ngo card id 3")
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2), testCard(stack, 3), testCard(stack, 4)}}
+	if err := p.identifyLinks(); err != nil {
+		t.Fatal(err)
+	}
+	var tail, head *HyperCardLink
+	for _, link := range p.links {
+		if link.TransitivityRank == common.Tail {
+			tail = link
+		}
+		if link.TransitivityRank == common.Head {
+			head = link
+		}
+	}
+	if tail == nil || head == nil || tail.Target != p.cards[2] || head.Source != p.cards[2] || head.Target != p.cards[3] {
+		t.Fatalf("push was not paired with the following go: tail=%+v, head=%+v", tail, head)
+	}
+}
+
+func TestIdentifyLinksRejectsPushWithoutGo(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1, "push card id 2 of stack \"Example\"")
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2)}}
+	if err := p.identifyLinks(); err == nil {
+		t.Fatal("want an error for a push without a following go")
+	}
+}
+
+func TestIdentifyLinksHandlesSeveralPushesInOneScript(t *testing.T) {
+	stack := &HyperCardStack{Name: "Example"}
+	source := testCard(stack, 1, "push card id 3 of stack \"Example\"\ngo card id 2\npush card id 5 of stack \"Example\"\ngo card id 4")
+	p := &Parser{stacks: []*HyperCardStack{stack}, cards: []*HyperCardCard{source, testCard(stack, 2), testCard(stack, 3), testCard(stack, 4), testCard(stack, 5)}}
+	if err := p.identifyLinks(); err != nil {
+		t.Fatal(err)
+	}
+	heads := 0
+	for _, link := range p.links {
+		if link.TransitivityRank == common.Head {
+			heads++
+			source := link.Source.(*HyperCardCard)
+			target := link.Target.(*HyperCardCard)
+			if target.ID != source.ID+1 {
+				t.Fatalf("incorrect return pair: %d -> %d", source.ID, target.ID)
+			}
+		}
+	}
+	if heads != 2 {
+		t.Fatalf("got %d return links, want 2", heads)
+	}
+}
+
 func TestStackCardOnlyCommandsDoNotPanic(t *testing.T) {
 	stack := &HyperCardStack{Name: "Example"}
 	p := &Parser{stacks: []*HyperCardStack{stack}}
