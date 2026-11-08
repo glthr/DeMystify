@@ -111,3 +111,81 @@ func TestStackHandlerProjectionRejectsUnprovenContexts(t *testing.T) {
 		})
 	}
 }
+
+func TestStackHandlerProjectionRequiresCompleteBackgrounds(t *testing.T) {
+	for name, edit := range map[string]struct{ file, old, new string }{
+		"undeclared owner":      {"card_1.xml", "<owner>7</owner>", "<owner>99</owner>"},
+		"missing declared file": {stackFileName, "<script>", "<background id=\"8\" file=\"background_8.xml\"/><script>"},
+		"mismatched identity":   {"background_7.xml", "<id>7</id>", "<id>8</id>"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := handlerFixture(t, detailHandler, detailCaller, "", "<background/>")
+			path := filepath.Join(p.stacksDir, edit.file)
+			content, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(strings.Replace(string(content), edit.old, edit.new, 1)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			p, err = NewParser(p.stacksDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, link := range p.links {
+				if _, ok := link.Source.(*HyperCardCard); ok {
+					t.Fatal("incomplete background proof acquired a caller edge")
+				}
+			}
+		})
+	}
+}
+
+func TestUncalledSummariesAreNotWorldMoves(t *testing.T) {
+	p := handlerFixture(t, detailHandler, "", "", "<background/>")
+	path := filepath.Join(p.stacksDir, "card_3.xml")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(string(content), "openDetail 7", "unknownHandler 7", 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p, err = NewParser(p.stacksDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.links) != 0 {
+		t.Fatal("a summarized definition without a call is not a card movement")
+	}
+}
+
+func TestStackHandlerProjectionRejectsDuplicateBackgroundDeclarations(t *testing.T) {
+	for _, duplicate := range []string{`<background id="7" file="background_8.xml"/>`, `<background id="8" file="background_7.xml"/>`} {
+		p := handlerFixture(t, detailHandler, detailCaller, "", "<background/>")
+		path := filepath.Join(p.stacksDir, stackFileName)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(strings.Replace(string(content), "<script>", duplicate+"<script>", 1)), 0600); err != nil {
+			t.Fatal(err)
+		}
+		file, id := "background_8.xml", "7"
+		if strings.Contains(duplicate, `id="8"`) {
+			file, id = "background_7.xml", "8"
+		}
+		if err := os.WriteFile(filepath.Join(p.stacksDir, file), []byte("<background><id>"+id+"</id></background>"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		p, err = NewParser(p.stacksDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, link := range p.links {
+			if _, ok := link.Source.(*HyperCardCard); ok {
+				t.Fatal("ambiguous background identity acquired a caller edge")
+			}
+		}
+	}
+}
