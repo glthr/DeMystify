@@ -25,28 +25,6 @@ func (g *Generator) writeCustomPathInfo(buf *bytes.Buffer) {
 	buf.WriteString("\n\n")
 }
 
-// identifySelfLoops identifies all self-loop edges
-func (g *Generator) identifySelfLoops() []int64 {
-	selfLoopSet := make(map[int64]bool)
-
-	for fromID, targets := range g.edgesMap {
-		if _, hasSelfLoop := targets[fromID]; hasSelfLoop {
-			selfLoopSet[fromID] = true
-		}
-	}
-
-	selfLoops := make([]int64, 0, len(selfLoopSet))
-	for id := range selfLoopSet {
-		selfLoops = append(selfLoops, id)
-	}
-
-	sort.Slice(selfLoops, func(i, j int) bool {
-		return selfLoops[i] < selfLoops[j]
-	})
-
-	return selfLoops
-}
-
 // getSortedNodeIDs returns a sorted slice of node IDs from a map
 func (g *Generator) getSortedNodeIDs(nodeMap map[int64]map[int64][]common.Edge) []int64 {
 	var nodeIDs []int64
@@ -59,14 +37,11 @@ func (g *Generator) getSortedNodeIDs(nodeMap map[int64]map[int64][]common.Edge) 
 	return nodeIDs
 }
 
-// getSortedTargetIDs returns a sorted slice of target node IDs
-// If bidirectionalOnly is true, only returns targets where fromID < toID
-func (g *Generator) getSortedTargetIDs(targetMap map[int64][]common.Edge, fromID int64, bidirectionalOnly bool) []int64 {
+// getSortedTargetIDs returns a sorted slice of target node IDs.
+func (g *Generator) getSortedTargetIDs(targetMap map[int64][]common.Edge) []int64 {
 	var targetIDs []int64
 	for toID := range targetMap {
-		if !bidirectionalOnly || fromID < toID {
-			targetIDs = append(targetIDs, toID)
-		}
+		targetIDs = append(targetIDs, toID)
 	}
 	sort.Slice(targetIDs, func(i, j int) bool {
 		return targetIDs[i] < targetIDs[j]
@@ -115,24 +90,6 @@ func (g *Generator) renderSelfLoopEdge(buf *bytes.Buffer, nodeID int64, edge *co
 	style.isSelfLoop = true
 	styleStr := g.buildEdgeStyleString(style)
 	buf.WriteString(fmt.Sprintf("  \"%d\" -> \"%d\" [%s];\n", nodeID, nodeID, styleStr))
-}
-
-// processSelfLoops handles all self-loop edges
-func (g *Generator) processSelfLoops(buf *bytes.Buffer, selfLoops []int64) {
-	for _, nodeID := range selfLoops {
-		edges, ok := g.edgesMap[nodeID][nodeID]
-		if !ok {
-			continue
-		}
-
-		// sort edges for deterministic output
-		sortedEdges := g.sortEdges(edges)
-
-		for _, edge := range sortedEdges {
-			isOnPath := g.isOnCustomPath(nodeID, nodeID)
-			g.renderSelfLoopEdge(buf, nodeID, &edge, isOnPath)
-		}
-	}
 }
 
 // buildEdgeStyleString converts an edgeStyle to a DOT style attribute
@@ -214,7 +171,7 @@ func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
 	}
 
 	for _, fromID := range g.getSortedNodeIDs(g.edgesMap) {
-		for _, toID := range g.getSortedTargetIDs(g.edgesMap[fromID], fromID, false) {
+		for _, toID := range g.getSortedTargetIDs(g.edgesMap[fromID]) {
 			pairID := g.getNodePairID(fromID, toID)
 			reverseID := g.getNodePairID(toID, fromID)
 			for i, edge := range g.edgesMap[fromID][toID] {

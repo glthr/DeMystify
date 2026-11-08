@@ -147,3 +147,17 @@ func TestBidirectionalMergeMatchesEachEdgesAttributes(t *testing.T) {
 		}
 	}
 }
+
+func TestCustomPathSelfLoopRenderedOnce(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	node := metadata.Nodes[0]
+	metadata.Edges = append(metadata.Edges, &common.Edge{Source: node, Target: node, Attributes: []common.EdgeAttribute{common.SelfReference}})
+	output, err := g.Generate([]int64{node.GraphID, node.GraphID, node.GraphID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := edgeLines(output)
+	if len(lines) != 1 || !strings.Contains(lines[0], "Path edge") || !strings.Contains(lines[0], "constraint=false") {
+		t.Fatalf("self-loop was duplicated or lost its styling: %v", lines)
+	}
+}
