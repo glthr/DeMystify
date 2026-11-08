@@ -14,10 +14,11 @@ import (
 const stackFileName = "stack_-1.xml"
 
 type Parser struct {
-	stacksDir string
-	stacks    []*HyperCardStack
-	cards     []*HyperCardCard
-	links     []*HyperCardLink
+	stacksDir   string
+	stacks      []*HyperCardStack
+	cards       []*HyperCardCard
+	links       []*HyperCardLink
+	pushedLinks map[*HyperCardLink]bool
 }
 
 type HyperCardLink struct {
@@ -155,7 +156,7 @@ func (p *Parser) identifyLinks() error {
 	for _, card := range p.cards {
 		if card.IsPushCard {
 			for _, link := range p.links {
-				if link.Source == card && link.Target != nil && link.TransitivityRank == common.DefaultTransitivity {
+				if link.Source == card && p.pushedLinks[link] && link.Target != nil && link.TransitivityRank == common.DefaultTransitivity {
 					if link.Target.(*HyperCardCard).IsPopCard {
 						link.IsBacktracking = true
 					}
@@ -168,10 +169,14 @@ func (p *Parser) identifyLinks() error {
 }
 
 func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityID *int64) ([]*HyperCardLink, error) {
+	if p.pushedLinks == nil {
+		p.pushedLinks = make(map[*HyperCardLink]bool)
+	}
 	var links []*HyperCardLink
 	var handlers []int
 	handlerID := 0
 	handlerName := ""
+	pushed := false
 	for _, line := range script.lines {
 		// Handler declarations delimit independent sequences of commands.
 		// Nested `end if`/`end repeat` statements do not end a handler.
@@ -180,13 +185,19 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 			switch strings.ToLower(fields[0]) {
 			case "on", "function":
 				handlerID++
+				pushed = false
 				handlerName = fields[1]
 			case "end":
 				if handlerName != "" && strings.EqualFold(fields[1], handlerName) {
 					handlerID++
+					pushed = false
 					handlerName = ""
 				}
 			}
+		}
+		command, disabled := normalizeCommand(line.Line)
+		if !disabled && !line.IsDisabled && findCommandMatch(pushCardPattern, command) != nil {
+			pushed = true
 		}
 		link, err := p.parseCardCommand(source, line.Line)
 		if err != nil {
@@ -194,6 +205,9 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 		}
 		if link != nil {
 			link.IsDisabled = line.IsDisabled
+			if pushed && !link.IsDisabled {
+				p.pushedLinks[link] = true
+			}
 			links = append(links, link)
 			handlers = append(handlers, handlerID)
 		}

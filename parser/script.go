@@ -32,7 +32,7 @@ var (
 	pushCardPattern             = regexp.MustCompile(`(?i)\bpush\s+card\b`)
 )
 
-func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, error) {
+func normalizeCommand(command string) (string, bool) {
 	command = strings.TrimSpace(command)
 	disabled := strings.HasPrefix(command, "--")
 	if disabled {
@@ -49,6 +49,11 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 			break
 		}
 	}
+	return command, disabled
+}
+
+func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, error) {
+	command, disabled := normalizeCommand(command)
 	if link, err := p.handleGoToNamedCardOfStack(source, command); link != nil || err != nil {
 		return link, err
 	}
