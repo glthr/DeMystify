@@ -49,6 +49,7 @@ func ParseSimpleCard(parentStack *HyperCardStack, filepath string, cardIdNameMap
 	}
 
 	type simpleCard struct {
+		XMLName        xml.Name `xml:"card"`
 		Stack          string
 		ID             int             `xml:"id"`
 		Parts          []simplePart    `xml:"part"`

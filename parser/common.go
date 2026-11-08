@@ -259,7 +259,8 @@ func splitScript(script string) []string {
 	if script == "" {
 		return []string{}
 	}
-	return strings.Split(strings.ReplaceAll(script, "\r\n", "\n"), "\n")
+	script = strings.ReplaceAll(script, "\r\n", "\n")
+	return strings.Split(strings.ReplaceAll(script, "\r", "\n"), "\n")
 }
 
 func (p *Parser) GetAllStacks() []*HyperCardStack {

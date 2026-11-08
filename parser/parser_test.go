@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -30,5 +32,21 @@ func TestCardCommandsRejectOverflowingIDs(t *testing.T) {
 		if _, err := p.parseCardCommand(card, command); err == nil {
 			t.Errorf("want an error for overflowing ID in %q", command)
 		}
+	}
+}
+
+func TestSplitScriptSupportsClassicMacLineEndings(t *testing.T) {
+	if got := splitScript("one\rtwo\r\nthree\nfour"); len(got) != 4 {
+		t.Fatalf("got %q, want four script lines", got)
+	}
+}
+
+func TestParseSimpleCardRejectsWrongXMLRoot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "card_1.xml")
+	if err := os.WriteFile(path, []byte("<stack><id>1</id></stack>"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseSimpleCard(&HyperCardStack{Name: "Example"}, path, nil); err == nil {
+		t.Fatal("want an error for a stack XML document passed as a card")
 	}
 }
