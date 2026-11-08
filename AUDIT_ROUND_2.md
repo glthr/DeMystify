@@ -4,7 +4,7 @@ This audit starts at `4335f9d`. It tests both the supplied XML snapshot and a fr
 
 ## Fresh conversion provenance
 
-Six actual HyperCard stack data forks were extracted selectively from the supplied emulator archives. Their SHA256 hashes agree between the ZIP and 7z copies. Original files remain unchanged. Available Channelwood resource-fork and FinderInfo sidecars were preserved on the working copies; the other five archived stacks provide no such sidecars.
+Six actual HyperCard stack data forks were extracted selectively from the supplied emulator archives. Their SHA256 hashes agree between the ZIP and 7z copies. Original files remain unchanged. These user-supplied emulator archives have not been independently authenticated as pristine CD-ROM images. Available Channelwood resource-fork and FinderInfo sidecars were preserved on the working copies; the other five archived stacks provide no such sidecars.
 
 The converter is unmodified [stackimport](https://github.com/uliwitness/stackimport) at `878664b2122abc1caec25b5f71d2222574f4f3c8`, with snd2wav submodule `d6900ad35ba4da1fb488fe006f64a7977d98b32c`. It was built natively with Apple clang 21, `-std=gnu++11`, Carbon and CoreServices, using upstream Mac resource support and QuickTime disabled. Each conversion used `--noprogress`.
 
@@ -35,7 +35,7 @@ Eleven XML files differ from the saved conversion, mostly in whitespace. Three s
 | Dock-to-ending distance | 24 | 24 |
 | Longest finite shortest distance | 130 | 130 |
 
-The sole added relationship is `Dunny Age:5200` (Father-Left) to `Dunny Age:5119` (Father-In). Its distance falls from three edges to one. Five ordered-pair distances improve, all starting at card 5200; no pair becomes newly reachable and no distance worsens. Component memberships, all node records and dock reachability stay unchanged.
+The sole added relationship is `Dunny Age:5200` (Father-Left) to `Dunny Age:5119` (Father-In). Its distance falls from three edges to one. Five ordered-pair distances improve, all starting at card 5200; no pair becomes newly reachable and no distance worsens. Component memberships, all node records and dock reachability stay unchanged. Distance measurements exclude disabled and backtracking edges. Source/sink totals include isolated nodes and are not disjoint populations.
 
 This restores a local orientation connection between existing views. It does not reveal a new location, prove a developer changed the room, or alter the two headline distances in the articles.
 
