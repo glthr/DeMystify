@@ -304,3 +304,17 @@ func TestTraversalAttributesUpdateRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestIncomingBacktrackingEdgeDoesNotHideSink(t *testing.T) {
+	nodes := []*common.Node{{Name: "A"}, {Name: "B"}}
+	g, err := NewGraph(&common.Metadata{
+		Nodes: nodes,
+		Edges: []*common.Edge{{Source: nodes[0], Target: nodes[1], Attributes: []common.EdgeAttribute{common.Backtracking}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sinks := g.FindNodesWithNoOutgoingEdges(); !reflect.DeepEqual(sinks, []common.NodeInfo{{ID: 1, Name: "B"}}) {
+		t.Fatalf("sinks = %+v; want B", sinks)
+	}
+}

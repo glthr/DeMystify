@@ -112,34 +112,13 @@ func (na *nodesAnalyzer) findNodesWithNoIncomingEdges() []common.NodeInfo {
 func (na *nodesAnalyzer) findNodesWithNoOutgoingEdges() []common.NodeInfo {
 	var result []common.NodeInfo
 
-	nodes := na.g.Graph.Nodes()
-	for nodes.Next() {
-		node := nodes.Node()
-		id := node.ID()
-
+	for _, id := range na.g.traverser.getAllNodeIDs() {
 		from := na.g.From(id)
 		if !from.Next() {
-			// no outgoing edges in the graph structure, but we need to check
-			// if there are any backtracking edges in the metadata
-
-			hasBacktrackingEdge := false
-
-			// check all edges in metadata where this node is the origin
-			for _, edge := range na.g.Metadata.Edges {
-				if edge.Target.GraphID == id && edge.IsOfType(common.Backtracking) {
-					hasBacktrackingEdge = true
-					break
-				}
-			}
-
-			// only consider as sink if there are no outgoing edges and no backtracking edges
-			if !hasBacktrackingEdge {
-				na.g.addNodeAttribute(id, common.IsSink)
-				result = append(result, common.NodeInfo{
-					ID:   id,
-					Name: na.g.GetNameForID(id),
-				})
-			}
+			na.g.addNodeAttribute(id, common.IsSink)
+			result = append(result, common.NodeInfo{
+				ID: id, Name: na.g.GetNameForID(id),
+			})
 		}
 	}
 
