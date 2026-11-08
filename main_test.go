@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+"strings"
 )
 
 func TestCheckNeatoInstalledUsesPath(t *testing.T) {
@@ -76,5 +77,14 @@ func TestComputeShortestPathLookupErrors(t *testing.T) {
 				t.Fatalf("got (%v, %v), want nil result and lookup error", result, err)
 			}
 		})
+	}
+}
+
+func TestRunReportsUsageBeforeCheckingDependencies(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	for _, args := range [][]string{nil, {"one", "two"}} {
+		if err := run(args); err == nil || !strings.Contains(err.Error(), "usage:") {
+			t.Fatalf("run(%v) = %v, want usage error", args, err)
+		}
 	}
 }
