@@ -129,3 +129,21 @@ func TestBidirectionalMergeRetainsTransitiveEdges(t *testing.T) {
 		t.Fatalf("bidirectional merge discarded transitive edges:\n%s", output)
 	}
 }
+
+func TestBidirectionalMergeMatchesEachEdgesAttributes(t *testing.T) {
+	g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge}, []common.EdgeAttribute{common.CrossAge})
+	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.CrossAge}})
+	output, err := g.Generate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := edgeLines(output)
+	if len(lines) != 2 {
+		t.Fatalf("unmatched forward edge lost: %v", lines)
+	}
+	for _, line := range lines {
+		if strings.Contains(line, "dir=both") && !strings.Contains(line, "CrossAge connection") {
+			t.Fatalf("merged edge used attributes from an unmatched edge: %s", line)
+		}
+	}
+}

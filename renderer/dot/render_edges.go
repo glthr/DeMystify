@@ -14,66 +14,6 @@ func (g *Generator) writeEdges(buf *bytes.Buffer) {
 	g.renderMetadataEdges(buf)
 }
 
-// processBidirectionalEdges handles bidirectional edges with matching attributes
-// skipCustomPath determines whether to skip edges that are part of the custom path
-func (g *Generator) processBidirectionalEdges(buf *bytes.Buffer, processedPairs, bidirectionalPairs, renderedNodePairs map[string]bool, skipCustomPath bool) {
-	// get sorted source and target IDs
-	sourceIDs := g.getSortedNodeIDs(g.edgesMap)
-
-	// process bidirectional edges with matching attributes
-	for _, fromID := range sourceIDs {
-		targetIDs := g.getSortedTargetIDs(g.edgesMap[fromID], fromID, true)
-
-		for _, toID := range targetIDs {
-			// skip self-loops (already processed)
-			if fromID == toID {
-				continue
-			}
-
-			forwardPairID := g.getNodePairID(fromID, toID)
-			reversePairID := g.getNodePairID(toID, fromID)
-			biPairID := g.getBidirectionalPairID(fromID, toID)
-
-			if processedPairs[forwardPairID] {
-				continue
-			}
-
-			// skip edges that are part of the custom path if requested
-			if skipCustomPath && (g.customPathEdgeSet[forwardPairID] || g.customPathEdgeSet[reversePairID]) {
-				processedPairs[forwardPairID] = true
-				processedPairs[reversePairID] = true
-				continue
-			}
-
-			// check for bidirectional relationship with matching attributes
-			if bidirectionalPairs[biPairID] && g.hasMatchingEdges(fromID, toID) {
-				// find non-disabled, non-transitive edges
-				var matchedEdge *common.Edge
-				forwardEdges := g.edgesMap[fromID][toID]
-
-				for _, edge := range forwardEdges {
-					if !edge.IsOfType(common.Disabled) &&
-						!edge.IsOfType(common.RestrictiveTransitivityTail) &&
-						!edge.IsOfType(common.RestrictiveTransitivityHead) {
-						matchedEdge = &edge
-						break
-					}
-				}
-
-				if matchedEdge != nil {
-					// render the bidirectional edge
-					g.renderBidirectionalEdge(buf, fromID, toID, matchedEdge)
-
-					processedPairs[forwardPairID] = true
-					processedPairs[reversePairID] = true
-					renderedNodePairs[forwardPairID] = true
-					renderedNodePairs[reversePairID] = true
-				}
-			}
-		}
-	}
-}
-
 // processRegularEdges processes regular (non-matched bidirectional, non-self-loop) edges
 // skipCustomPath determines whether to skip edges that are part of the custom path
 func (g *Generator) processRegularEdges(buf *bytes.Buffer, processedPairs, renderedNodePairs, transitiveEdgesProcessed map[string]bool, skipCustomPath bool) {
