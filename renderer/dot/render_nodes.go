@@ -43,19 +43,18 @@ func (g *Generator) writeNodes(buf *bytes.Buffer) {
 		// check if node is on custom path
 		isOnCustomPath := customPathNodes[id]
 
-		// get node style (which may include custom style from analysis)
-		baseStyleStr := g.getNodeStyleString(id, nodeObj)
-		styleStr := baseStyleStr
-
-		// apply custom path styling if applicable
+		style := g.getNodeStyle(id, nodeObj)
 		if isOnCustomPath {
-			styleStr = g.applyCustomPathStylingToNode(baseStyleStr, nodeObj, true)
+			style = g.applyPathStyle(style, nodeObj)
 		}
-
-		// add label if not already present
-		styleStr = g.ensureNodeLabel(styleStr, nodeObj, id)
-
-		buf.WriteString(fmt.Sprintf("  \"%d\" [%s];\n", id, styleStr))
+		if style.label == "" {
+			if g.config.UseNodeNames {
+				style.label = g.getDisplayName(nodeObj)
+			} else {
+				style.label = fmt.Sprintf("%d", id)
+			}
+		}
+		buf.WriteString(fmt.Sprintf("  \"%d\" [%s];\n", id, g.buildNodeStyleString(style)))
 	}
 }
 
@@ -78,10 +77,10 @@ func (g *Generator) getDisplayName(node common.Node) string {
 	return name
 }
 
-// getNodeStyleString gets the style string for a node
-func (g *Generator) getNodeStyleString(id int64, node common.Node) string {
+// getNodeStyle gets the style for a node.
+func (g *Generator) getNodeStyle(id int64, node common.Node) nodeStyle {
 	if style, hasStyle := g.nodeStyles[id]; hasStyle {
-		return g.buildNodeStyleString(style)
+		return style
 	}
 
 	// create a default style
@@ -125,7 +124,7 @@ func (g *Generator) getNodeStyleString(id int64, node common.Node) string {
 		style.borderColor = "#fbc02d"
 	}
 
-	return g.buildNodeStyleString(style)
+	return style
 }
 
 // applyCustomPathStylingToNode enhances style for nodes on the custom path
@@ -226,4 +225,18 @@ func escapeForDOT(input string) string {
 	// escape quotes
 	result = strings.ReplaceAll(result, "\"", "\\\"")
 	return result
+}
+
+// applyPathStyle keeps style values structured until DOT encoding.
+// Parsing a style string on commas would corrupt commas inside quoted labels.
+func (g *Generator) applyPathStyle(style nodeStyle, nodeObj common.Node) nodeStyle {
+	style.fillColor = "#E74C3C"
+	style.fontColor = "#FFFFFF"
+	if !nodeObj.IsOfType(common.ContainsBluePage) &&
+		!nodeObj.IsOfType(common.ContainsRedPage) &&
+		!nodeObj.IsOfType(common.ContainsWhitePage) {
+		style.penWidth = 2.0
+		style.borderColor = "#B71C1C"
+	}
+	return style
 }

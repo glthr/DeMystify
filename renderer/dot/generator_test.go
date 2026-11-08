@@ -61,3 +61,19 @@ func TestSmallComponentsDoNotCreatePhantomSingleton(t *testing.T) {
 		t.Fatalf("small component created nonexistent singleton anchor:\n%s", output)
 	}
 }
+
+func TestNodeLabelEscapingAndPathStyling(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	node := metadata.Nodes[0]
+	secondary := "one, label=two"
+	copy := g.graph.NodeMap[node.Name]
+	copy.SecondaryName = &secondary
+	g.graph.NodeMap[node.Name] = copy
+	output, err := g.Generate([]int64{node.GraphID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, `label="A\none, label=two"`) {
+		t.Fatalf("path style corrupted label comma:\n%s", output)
+	}
+}
