@@ -28,7 +28,7 @@ go test -race ./...
 go vet ./...
 ```
 
-To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the converted stack directory. The game data is optional and must not be added to the repository.
+To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the converted stack directory. The test accepts the two verified conversion profiles described in [the second audit](AUDIT_ROUND_2.md), selecting expected counts from the input script rather than the graph output. The game data is optional and must not be added to the repository.
 
 Format changed Go files with `gofmt`. The tests use synthetic stack and card data, so they do not require a Myst CD-ROM. When Graphviz is installed, the integration tests also validate generated DOT with `neato`; those checks are skipped when it is unavailable.
 

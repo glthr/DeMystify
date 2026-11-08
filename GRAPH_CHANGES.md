@@ -1,6 +1,8 @@
 # Graph changes
 
-The audit uses the original six Myst stacks and 1,355 converted cards. The reference code is `0276f8c`, and its app-generated DOT exactly reproduces the committed `generated/graph.dot`.
+This first-audit ledger uses the supplied XML snapshot of six Myst stacks and 1,355 converted cards. The reference code is `0276f8c`, and its app-generated DOT exactly reproduces the committed `generated/graph.dot`.
+
+A [second audit and fresh raw-stack conversion](AUDIT_ROUND_2.md) subsequently verified the same-input DOT byte-for-byte and recovered one further Dunny relationship from the fresh input (3,215 pairs / 3,228 records). The tables below retain the first audit's controlled comparison.
 
 ## Maintenance verification
 
