@@ -1,6 +1,6 @@
 # Graph changes
 
-This first-audit ledger uses the supplied XML snapshot of six Myst stacks and 1,355 converted cards. The reference code is `0276f8c`, and its app-generated DOT exactly reproduces the committed `generated/graph.dot`.
+This first-audit ledger uses the supplied XML snapshot of six Myst stacks and 1,355 converted cards. The reference code is `0276f8c`, and its app-generated DOT exactly reproduces [`generated/graph.dot` at that revision](https://github.com/glthr/DeMystify/blob/0276f8c/generated/graph.dot).
 
 A [second audit and fresh raw-stack conversion](AUDIT_ROUND_2.md) subsequently verified the same-input DOT byte-for-byte and recovered one further Dunny relationship from the fresh input (3,215 pairs / 3,228 records). The tables below retain the first audit's controlled comparison.
 
@@ -81,6 +81,6 @@ go test -race ./...
 go vet ./...
 ```
 
-DOT is the primary comparison. Corrected graph topology can move many nodes in Neato even when only a few arrows change; movement alone is not another game-related correction. The original published PDF remains an archived reference.
+DOT is the primary comparison. Corrected graph topology can move many nodes in Neato even when only a few arrows change; movement alone is not another game-related correction. The [original published PDF](https://github.com/glthr/DeMystify/blob/0276f8c/generated/myst_graph.pdf) remains an archived reference in Git history. The current full-graph artifacts are regenerated from the fresh conversion; see [their provenance](generated/README.md).
 
 Extraction remains static. Eighteen calling-card routes through three Channelwood custom stack handlers are not expanded yet. Variable-based card names, dynamic expressions, and the HyperCard return stack are not executed. In particular, a shortest graph path is not a guaranteed playable walkthrough.
