@@ -176,3 +176,13 @@ func TestParallelEdgesDoNotHideUsableRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestZeroCostMostSeparatedPath(t *testing.T) {
+	g, nodes := newTestGraph(t, 2)
+	if err := g.AddEdge(&common.Edge{Source: nodes[0], Target: nodes[1]}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := g.GetMostSeparatedNodePath(); !ok || !reflect.DeepEqual(got, []int64{0, 1}) {
+		t.Fatalf("zero-cost most separated path = %v, %v", got, ok)
+	}
+}

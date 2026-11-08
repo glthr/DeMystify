@@ -40,7 +40,7 @@ func (g *MystGraph) GetMostSeparatedNodePath() ([]int64, bool) {
 	mostSeparated := g.FindMostSeparatedNodes()
 
 	// if no path found (either nodes are disconnected or no valid path exists)
-	if mostSeparated.Path == nil || len(mostSeparated.Path) == 0 || mostSeparated.Distance <= 0 {
+	if len(mostSeparated.Path) == 0 {
 		return nil, false
 	}
 
@@ -187,7 +187,7 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 	// check all pairs of nodes
 	for _, src := range nodeIDs {
 		// calculate the shortest paths from this source
-		p := path.DijkstraFrom(pa.g.Node(src), pa.g)
+		p := path.DijkstraFrom(pa.g.Node(src), orderedPathGraph{pa.g})
 
 		for _, dst := range nodeIDs {
 			if src == dst {
@@ -229,6 +229,9 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 
 	if len(candidates) == 1 {
 		candidate := candidates[0]
+		if shortest, err := pa.computeShortestPath(candidate.source, candidate.target, nil); err == nil {
+			candidate.path = shortest.Path
+		}
 		return common.NodePairInfo{
 			Source: common.NodeInfo{
 				ID:   candidate.source,
@@ -273,6 +276,10 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 			bestPeripheralScore = currentScore
 			bestCandidate = candidate
 		}
+	}
+
+	if shortest, err := pa.computeShortestPath(bestCandidate.source, bestCandidate.target, nil); err == nil {
+		bestCandidate.path = shortest.Path
 	}
 
 	result = common.NodePairInfo{
