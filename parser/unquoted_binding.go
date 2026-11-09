@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"path/filepath"
 	"regexp"
 )
 
@@ -23,20 +22,18 @@ func (p *Parser) unquotedNameIsStatic(source any, name string) bool {
 		return word.MatchString(command)
 	}
 	var scripts []HyperTalk
-	directories := map[string]*HyperCardStack{}
+	stacks := map[*HyperCardStack]bool{}
 	addStack := func(s *HyperCardStack) {
 		if s != nil {
 			scripts = append(scripts, s.Script...)
-			if s.Directory != "" {
-				directories[s.Directory] = s
-			}
+			stacks[s] = true
 		}
 	}
 	addCard := func(c *HyperCardCard) {
 		if c != nil {
 			scripts = append(scripts, c.Scripts...)
-			if c.Filepath != "" {
-				directories[filepath.Dir(c.Filepath)] = c.Stack
+			if c.Stack != nil {
+				stacks[c.Stack] = true
 			}
 		}
 	}
@@ -50,6 +47,11 @@ func (p *Parser) unquotedNameIsStatic(source any, name string) bool {
 	case *HyperCardStack:
 		addStack(s)
 	case *HyperCardCard:
+		if s != nil && (s.Filepath != "" || s.Source.Path != "") {
+			if _, loaded := p.backgrounds[s.Stack]; !loaded {
+				return false
+			}
+		}
 		addCard(s)
 		if s != nil {
 			addStack(s.Stack)
@@ -62,8 +64,8 @@ func (p *Parser) unquotedNameIsStatic(source any, name string) bool {
 			}
 		}
 	}
-	for directory, stack := range directories {
-		background, verified := p.backgroundScripts(stack, directory)
+	for stack := range stacks {
+		background, verified := p.backgroundScripts(stack)
 		if !verified {
 			return false
 		}

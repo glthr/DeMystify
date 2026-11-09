@@ -1,7 +1,7 @@
 package parser
 
-func (p *Parser) prepareStackHandlers(stack *HyperCardStack, dir string) {
-	scripts, verified := p.backgroundScripts(stack, dir)
+func (p *Parser) prepareStackHandlers(stack *HyperCardStack) {
+	scripts, verified := p.backgroundScripts(stack)
 	background := declaredHandlers(scripts)
 	declarations := declaredHandlers(stack.Script)
 	if !verified || shadowsHandlerPrimitive(background) || shadowsHandlerPrimitive(declarations) {
@@ -38,7 +38,7 @@ func (p *Parser) withoutHandlerDefinitions(stack *HyperCardStack, script HyperTa
 			}
 		}
 	}
-	var filtered HyperTalk
+	filtered := HyperTalk{RawText: script.RawText, Source: script.Source}
 	for i, line := range script.lines {
 		if !skip[i] {
 			filtered.lines = append(filtered.lines, line)

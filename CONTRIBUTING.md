@@ -30,6 +30,8 @@ go vet ./...
 
 To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the converted stack directory. The test selects expected counts from the input script rather than the graph output. The game data is optional and must not be added to the repository.
 
+To compare native import with XML produced from the same originals, set both `DEMYSTIFY_NATIVE_TEST_DATA` (the directory of original stack data forks) and `DEMYSTIFY_TEST_DATA` (the corresponding XML directory), then run `go test -run TestNativeMystParity .`. This checks the decoded objects, graph records and generated DOT. Native parser fixtures and fuzz seeds in the repository are synthetic.
+
 Format changed Go files with `gofmt`. The tests use synthetic stack and card data, so they do not require a Myst CD-ROM. When Graphviz is installed, the integration tests also validate generated DOT with `neato`; those checks are skipped when it is unavailable.
 
 ## License

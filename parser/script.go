@@ -6,11 +6,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/glthr/DeMystify/hypercard"
+
 	"github.com/glthr/DeMystify/common"
 )
 
 type HyperTalk struct {
 	lines []ScriptLine
+	// RawText and Source retain input evidence before per-line normalization.
+	RawText string
+	Source  hypercard.Source
 }
 
 type ScriptLine struct {
