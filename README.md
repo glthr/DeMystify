@@ -16,7 +16,7 @@ The analysis extracts links from supported HyperTalk commands without executing 
 
 *   A 1993 Myst CD-ROM (Macintosh)
 *   [Go](https://go.dev/doc/install)
-*   [Neato](https://graphviz.org/docs/layouts/neato/) for PDF output; HTML and DOT output work without it
+*   [Neato](https://graphviz.org/docs/layouts/neato/) for PDF output and PDF-style browser placement; the built-in image atlas and DOT output work without it
 
 Copy the six HyperCard stacks from the CD-ROM's `Myst Files` directory: `Channelwood Age`, `Dunny Age`, `Mechanical Age`, `Myst`, `Selenitic Age` and `Stoneship Age`. DeMystify reads these files directly into Go objects; no conversion tool or intermediate XML is required.
 
@@ -48,6 +48,16 @@ go run . --format html --assets "/path/to/views" "/path/to/Myst Files"
 ```
 
 Open `generated/web/index.html` directly in your browser. The viewer works offline, with no server, CDN or JavaScript package installation. Scroll or pinch to zoom, drag to pan, use the zoom/fit controls, filter by Age, or search for a card ID, name or picture name. Zooming into the graph reveals view thumbnails inside its nodes. Selecting a card opens its larger view and incoming/outgoing connections.
+
+When Neato is installed, the browser starts with the PDF graph's organic placement, routed connections, arrow shapes and colors. Switch between **PDF graph** and **Image atlas** in the viewer. In the PDF view, the **Images** control switches between compact thumbnails and the original graph labels, retaining the same node boxes and positions. Card pictures and interaction zones remain available in the side panel in both views.
+
+`--web-layout auto` is the default: use the PDF drawing when Neato is available, otherwise the built-in image atlas. Choose `--web-layout pdf` to require the PDF-style graph or `--web-layout atlas` to generate HTML without Neato. For example:
+
+```bash
+go run . --format html --web-layout pdf --assets "/path/to/views" "/path/to/Myst Files"
+```
+
+When HTML and PDF are generated together, both use the same Graphviz layout pass. The browser stores its drawing locally and needs no Graphviz installation when opened.
 
 Enable **Interactive zones** on the selected view to inspect card and background buttons and fields. Select a zone to read its stored name, visibility/enabled flags and HyperTalk script. These are the geometry and flags saved in the stack; scripts can change them at runtime. The viewer inspects the static graph and does not execute the game.
 

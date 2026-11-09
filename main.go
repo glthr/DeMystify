@@ -14,6 +14,7 @@ import (
 	"github.com/glthr/DeMystify/parser"
 	pdf "github.com/glthr/DeMystify/renderer"
 	"github.com/glthr/DeMystify/renderer/dot"
+	pdflayout "github.com/glthr/DeMystify/renderer/layout"
 	web "github.com/glthr/DeMystify/renderer/web"
 )
 
@@ -25,12 +26,14 @@ Options:
   --format all|html|pdf|dot   Output formats (default all; DOT is always saved)
   --assets directory         Decoded view images and optional images.json mappings
   --web-output directory     Browser export directory (default generated/web)
+  --web-layout auto|pdf|atlas Browser placement (default auto: PDF when Neato is available)
 
-HTML exports open directly in a browser and do not require Neato.
+HTML exports open offline. The PDF layout requires Neato during generation;
+--web-layout atlas uses the built-in layout without Neato.
 `
 
 type outputOptions struct {
-	format, assetsDir, webDir, input string
+	format, assetsDir, webDir, webLayout, input string
 }
 
 func parseOutputOptions(args []string) (outputOptions, error) {
@@ -40,6 +43,7 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	flags.StringVar(&options.format, "format", "all", "output formats")
 	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
 	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
+	flags.StringVar(&options.webLayout, "web-layout", "auto", "browser placement")
 	if err := flags.Parse(args); err != nil {
 		return options, fmt.Errorf("%s\n%w", usage, err)
 	}
@@ -54,8 +58,24 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	if options.webDir == "" {
 		return options, fmt.Errorf("%s\nweb output directory is empty", usage)
 	}
+	switch options.webLayout {
+	case "auto", "pdf", "atlas":
+	default:
+		return options, fmt.Errorf("%s\nunknown web layout %q", usage, options.webLayout)
+	}
 	options.input = flags.Arg(0)
 	return options, nil
+}
+
+func needsPDFLayout(options outputOptions) (bool, error) {
+	if options.format != "all" && options.format != "html" || options.webLayout == "atlas" {
+		return false, nil
+	}
+	err := CheckNeatoInstalled()
+	if options.webLayout == "pdf" && err != nil {
+		return false, err
+	}
+	return err == nil, nil
 }
 
 func main() {
@@ -77,6 +97,10 @@ func run(args []string) error {
 		if err := CheckNeatoInstalled(); err != nil {
 			return err
 		}
+	}
+	usePDFLayout, err := needsPDFLayout(options)
+	if err != nil {
+		return err
 	}
 
 	// parser: extract information from the stacks and cards
@@ -147,10 +171,30 @@ func run(args []string) error {
 	if err := os.WriteFile(graphFilePath, []byte(dotContent), 0644); err != nil {
 		return fmt.Errorf("saving DOT file: %w", err)
 	}
+	var drawing *pdflayout.Drawing
+	pdfRendered := false
+	if usePDFLayout {
+		fmt.Println("Preparing the shared PDF graph layout...")
+		var value pdflayout.Drawing
+		if options.format == "all" {
+			var encoded []byte
+			encoded, err = pdf.RenderPDFAndLayout(graphFilePath)
+			if err == nil {
+				value, err = pdflayout.FromJSON(encoded)
+			}
+			pdfRendered = err == nil
+		} else {
+			value, err = pdflayout.Run(dotContent)
+		}
+		if err != nil {
+			return fmt.Errorf("preparing PDF-style browser layout (use --web-layout atlas for the built-in layout): %w", err)
+		}
+		drawing = &value
+	}
 
 	if options.format == "all" || options.format == "html" {
 		fmt.Println("Generating the browser viewer...")
-		report, err := web.Write(options.webDir, metadata, web.Options{AssetsDir: options.assetsDir, InputDir: options.input, Corpus: &corpus})
+		report, err := web.Write(options.webDir, metadata, web.Options{AssetsDir: options.assetsDir, InputDir: options.input, Corpus: &corpus, PDFLayout: drawing})
 		if err != nil {
 			return fmt.Errorf("generating browser viewer: %w", err)
 		}
@@ -163,7 +207,7 @@ func run(args []string) error {
 			fmt.Printf("Image note: %s\n", warning)
 		}
 	}
-	if options.format == "all" || options.format == "pdf" {
+	if (options.format == "all" || options.format == "pdf") && !pdfRendered {
 		fmt.Println("Generating the PDF file...")
 		return pdf.RenderPDF(graphFilePath)
 	}

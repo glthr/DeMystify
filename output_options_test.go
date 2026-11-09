@@ -12,7 +12,7 @@ func TestOutputOptionsKeepPDFAndAddBrowserExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.format != "all" || options.webDir != "generated/web" || options.input != "stacks" {
+	if options.format != "all" || options.webDir != "generated/web" || options.webLayout != "auto" || options.input != "stacks" {
 		t.Fatalf("default output: %+v", options)
 	}
 	options, err = parseOutputOptions([]string{"--format", "html", "--assets", "views", "--web-output", "viewer", "stacks"})
@@ -22,7 +22,7 @@ func TestOutputOptionsKeepPDFAndAddBrowserExport(t *testing.T) {
 	if options.format != "html" || options.assetsDir != "views" || options.webDir != "viewer" {
 		t.Fatalf("HTML options: %+v", options)
 	}
-	for _, args := range [][]string{{"--format", "unknown", "stacks"}, {"--web-output", "", "stacks"}, {"--missing", "stacks"}} {
+	for _, args := range [][]string{{"--format", "unknown", "stacks"}, {"--web-output", "", "stacks"}, {"--web-layout", "unknown", "stacks"}, {"--missing", "stacks"}} {
 		if _, err := parseOutputOptions(args); err == nil {
 			t.Errorf("accepted %v", args)
 		}
@@ -44,5 +44,11 @@ func TestHTMLModeDoesNotRequireNeato(t *testing.T) {
 	}
 	if err := run([]string{"--format", "pdf", dir}); err == nil || !strings.Contains(err.Error(), "neato") {
 		t.Fatalf("PDF mode should require Neato: %v", err)
+	}
+	if err := run([]string{"--format", "html", "--web-layout", "pdf", dir}); err == nil || !strings.Contains(err.Error(), "neato") {
+		t.Fatalf("explicit PDF layout should require Neato: %v", err)
+	}
+	if err := run([]string{"--format", "html", "--web-layout", "atlas", dir}); err == nil || !strings.Contains(err.Error(), "expected 6 stacks") {
+		t.Fatalf("explicit atlas should not require Neato: %v", err)
 	}
 }
