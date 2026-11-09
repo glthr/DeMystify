@@ -9,11 +9,6 @@ import (
 	"github.com/glthr/DeMystify/common"
 )
 
-// writeEdges renders individual metadata edges without dropping parallel records.
-func (g *Generator) writeEdges(buf *bytes.Buffer) {
-	g.renderMetadataEdges(buf)
-}
-
 func (g *Generator) writeCustomPathInfo(buf *bytes.Buffer) {
 	buf.WriteString("  // Custom path: ")
 	for i, id := range g.customPath {
@@ -23,50 +18,6 @@ func (g *Generator) writeCustomPathInfo(buf *bytes.Buffer) {
 		buf.WriteString(fmt.Sprintf("%d", id))
 	}
 	buf.WriteString("\n\n")
-}
-
-// getSortedNodeIDs returns a sorted slice of node IDs from a map
-func (g *Generator) getSortedNodeIDs(nodeMap map[int64]map[int64][]common.Edge) []int64 {
-	var nodeIDs []int64
-	for nodeID := range nodeMap {
-		nodeIDs = append(nodeIDs, nodeID)
-	}
-	sort.Slice(nodeIDs, func(i, j int) bool {
-		return nodeIDs[i] < nodeIDs[j]
-	})
-	return nodeIDs
-}
-
-// getSortedTargetIDs returns a sorted slice of target node IDs.
-func (g *Generator) getSortedTargetIDs(targetMap map[int64][]common.Edge) []int64 {
-	var targetIDs []int64
-	for toID := range targetMap {
-		targetIDs = append(targetIDs, toID)
-	}
-	sort.Slice(targetIDs, func(i, j int) bool {
-		return targetIDs[i] < targetIDs[j]
-	})
-	return targetIDs
-}
-
-// sortEdges sorts edges for deterministic order
-func (g *Generator) sortEdges(edges []common.Edge) []common.Edge {
-	sortedEdges := make([]common.Edge, len(edges))
-	copy(sortedEdges, edges)
-
-	sort.SliceStable(sortedEdges, func(i, j int) bool {
-		// Prefer enabled edges when choosing a parallel edge to highlight.
-		if sortedEdges[i].IsOfType(common.Disabled) != sortedEdges[j].IsOfType(common.Disabled) {
-			return !sortedEdges[i].IsOfType(common.Disabled) // non-disabled first
-		}
-		if sortedEdges[i].IsOfType(common.Backtracking) != sortedEdges[j].IsOfType(common.Backtracking) {
-			return !sortedEdges[i].IsOfType(common.Backtracking) // non-backtracking first
-		}
-		// default to transitivity ID
-		return sortedEdges[i].TransitivityID < sortedEdges[j].TransitivityID
-	})
-
-	return sortedEdges
 }
 
 // renderEdge renders an edge to the buffer
@@ -152,59 +103,50 @@ func (g *Generator) buildEdgeStyleString(style edgeStyle) string {
 // with matching attributes. Tracking whole node pairs would discard parallel edges.
 func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
 	var loops, bidirectional, regular bytes.Buffer
-	processed := make(map[string][]bool)
-	for fromID, targets := range g.edgesMap {
-		for toID, edges := range targets {
-			targets[toID] = g.sortEdges(edges)
-			processed[g.getNodePairID(fromID, toID)] = make([]bool, len(edges))
-		}
+	pairs, groups := indexEdges(g.metadata.Edges)
+	pathPairs := make(map[nodePair]bool)
+	for i := 0; i+1 < len(g.customPath); i++ {
+		pathPairs[nodePair{g.customPath[i], g.customPath[i+1]}] = true
 	}
-
-	type pathEdge struct {
-		fromID, toID int64
-		edge         common.Edge
-	}
-	var pathEdges []pathEdge
-	highlighted := make(map[string]bool)
+	var pathEdges []*common.Edge
+	highlighted := make(map[nodePair]bool)
 	if len(g.customPath) > 1 {
 		g.writeCustomPathInfo(buf)
 	}
 
-	for _, fromID := range g.getSortedNodeIDs(g.edgesMap) {
-		for _, toID := range g.getSortedTargetIDs(g.edgesMap[fromID]) {
-			pairID := g.getNodePairID(fromID, toID)
-			reverseID := g.getNodePairID(toID, fromID)
-			for i, edge := range g.edgesMap[fromID][toID] {
-				if processed[pairID][i] {
-					continue
-				}
-				processed[pairID][i] = true
+	for _, pair := range pairs {
+		reversePair := nodePair{pair.to, pair.from}
+		for _, record := range groups[pair] {
+			if record.used {
+				continue
+			}
+			record.used = true
+			edge := record.edge
 
-				if g.isOnCustomPath(fromID, toID) && !highlighted[pairID] {
-					pathEdges = append(pathEdges, pathEdge{fromID, toID, edge})
-					highlighted[pairID] = true
-					continue
-				}
-				if fromID == toID {
-					g.renderSelfLoopEdge(&loops, fromID, &edge, false)
-					continue
-				}
+			if pathPairs[pair] && !highlighted[pair] {
+				pathEdges = append(pathEdges, edge)
+				highlighted[pair] = true
+				continue
+			}
+			if pair.from == pair.to {
+				g.renderSelfLoopEdge(&loops, pair.from, edge, false)
+				continue
+			}
 
-				// Keep both directions explicit when either is highlighted.
-				matched := false
-				if !g.isOnCustomPath(fromID, toID) && !g.isOnCustomPath(toID, fromID) {
-					for j, reverse := range g.edgesMap[toID][fromID] {
-						if !processed[reverseID][j] && g.edgeAttributesMatch(&edge, &reverse) {
-							processed[reverseID][j] = true
-							g.renderBidirectionalEdge(&bidirectional, fromID, toID, &edge)
-							matched = true
-							break
-						}
+			// Keep both directions explicit when either is highlighted.
+			matched := false
+			if !pathPairs[pair] && !pathPairs[reversePair] {
+				for _, reverse := range groups[reversePair] {
+					if !reverse.used && g.edgeAttributesMatch(edge, reverse.edge) {
+						reverse.used = true
+						g.renderBidirectionalEdge(&bidirectional, pair.from, pair.to, edge)
+						matched = true
+						break
 					}
 				}
-				if !matched {
-					g.renderEdge(&regular, fromID, toID, &edge, false)
-				}
+			}
+			if !matched {
+				g.renderEdge(&regular, pair.from, pair.to, edge, false)
 			}
 		}
 	}
@@ -214,18 +156,19 @@ func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
 	buf.Write(regular.Bytes())
 
 	// Render highlights last so ordinary parallel edges cannot obscure them.
-	for _, item := range pathEdges {
-		if item.fromID == item.toID {
-			g.renderSelfLoopEdge(buf, item.fromID, &item.edge, true)
+	for _, edge := range pathEdges {
+		fromID, toID := edge.Source.GraphID, edge.Target.GraphID
+		if fromID == toID {
+			g.renderSelfLoopEdge(buf, fromID, edge, true)
 		} else {
-			g.renderEdge(buf, item.fromID, item.toID, &item.edge, true)
+			g.renderEdge(buf, fromID, toID, edge, true)
 		}
 	}
 	// A supplied custom path may contain implied transitions absent from metadata.
 	for i := 0; i+1 < len(g.customPath); i++ {
 		fromID, toID := g.customPath[i], g.customPath[i+1]
-		pairID := g.getNodePairID(fromID, toID)
-		if highlighted[pairID] {
+		pair := nodePair{fromID, toID}
+		if highlighted[pair] {
 			continue
 		}
 		edge := common.Edge{Source: &common.Node{GraphID: fromID}, Target: &common.Node{GraphID: toID}}
@@ -233,7 +176,7 @@ func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
 		style := g.applyEdgeStyle(&edge, true)
 		style.tooltip += " (implied)"
 		buf.WriteString(fmt.Sprintf("  \"%d\" -> \"%d\" [%s];\n", fromID, toID, g.buildEdgeStyleString(style)))
-		highlighted[pairID] = true
+		highlighted[pair] = true
 	}
 	buf.WriteString("\n")
 }

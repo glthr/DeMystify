@@ -191,7 +191,3 @@ func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
 
 	return true
 }
-
-func (g *Generator) getNodePairID(fromID, toID int64) string {
-	return fmt.Sprintf("%d->%d", fromID, toID)
-}
