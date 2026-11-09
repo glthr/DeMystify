@@ -35,7 +35,7 @@ func TestOriginalMystImport(t *testing.T) {
 	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
-	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 56 || isolated != 19 {
+	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 51 || isolated != 19 {
 		t.Fatalf("unexpected source/sink/isolated counts: %d/%d/%d", sources, sinks, isolated)
 	}
 	for _, pair := range [][2]string{
@@ -66,6 +66,11 @@ func TestOriginalMystImport(t *testing.T) {
 		{"Channelwood Age:96885", "Channelwood Age:84124"},
 		{"Channelwood Age:23467", "Channelwood Age:36337"},
 		{"Channelwood Age:46136", "Channelwood Age:84124"},
+		// Sound, display and wait commands between two requests do not end a
+		// sequence: the electrified cage and the fireplace are transition views.
+		{"Mechanical Age:32201", "Mechanical Age:31976"},
+		{"Myst:87741", "Myst:56926"},
+		{"Myst:49781", "Myst:56926"},
 	} {
 		if !g.HasEdge(pair[0], pair[1]) {
 			t.Errorf("missing sequence reference %s -> %s", pair[0], pair[1])
@@ -128,9 +133,9 @@ func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
 		}
 		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
 		case "on mouseup 5119 end mouseup":
-			return 3241, 3260, false
+			return 3248, 3274, false
 		case "on mouseup go to card id 5119 end mouseup":
-			return 3242, 3261, true
+			return 3249, 3275, true
 		}
 	}
 	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")

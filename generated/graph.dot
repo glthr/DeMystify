@@ -1619,7 +1619,7 @@ digraph G {
   "154" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:45661\nElevatorEntered"];
   "155" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:46136 (qel4)\nVillage .5-W"];
   "156" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:46447\nVillage 1-E"];
-  "157" [color="#FF4500", fillcolor="#FFA07A", label="Channelwood Age:46695\nTempleHall Wall", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
+  "157" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:46695\nTempleHall Wall"];
   "158" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:4696\nPumphouse 2-N"];
   "159" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:46979\nvillage high 9.5-w"];
   "160" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:47569\nVillage 2-E"];
@@ -1963,7 +1963,7 @@ digraph G {
   "498" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:31339\nHubControl 2-S LookUp"];
   "499" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:31555\nHubControl 2-S Down"];
   "500" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:31976\nA-Cache Cage Electrified"];
-  "501" [color="#FF4500", fillcolor="#FFA07A", label="Mechanical Age:32201\nA-Cache Cage Elec-Bright", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
+  "501" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:32201\nA-Cache Cage Elec-Bright"];
   "502" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:32302 (qach4)\nA to Hall Shot"];
   "503" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:32588 (qsir4)\nS to Hall Shot"];
   "504" [color="#9CCCC2", fillcolor="#c3fff3", label="Mechanical Age:32989\nA-Throne 3-E Throne"];
@@ -2192,7 +2192,7 @@ digraph G {
   "727" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:36943\nCabin2-E"];
   "728" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:37341\nCabin2-W"];
   "729" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:37618\nCabin3-W"];
-  "730" [color="#FF4500", fillcolor="#FFA07A", label="Myst:37752\nCabin3-W HandleDown", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
+  "730" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:37752\nCabin3-W HandleDown"];
   "731" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:37940\nCabin3-W SafeOpen"];
   "732" [color="#228B22", fillcolor="#98FB98", label="Myst:38306\nForest4-E (Door Open)", penwidth=1.5, tooltip="Source node (no incoming connections from other nodes)"];
   "733" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:38607\nPlanetarium1-N LightsOff"];
@@ -2389,7 +2389,7 @@ digraph G {
   "924" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:84836\nBook BadOpen3"];
   "925" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:85075\nBook BadCover4"];
   "926" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:85465\nBook BadOpen4"];
-  "927" [color="#FF4500", fillcolor="#FFA07A", label="Myst:85634\nObservatoryElevEntered", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
+  "927" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:85634\nObservatoryElevEntered"];
   "928" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:86000\nVault 4-In Water"];
   "929" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:86247\nobservplatform1-e"];
   "930" [color="#228B22", fillcolor="#98FB98", label="Myst:8631\nWoodpath1-N Crumpled", penwidth=1.5, tooltip="Source node (no incoming connections from other nodes)"];
@@ -2398,7 +2398,7 @@ digraph G {
   "933" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:86826 (qvau)\nVault 6-In"];
   "934" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:87276\nVault 6-E"];
   "935" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:87373\nobservplatform2-w"];
-  "936" [color="#FF4500", fillcolor="#FFA07A", label="Myst:87741\nfireplace-entered", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
+  "936" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:87741\nfireplace-entered"];
   "937" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:8794\nWoodpath3-E"];
   "938" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:87971\nVault 6-W"];
   "939" [color="#94B4CC", fillcolor="#bae1ff", label="Myst:88101\nVault 6-out"];
@@ -3918,6 +3918,7 @@ digraph G {
   "155" -> "317" [];
   "155" -> "371" [];
   "156" -> "160" [];
+  "157" -> "341" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "158" -> "176" [];
   "159" -> "13" [];
   "159" -> "303" [];
@@ -4098,6 +4099,8 @@ digraph G {
   "318" -> "268" [];
   "321" -> "283" [];
   "323" -> "324" [];
+  "324" -> "14" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
+  "324" -> "323" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "326" -> "336" [];
   "328" -> "14" [];
   "328" -> "325" [];
@@ -4280,6 +4283,7 @@ digraph G {
   "497" -> "529" [];
   "497" -> "530" [];
   "500" -> "430" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
+  "501" -> "500" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "502" -> "472" [];
   "503" -> "465" [];
   "504" -> "537" [];
@@ -4358,6 +4362,7 @@ digraph G {
   "571" -> "567" [];
   "572" -> "567" [];
   "572" -> "570" [];
+  "572" -> "574" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "572" -> "574" [];
   "573" -> "528" [];
   "574" -> "567" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
@@ -4526,6 +4531,8 @@ digraph G {
   "726" -> "727" [];
   "727" -> "728" [];
   "728" -> "668" [];
+  "729" -> "728" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
+  "730" -> "729" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "731" -> "726" [];
   "731" -> "728" [];
   "731" -> "730" [];
@@ -4655,6 +4662,7 @@ digraph G {
   "820" -> "844" [];
   "820" -> "854" [];
   "822" -> "627" [];
+  "823" -> "824" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "823" -> "863" [];
   "824" -> "825" [];
   "825" -> "826" [];
@@ -4768,10 +4776,13 @@ digraph G {
   "924" -> "776" [];
   "925" -> "926" [];
   "926" -> "776" [];
+  "927" -> "793" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
+  "927" -> "842" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "928" -> "931" [];
   "930" -> "684" [];
   "930" -> "907" [];
   "931" -> "933" [];
+  "936" -> "809" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "937" -> "951" [];
   "937" -> "954" [];
   "939" -> "940" [];
@@ -4785,8 +4796,10 @@ digraph G {
   "945" -> "942" [];
   "946" -> "949" [];
   "948" -> "941" [];
+  "948" -> "941" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "948" -> "945" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "948" -> "947" [];
+  "948" -> "949" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "949" -> "941" [];
   "949" -> "945" [];
   "951" -> "699" [];
@@ -5014,6 +5027,7 @@ digraph G {
   "1166" -> "1167" [];
   "1167" -> "1169" [];
   "1169" -> "1089" [];
+  "1170" -> "1171" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "1172" -> "1044" [];
   "1174" -> "1030" [];
   "1175" -> "1165" [];

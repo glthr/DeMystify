@@ -151,7 +151,11 @@ func TestLiteralSequenceRejectsControlFlowAndUnresolvedContexts(t *testing.T) {
 }
 
 func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
-	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "wait until ready", "vs direction", `vs "direction"`, `vs "left" & suffix`, `vs "left", 2`, "put navigator() into state"} {
+	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "vs direction", `vs "direction"`, `vs "left" & suffix`, `vs "left", 2`, "put navigator() into state",
+		// A parenthesized call could run a function of the imported stacks.
+		"wait until ready()", "play chooser()", "set cursor to pick(1)", `HTVisual effect("wipe"),,,1`, `playQT "" & loop()`,
+		// Not among the player's display, sound and wait commands.
+		"hc", "ww", "xCIcon3 it,4001", "openCard", "put 1 into state", "get the mouse", "lock screen", `answer "ready"`} {
 		t.Run(command, func(t *testing.T) {
 			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\ngo card id 4\nend mouseUp"))
 			edges := sequenceEdges(metadata)
@@ -159,6 +163,48 @@ func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
 				t.Fatalf("opaque call was crossed, or the following explicit run was lost: %+v", edges)
 			}
 		})
+	}
+}
+
+func TestLiteralSequenceCrossesPlayerDisplaySoundAndWaitCommands(t *testing.T) {
+	for _, command := range []string{`play "SW kachunk"`, "play stop", "wait 20", `wait until the sound is "done"`, "wait until ready", "set cursor to none",
+		"vd", `dplay "DR SafeLatch"`, `playQT "MR Elev Room Loud MoV",,loop,50`, `playQT "",,"loop",volume * 2,,,,,true`, "soundidle", "SoundIdle",
+		`HTVisual "wipe up",,,1,32`, `htvisual "scroll down",,the rect of card button panel,1,4`, "htlock true", "htlock forcefalse",
+		// Parentheses inside a quoted name are text, not a call.
+		`htaddpict "vault controlpanel (sunk)",the rect of card button marker,"srccopy"`,
+		"play \"EL sharphum\"\nplay \"SW kachunk\"\nvs \"left\"\nset cursor to none -- trailing note"} {
+		t.Run(command, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\nend mouseUp"))
+			edges := sequenceEdges(metadata)
+			if len(edges) != 1 || edges[0].Source.Name != "Example:2" || edges[0].Target.Name != "Example:3" {
+				t.Fatalf("a display, sound or wait command ended the run: %+v", edges)
+			}
+			if len(metadata.Edges) != 3 {
+				t.Fatalf("got %d records, want both owner references and the continuation", len(metadata.Edges))
+			}
+		})
+	}
+}
+
+func TestLiteralSequenceImportedHandlersOverrideTransparentCommands(t *testing.T) {
+	for name := range sequenceTransparent {
+		for _, scope := range []string{"stack", "source-card", "target-card"} {
+			t.Run(name+"/"+scope, func(t *testing.T) {
+				corpus := sequenceCorpus("on mouseUp\ngo card id 2\n" + name + " something\ngo card id 3\nend mouseUp")
+				script := hypercard.Script{Text: "on " + name + " value\ngo card id 4\nend " + name}
+				switch scope {
+				case "stack":
+					corpus.Stacks[0].Script = script
+				case "source-card":
+					corpus.Stacks[0].Cards[0].Script = script
+				case "target-card":
+					corpus.Stacks[0].Cards[1].Script = script
+				}
+				if len(sequenceEdges(sequenceMetadata(t, corpus))) != 0 {
+					t.Fatal("an imported handler of the same name was ignored")
+				}
+			})
+		}
 	}
 }
 

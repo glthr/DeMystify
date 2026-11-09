@@ -14,6 +14,20 @@ var (
 	sequenceVisual = regexp.MustCompile(`(?i)^visual\s+effect\s+(?:cut|plain|dissolve|(?:scroll|wipe)\s+(?:left|right|up|down))(?:\s+(?:very\s+)?(?:fast|slow))?$`)
 )
 
+// Between two requests, these commands of the shared Myst player display, play
+// a sound or wait, and none changes the current card. vd, dplay, playQT and
+// soundIdle are handlers of the player stack; HTVisual, HTLock and HTAddPict
+// are its externals; play, wait and set are HyperTalk built-ins. Like VS, this
+// is a stated convention of this abstraction rather than a summary of
+// arbitrary calls: every name occurs between two requests in the six stacks,
+// an imported handler of the same name takes precedence, and a call written
+// with parentheses could run an imported function, so it still ends the run.
+var sequenceTransparent = map[string]bool{
+	"vd": true, "dplay": true, "playqt": true, "soundidle": true,
+	"htvisual": true, "htlock": true, "htaddpict": true,
+	"play": true, "wait": true, "set": true,
+}
+
 // literalSequence tracks static order only. It does not execute a handler or
 // model the openCard/closeCard callbacks triggered by a go command.
 type literalSequence struct {
@@ -94,6 +108,12 @@ func (s *literalSequence) cardDeclarations(card *HyperCardCard) map[string]int {
 	return names
 }
 
+func (s *literalSequence) transparent(command string) bool {
+	name := strings.ToLower(strings.Fields(command)[0])
+	return sequenceTransparent[name] && !s.overridden(name) &&
+		!strings.ContainsAny(unquotedNameStrings.ReplaceAllString(command, ""), "()")
+}
+
 func (s *literalSequence) overridden(name string) bool {
 	return s.shared[name] != 0 || s.local[name] != 0 || s.current != nil && s.cardDeclarations(s.current)[name] != 0
 }
@@ -150,7 +170,7 @@ func (s *literalSequence) observe(index int, line ScriptLine, link *HyperCardLin
 	}
 	// VS is an explicit visual-only convention of this abstraction, not an
 	// inferred summary of arbitrary external handlers. Imported overrides win.
-	if sequenceVS.MatchString(command) && !s.overridden("vs") || sequenceVisual.MatchString(command) && !s.overridden("visual") {
+	if sequenceVS.MatchString(command) && !s.overridden("vs") || sequenceVisual.MatchString(command) && !s.overridden("visual") || s.transparent(command) {
 		return nil
 	}
 	s.current = nil
