@@ -46,3 +46,30 @@ func TestRenderPDFRejectsEmptySuccessfulOutput(t *testing.T) {
 		t.Fatalf("empty render replaced the previous PDF: %q, %v", got, err)
 	}
 }
+
+func TestRenderedPDFIsAsReadableAsItsDOTSource(t *testing.T) {
+	t.Chdir(t.TempDir())
+	fakeNeato(t, "for arg do output=\"$arg\"; done\nprintf 'rendered PDF' > \"$output\"\n")
+	for _, mode := range []os.FileMode{0644, 0640, 0600, 0444} {
+		if err := os.WriteFile("graph.dot", []byte("digraph G {}"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod("graph.dot", mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := RenderPDF("graph.dot"); err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(pdfFilePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The owner keeps write access so that a later render can replace the file.
+		if want := mode | 0200; info.Mode().Perm() != want {
+			t.Errorf("DOT mode %04o: PDF mode %04o, want %04o", mode, info.Mode().Perm(), want)
+		}
+		if err := os.Remove("graph.dot"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
