@@ -145,9 +145,17 @@ func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
 			if seenCards[card.ID] {
 				return fmt.Errorf("duplicate card ID %d in stack %q", card.ID, stack.Name)
 			}
+			if len(stack.cardIDs) != 0 && !stack.cardIDs[card.ID] {
+				return fmt.Errorf("card ID %d is absent from stack %q manifest", card.ID, stack.Name)
+			}
 			seenCards[card.ID] = true
 
 			p.cards = append(p.cards, card)
+		}
+		for id := range stack.cardIDs {
+			if !seenCards[id] {
+				return fmt.Errorf("missing card ID %d declared in stack %q manifest", id, stack.Name)
+			}
 		}
 		p.prepareStackHandlers(stack, stackPath.stackRootDir)
 	}

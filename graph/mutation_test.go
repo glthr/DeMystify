@@ -20,6 +20,24 @@ func TestRound2AddedNodeUpdatesMetadata(t *testing.T) {
 	}
 }
 
+func TestAddingNodeAfterClearingNameMapping(t *testing.T) {
+	g, _ := newTestGraph(t, 1)
+	g.SetNameMapping(nil)
+	if got := g.GetNameForID(0); got != "Node 0" {
+		t.Fatalf("cleared mapping fallback = %q", got)
+	}
+	node := &common.Node{Name: "new card"}
+	if err := g.AddNode(node); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := g.GetNodeName(node.GraphID); !ok || got != node.Name {
+		t.Fatalf("new node name = %q, %v", got, ok)
+	}
+	if got := g.Metadata.TotalNodes; got != 2 {
+		t.Fatalf("node count = %d, want 2", got)
+	}
+}
+
 func TestRound2AddedEdgeUpdatesMetadata(t *testing.T) {
 	g, nodes := newTestGraph(t, 2)
 	edge := &common.Edge{Source: nodes[0], Target: nodes[1]}

@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,34 @@ func TestImportRejectsDuplicateCardFiles(t *testing.T) {
 	}
 	if _, err := NewParser(filepath.Dir(path)); err == nil {
 		t.Fatal("accepted two files defining the same card ID")
+	}
+}
+
+func TestImportChecksExplicitCardManifest(t *testing.T) {
+	for _, tc := range []struct {
+		name, manifest string
+		cards          map[string]string
+		wantError      string
+	}{
+		{"complete", `<card id="1"/><card id="2" name="Gate"/>`, map[string]string{"card_1.xml": "1", "card_2.xml": "2"}, ""},
+		{"missing", `<card id="1"/><card id="2"/>`, map[string]string{"card_1.xml": "1"}, "missing card ID 2"},
+		{"empty export", `<card id="1"/>`, nil, "missing card ID 1"},
+		{"unexpected", `<card id="1"/>`, map[string]string{"card_1.xml": "1", "card_2.xml": "2"}, "card ID 2 is absent"},
+		{"replaced", `<card id="1"/>`, map[string]string{"card_2.xml": "2"}, "card ID 2 is absent"},
+		{"no manifest", "", map[string]string{"card_1.xml": "1"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeXMLFixture(t, stackFileName, "<stack><name>Example</name>"+tc.manifest+"</stack>")
+			for name, id := range tc.cards {
+				if err := os.WriteFile(filepath.Join(filepath.Dir(path), name), []byte("<card><id>"+id+"</id></card>"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := NewParser(filepath.Dir(path))
+			if tc.wantError == "" && err != nil || tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
+				t.Fatalf("NewParser error = %v; want error containing %q", err, tc.wantError)
+			}
+		})
 	}
 }
 

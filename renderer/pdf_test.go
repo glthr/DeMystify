@@ -48,7 +48,11 @@ func TestRenderPDFPassesPathsAsSingleArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "-Tpdf\n-Goverlap=false\n-Gdpi=600\na directory/graph.dot\n-o\n"
+	input, err := filepath.Abs("a directory/graph.dot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "-Tpdf\n-Goverlap=false\n-Gdpi=600\n" + input + "\n-o\n"
 	arguments := strings.Split(strings.TrimSuffix(string(args), "\n"), "\n")
 	if !strings.HasPrefix(string(args), expected) || len(arguments) != 6 || filepath.Dir(arguments[5]) != filepath.Dir(pdfFilePath) || arguments[5] == pdfFilePath {
 		t.Fatalf("unexpected Neato arguments: %q", args)

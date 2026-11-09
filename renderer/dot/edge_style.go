@@ -38,6 +38,7 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 			style.arrowhead = "inv"
 			style.tooltip = "Pop back on path"
 		}
+		g.applyDisabledStyle(edge, &style)
 
 		// set arrowhead to none for restrictive transitivity edges on the custom path
 		if edge.IsOfType(common.RestrictiveTransitivityTail) {
@@ -128,6 +129,10 @@ func (g *Generator) applyEdgeStateStyle(edge *common.Edge, style *edgeStyle) {
 		}
 	}
 
+	g.applyDisabledStyle(edge, style)
+}
+
+func (g *Generator) applyDisabledStyle(edge *common.Edge, style *edgeStyle) {
 	if edge.IsOfType(common.Disabled) {
 		if !edge.IsOfType(common.RestrictiveTransitivityTail) && !edge.IsOfType(common.RestrictiveTransitivityHead) {
 			style.style = "dashed"
@@ -185,8 +190,4 @@ func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
 	}
 
 	return true
-}
-
-func (g *Generator) getNodePairID(fromID, toID int64) string {
-	return fmt.Sprintf("%d->%d", fromID, toID)
 }

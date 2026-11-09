@@ -47,7 +47,7 @@ func (g *Generator) categorizeComponents(components [][]int64) ([]int64, [][]int
 		if len(comp) == 1 {
 			singletons = append(singletons, comp[0])
 		} else if len(comp) <= 10 {
-			smallComps = append(smallComps, comp)
+			smallComps = append(smallComps, append([]int64(nil), comp...))
 		}
 	}
 
