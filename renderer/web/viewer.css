@@ -17,3 +17,4 @@ dialog{color:var(--text);border:1px solid #6c7457;background:#202820;border-radi
 @media(max-width:760px){.map-tools{max-height:calc(57% - 34px)}}
 .reference-row .ref-arrow.inverted{font-size:9px;white-space:nowrap;flex:none}
 .legend-line.backtracking,.legend-line.pdf-return{position:relative}.legend-line.backtracking{color:#ab9abe}.legend-line.pdf-return{color:#5375b9}.legend-line.backtracking:before,.legend-line.backtracking:after,.legend-line.pdf-return:before,.legend-line.pdf-return:after{content:"";position:absolute;top:-4px;width:6px;height:7px;background:currentColor}.legend-line.backtracking:before,.legend-line.pdf-return:before{left:0;clip-path:polygon(0 0,100% 50%,0 100%)}.legend-line.backtracking:after,.legend-line.pdf-return:after{right:0;clip-path:polygon(100% 0,0 50%,100% 100%)}
+.legend-arrow{width:23px;height:9px;flex:none;fill:none;stroke:#899782;stroke-width:1;stroke-linejoin:round}.pdf-line-sample .legend-arrow{width:20px;stroke:#000}

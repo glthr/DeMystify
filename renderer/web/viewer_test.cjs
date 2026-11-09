@@ -102,10 +102,26 @@ const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < .0000
 test("ordered navigation continuations remain distinct from inverted saved returns", () => {
   const data = fixture(); data.edges = [{source: 1, target: 2, attributes: ["intraAge", "sequenceContinuation"]}];
   const h = harness(data);
-  assert.match(h.get("outgoing-list").textContent, /Scripted sequence · next step/);
+  assert.match(h.get("outgoing-list").textContent, /Automatic next step · hollow arrow/);
   assert.equal(h.get("outgoing-list").children[0].children[0].textContent, "↗");
   assert.doesNotMatch(h.get("outgoing-list").textContent, /Saved return/);
   assert.equal(h.app.graph.edges.length, 1); assert.equal(h.app.graph.outgoing.get(2).length, 0);
+});
+
+test("automatic next steps end in a hollow arrowhead and both legends explain it", () => {
+  const data = fixture(); data.nodes = data.nodes.slice(0, 2); data.edges = [{source: 1, target: 2, attributes: ["intraAge", "sequenceContinuation"]}];
+  const h = harness(data); h.app.state.camera = {x: 200, y: 200, scale: 1};
+  const paints = () => { h.canvasPaints.length = 0; h.app.draw(); return h.canvasPaints; };
+  let drawn = paints(), cleared = drawn.findIndex(paint => paint.method === "fill" && paint.composite === "destination-out");
+  assert.ok(cleared >= 0, "the head is cleared rather than filled with the edge colour");
+  assert.equal(drawn.filter(paint => paint.composite === "destination-out").length, 1);
+  assert.equal(drawn[cleared + 1].method, "stroke"); assert.equal(drawn[cleared + 1].composite, "source-over", "the outline is drawn normally afterwards");
+  h.app.graph.edges[0].flags.delete("sequencecontinuation");
+  assert.equal(paints().filter(paint => paint.composite === "destination-out").length, 0, "an ordinary reference keeps its filled head");
+  h.app.graph.edges[0].flags.add("sequencecontinuation"); h.app.graph.edges[0].flags.add("disabled");
+  assert.equal(paints().filter(paint => paint.composite === "destination-out").length, 0, "a disabled record keeps its tee");
+  for (const id of ["atlas-legend", "pdf-legend"]) assert.equal(descendants(h.get(id), "svg").length, 1, id + " shows the hollow-arrow sample");
+  assert.equal(html.match(/<span>Automatic next step · hollow arrow<\/span>/g).length, 2);
 });
 
 test("saved-return entries have inward-pointing inverted triangles at both atlas endpoints", () => {

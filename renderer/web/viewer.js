@@ -2,7 +2,7 @@
   "use strict";
 
   const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79"];
-  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Scripted sequence · next step", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
+  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Automatic next step · hollow arrow", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
   const HIGHLIGHTS = [
     {id: "source", label: "Sources", flag: "source", description: "Uses the exported source flag. Source, sink and isolate flags may overlap."},
@@ -414,7 +414,10 @@
         ctx.moveTo(x + Math.sin(angle) * size * .6, y - Math.cos(angle) * size * .6); ctx.lineTo(x - Math.sin(angle) * size * .6, y + Math.cos(angle) * size * .6); ctx.stroke();
       } else {
         const points = arrowPolygon(x, y, angle, size, has(edge, "backtracking"));
-        ctx.moveTo(...points[0]); ctx.lineTo(...points[1]); ctx.lineTo(...points[2]); ctx.closePath(); ctx.fill();
+        ctx.moveTo(...points[0]); ctx.lineTo(...points[1]); ctx.lineTo(...points[2]); ctx.closePath();
+        // An automatic next step ends in a hollow head, as in the PDF graph: clear the head, then outline it.
+        if (has(edge, "sequencecontinuation") && !has(edge, "backtracking")) { ctx.save(); ctx.globalCompositeOperation = "destination-out"; ctx.globalAlpha = 1; ctx.fill(); ctx.restore(); ctx.setLineDash([]); ctx.stroke(); }
+        else ctx.fill();
       }
     }
     function drawEdge(edge, viewport) {
