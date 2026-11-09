@@ -46,8 +46,8 @@ function harness(data) {
   const frames = [], requestedImages = [];
   const document = new Element("document", null); document.ownerDocument = document; document.ids = new Map(); document.activeElement = null;
   document.getElementById = key => document.ids.get(key); document.createElement = tag => new Element(tag, document); document.createElementNS = (_, tag) => new Element(tag, document);
-  const canvasCalls = [];
-  document.context = new Proxy({measureText: text => ({width: String(text).length * 5.5})}, {get(target, key) { if (!(key in target)) target[key] = (...args) => canvasCalls.push([key, ...args]); return target[key]; }});
+  const canvasCalls = [], canvasPaints = [];
+  document.context = new Proxy({measureText: text => ({width: String(text).length * 5.5})}, {get(target, key) { if (!(key in target)) target[key] = (...args) => { canvasCalls.push([key, ...args]); if (["stroke", "fill", "fillRect", "fillText", "drawImage"].includes(key)) canvasPaints.push({method: key, fill: target.fillStyle, stroke: target.strokeStyle, alpha: target.globalAlpha, font: target.font, args}); }; return target[key]; }});
   const stack = [document], voidTags = new Set(["meta", "link", "input", "br", "hr", "img"]);
   for (const match of html.matchAll(/<\/?([a-z][a-z0-9-]*)([^>]*)>/gi)) {
     const tag = match[1].toLowerCase();
@@ -66,7 +66,7 @@ function harness(data) {
   const app = window.DeMystifyAtlas.app;
   const flush = () => { for (let n = 0; frames.length && n < 30; n++) frames.shift()(); assert.ok(frames.length < 30, "render loop must settle without image loads"); };
   flush();
-  return {window, document, app, api: window.DeMystifyAtlas, get: id => document.getElementById(id), requestedImages, canvasCalls, flush};
+  return {window, document, app, api: window.DeMystifyAtlas, get: id => document.getElementById(id), requestedImages, canvasCalls, canvasPaints, flush};
 }
 
 function fixture() {
@@ -179,4 +179,95 @@ test("all valid reference records survive normalization and local images cannot 
   const h = harness(fixture()); assert.equal(h.app.graph.edges.length, 4); assert.notEqual(h.app.graph.edges[0].parallel, h.app.graph.edges[1].parallel);
   for (const path of ["https://example.test/a.png", "//example.test/a.png", "javascript:alert(1)"]) assert.equal(h.api.safeImagePath(path), null);
   assert.equal(h.api.safeImagePath("images-abc/a.png"), "images-abc/a.png");
+});
+
+function pdfFixture() {
+  const data = fixture();
+  const geometries = [{id: 1, x: 120, y: 80, width: 84, height: 36, fill: "#d9fcc5"}, {id: 2, x: 320, y: 260, width: 92, height: 30, fill: "#ff9955"}, {id: 3, x: 90, y: 300, width: 60, height: 24, fill: "#ffffba"}];
+  data.pdfLayout = {bounds: {minX: 0, minY: 0, maxX: 900, maxY: 550}, nodes: geometries.map(node => ({...node, stroke: "#000000", fontColor: "#000000", penWidth: 1.2, shape: "box", style: "filled,rounded", draw: [{op: "c", color: "#000000"}, {op: "C", color: node.fill}, {op: "P", points: [[node.x - node.width / 2, node.y - node.height / 2], [node.x + node.width / 2, node.y - node.height / 2], [node.x + node.width / 2, node.y + node.height / 2], [node.x - node.width / 2, node.y + node.height / 2]]}], labels: [{op: "F", size: 10, face: "Arial"}, {op: "c", color: "#000000"}, {op: "T", pt: [node.x, node.y - 3], align: "c", width: 55, text: data.nodes.find(record => record.id === node.id).name}, {op: "T", pt: [node.x, node.y + 9], align: "c", width: 37, text: "Original label"}]})), edges: [
+    {source: 1, target: 2, color: "#000000", penWidth: .6, draw: [{op: "c", color: "#000000"}, {op: "b", points: [[162, 80], [700, -120], [850, 510], [320, 245]]}], head: [{op: "C", color: "#000000"}, {op: "P", points: [[317, 240], [320, 245], [323, 239]]}]},
+    {source: 1, target: 2, color: "#cccccc", style: "dashed", penWidth: .6, draw: [{op: "S", style: "dashed"}, {op: "b", points: [[150, 98], [170, 150], [250, 200], [300, 245]]}]},
+    {source: 1, target: 1, color: "#000000", draw: [{op: "b", points: [[100, 62], [60, 10], [190, 10], [140, 62]]}]}], draw: [{op: "c", color: "#fffffe00"}, {op: "C", color: "#ffffff"}, {op: "P", points: [[0, 0], [900, 0], [900, 550], [0, 550]]}]};
+  return data;
+}
+
+test("PDF layout is default when present and uses exact boxes without dropping inspector records", () => {
+  const data = pdfFixture(), h = harness(data);
+  assert.equal(h.app.state.mode, "pdf"); assert.equal(h.get("layout-tools").hidden, false); assert.equal(h.get("map-surface").classList.contains("is-pdf"), true);
+  assert.equal(h.get("pdf-layout").getAttribute("aria-pressed"), "true");
+  assert.equal(h.app.graph.byID.get(1).width, 84); assert.equal(h.app.graph.byID.get(1).height, 36); assert.equal(h.app.graph.byID.get(1).x, 120);
+  assert.equal(h.app.graph.edges.length, 4); assert.equal(h.app.graph.pdfLayout.edges.length, 3); assert.equal(h.get("outgoing-list").children.length, 3);
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fill" && paint.fill === "#d9fcc5"));
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fill" && paint.fill === "#ff9955"));
+  assert.ok(h.canvasPaints.filter(paint => paint.method === "stroke").every(paint => paint.alpha === 1), "initial selected dock must not wash out the PDF graph");
+});
+
+test("layout switching preserves selected card, Age filters, zones and metadata while refitting", () => {
+  const h = harness(pdfFixture()); h.app.setAges(["Myst"]); h.app.selectNode(2); h.app.showZone(h.app.graph.byID.get(1).zones[0], false);
+  h.get("atlas-layout").dispatch("click"); assert.equal(h.app.state.mode, "atlas"); assert.equal(h.app.state.selected.id, 2); assert.equal(h.app.state.ages.size, 1);
+  assert.equal(h.app.graph.byID.get(1).x, 0); assert.equal(h.app.graph.byID.get(1).width, 180); assert.equal(h.get("pdf-images-control").hidden, true);
+  h.get("pdf-layout").dispatch("click"); h.flush(); assert.equal(h.app.state.mode, "pdf"); assert.equal(h.app.state.selected.id, 2); assert.equal(h.app.state.ages.has("Selenitic Age"), false);
+  assert.equal(h.app.graph.byID.get(1).x, 120); assert.equal(h.app.graph.byID.get(1).width, 84); assert.equal(h.app.graph.nodes[0].zones[0].x, 10);
+});
+
+test("PDF Age colors and legends follow the drawing and restore the atlas palette on switching", () => {
+  const data = pdfFixture(); data.nodes[1].attributes.push("sink");
+  const h = harness(data), atlasColor = h.app.graph.atlasColors.get("Myst");
+  assert.equal(h.app.graph.colors.get("Myst"), "#d9fcc5", "sink highlight must not replace the Age's ordinary fill");
+  let myst = h.get("age-filters").children.find(label => label.textContent.startsWith("Myst"));
+  assert.equal(myst.style.getPropertyValue("--age-color"), "#d9fcc5");
+  assert.equal(h.get("pdf-legend").hidden, false); assert.equal(h.get("atlas-legend").hidden, true);
+  assert.equal(h.get("outgoing-list").children[0].children[2].style.background, "#d9fcc5");
+  const search = h.get("graph-search"); search.value = "Myst:42"; search.dispatch("input");
+  assert.equal(h.get("search-results").children[0].children[0].style.background, "#d9fcc5");
+  h.get("atlas-layout").dispatch("click"); myst = h.get("age-filters").children.find(label => label.textContent.startsWith("Myst"));
+  assert.equal(myst.style.getPropertyValue("--age-color"), atlasColor); assert.equal(h.get("search-results").children[0].children[0].style.background, atlasColor);
+  assert.equal(h.get("pdf-legend").hidden, true); assert.equal(h.get("atlas-legend").hidden, false);
+});
+
+test("PDF images stay inside original boxes; Images off replays original labels without thumbnail drawing", () => {
+  const h = harness(pdfFixture()); h.app.selectNode(1, true); h.flush();
+  for (const image of [...h.requestedImages]) image.finish(); h.flush();
+  const images = h.canvasPaints.filter(paint => paint.method === "drawImage" && paint.args[0].url === "images/thumb-1.png"); assert.ok(images.length);
+  for (const image of images) { const [, x, y, width, height] = image.args; assert.ok(x >= 78 && y >= 62 && x + width <= 162 && y + height <= 98); }
+  assert.equal(h.app.graph.byID.get(1).width, 84);
+  h.canvasPaints.length = 0; h.get("pdf-images").checked = false; h.get("pdf-images").dispatch("change"); h.flush();
+  assert.equal(h.canvasPaints.filter(paint => paint.method === "drawImage").length, 0);
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fillText" && paint.args[0] === "Original label"));
+});
+
+test("PDF routed-curve culling uses full control-point bounds rather than endpoints", () => {
+  const h = harness(pdfFixture()); h.app.state.camera = {scale: 1, x: -600, y: 0}; h.canvasCalls.length = 0; h.app.draw();
+  assert.ok(h.canvasCalls.some(call => call[0] === "bezierCurveTo" && call[1] === 700 && call[2] === -120 && call[3] === 850 && call[4] === 510));
+  const bounds = h.api.operationBounds(pdfFixture().pdfLayout.edges[0].draw); assert.equal(bounds.maxX, 850); assert.equal(bounds.minY, -120);
+});
+
+test("PDF mode falls back honestly when unavailable or incomplete; atlas controls stay hidden", () => {
+  const data = fixture(); data.pdfLayout = {...pdfFixture().pdfLayout, nodes: pdfFixture().pdfLayout.nodes.slice(1)};
+  let h = harness(data); assert.equal(h.app.state.mode, "atlas"); assert.equal(h.get("layout-tools").hidden, true);
+  data.pdfLayout = {nodes: pdfFixture().pdfLayout.nodes, edges: null, bounds: {minX: 0, minY: 0, maxX: 400, maxY: 400}};
+  h = harness(data); assert.equal(h.app.state.mode, "pdf"); assert.equal(h.app.graph.pdfLayout.edges.length, 0);
+});
+
+function operationContext() {
+  const calls = [], paints = [], saved = [], data = {strokeStyle: "original-stroke", fillStyle: "original-fill", lineWidth: 9, globalAlpha: 1};
+  const target = {measureText: text => ({width: text.length * 6}), save: () => saved.push({...data}), restore: () => { const last = saved.pop(); for (const key of Object.keys(data)) delete data[key]; Object.assign(data, last); }, createLinearGradient: (...args) => ({args, stops: [], addColorStop(frac, color) { this.stops.push({frac, color}); }}), createRadialGradient: (...args) => ({args, stops: [], addColorStop(frac, color) { this.stops.push({frac, color}); }})};
+  const context = new Proxy(target, {get(target, key) { if (key in data) return data[key]; if (!(key in target)) target[key] = (...args) => { calls.push([key, ...args]); if (["stroke", "fill", "fillText"].includes(key)) paints.push({op: key, ...data, args}); }; return target[key]; }, set(_, key, value) { data[key] = value; return true; }});
+  return {context, calls, paints, data};
+}
+
+test("Graphviz JSON operation replay preserves case-sensitive fills, style state, fonts and top-down baselines", () => {
+  const h = harness(fixture()), trace = operationContext(), points = [[10, 20], [30, 40], [50, 60], [70, 80]];
+  h.api.replayOperations(trace.context, [{op: "C", color: "#d9fcc5"}, {op: "c", color: "#123456"}, {op: "S", style: "setlinewidth(2.5),dashed"}, {op: "b", points}, {op: "B", points}, {op: "p", points}, {op: "P", points}, {op: "L", points}, {op: "e", rect: [30, 40, 10, 20]}, {op: "E", rect: [30, 40, 10, 20]}, {op: "F", face: "Arial", size: 10}, {op: "t", fontchar: 3}, {op: "T", pt: [200, 99], align: "r", width: 60, text: "Label"}]);
+  assert.equal(trace.paints.filter(paint => paint.op === "fill").length, 3, "JSON B/P/E fill; b/p/e do not");
+  assert.equal(trace.paints.filter(paint => paint.op === "stroke").length, 7);
+  assert.ok(trace.paints.filter(paint => paint.op === "stroke").every(paint => paint.strokeStyle === "#123456" && paint.lineWidth === 2.5));
+  const text = trace.paints.find(paint => paint.op === "fillText"); assert.match(text.font, /italic bold 10px Arial/); assert.equal(text.textAlign, "right"); assert.equal(text.textBaseline, "alphabetic");
+  assert.ok(trace.calls.some(call => call[0] === "translate" && call[1] === 200 && call[2] === 99)); assert.equal(trace.data.lineWidth, 9, "drawing-attribute state must not leak to the next object");
+});
+
+test("Graphviz gradients keep normalized endpoint geometry and color-stop fractions", () => {
+  const h = harness(fixture()), trace = operationContext();
+  h.api.replayOperations(trace.context, [{op: "C", grad: "linear", p0: [2, 3], p1: [20, 30], stops: [{frac: 0, color: "#ffffff"}, {frac: 1, color: "#000000"}]}, {op: "P", points: [[0, 0], [1, 0], [1, 1]]}]);
+  const fill = trace.paints.find(paint => paint.op === "fill").fillStyle; assert.deepEqual(fill.args, [2, 3, 20, 30]); assert.deepEqual(fill.stops, [{frac: 0, color: "#ffffff"}, {frac: 1, color: "#000000"}]);
 });

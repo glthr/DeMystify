@@ -1,5 +1,6 @@
-// Package web exports a self-contained, offline graph viewer. Layout and HTML
-// generation use Go only; original game images remain optional local inputs.
+// Package web exports a self-contained, offline graph viewer. HTML generation
+// and the native atlas layout use Go only; callers may also supply a Graphviz
+// drawing. Original game images remain optional local inputs.
 package web
 
 import (
@@ -35,6 +36,11 @@ func Write(dir string, metadata *common.Metadata, options Options) (Report, erro
 	data, err := collectData(metadata, options.Corpus)
 	if err != nil {
 		return Report{}, err
+	}
+	if options.PDFLayout != nil {
+		if err := attachPDFLayout(&data, options.PDFLayout); err != nil {
+			return Report{}, err
+		}
 	}
 	target, err := outputDirectory(dir, options)
 	if err != nil {

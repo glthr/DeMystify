@@ -24,6 +24,7 @@
       node.assetName = String(input.assetName || "");
       node.searchText = [node.id, node.name, node.stack, node.originalName, node.assetName].join(" ").toLowerCase();
       node.zones = (Array.isArray(input.zones) ? input.zones : []).map((zone, index) => ({...zone, key: index, id: zone.id == null ? index + 1 : zone.id, type: String(zone.type || "part"), name: String(zone.name || ""), layer: zone.layer === "background" ? "background" : "card", x: finite(zone.x), y: finite(zone.y), width: Math.max(0, finite(zone.width)), height: Math.max(0, finite(zone.height)), hidden: zone.hidden === true, enabled: zone.enabled !== false, script: typeof zone.script === "string" ? zone.script : ""}));
+      node.atlas = {x: node.x, y: node.y, width: node.width, height: node.height};
       nodes.push(node); byID.set(node.id, node);
     }
     const stacks = [...new Set(nodes.map(node => node.stack))].sort((a, b) => a.localeCompare(b));
@@ -40,7 +41,135 @@
       parallel.get(key).push(edge); edges.push(edge); incoming.get(target.id).push(edge); outgoing.get(source.id).push(edge);
     }
     for (const group of parallel.values()) group.forEach((edge, index) => { edge.parallel = index - (group.length - 1) / 2; });
-    return {nodes, byID, edges, stacks, colors, incoming, outgoing, meta: raw.meta || {}};
+    const graph = {nodes, byID, edges, stacks, colors, atlasColors: colors, incoming, outgoing, meta: raw.meta || {}};
+    graph.pdfLayout = normalizePDFLayout(raw.pdfLayout, byID);
+    graph.pdfColors = new Map();
+    if (graph.pdfLayout) for (const stack of stacks) {
+      const all = nodes.filter(node => node.stack === stack), ordinary = all.filter(node => has(node, "card") && !["source", "sink", "isolated", "virtual", "stack"].some(flag => has(node, flag)));
+      const counts = new Map();
+      for (const node of ordinary.length ? ordinary : all) {
+        const drawing = graph.pdfLayout.nodes.get(node.id), color = drawing.fill && !/^(none|transparent)$/i.test(drawing.fill) ? drawing.fill : drawing.stroke;
+        if (color) { const key = color.toLowerCase(); counts.set(key, (counts.get(key) || 0) + 1); }
+      }
+      graph.pdfColors.set(stack, [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || colors.get(stack));
+    }
+    return graph;
+  }
+
+  function operationBounds(operations) {
+    let result = null, fontSize = 14;
+    const add = (x, y) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (!result) result = {minX: x, minY: y, maxX: x, maxY: y};
+      else { result.minX = Math.min(result.minX, x); result.minY = Math.min(result.minY, y); result.maxX = Math.max(result.maxX, x); result.maxY = Math.max(result.maxY, y); }
+    };
+    for (const operation of operations || []) {
+      for (const point of operation.points || []) add(point[0], point[1]);
+      if (operation.op === "F") fontSize = Math.max(1, finite(operation.size, 14));
+      if (operation.pt && operation.op === "T") {
+        const width = Math.max(0, finite(operation.width)), align = operation.align === "r" ? 1 : operation.align === "c" ? .5 : 0;
+        add(operation.pt[0] - width * align, operation.pt[1] - fontSize * 1.3); add(operation.pt[0] + width * (1 - align), operation.pt[1] + fontSize * .4);
+      }
+      if (operation.rect && operation.rect.length >= 4) {
+        const [x, y, width, height] = operation.rect;
+        if (operation.op === "e" || operation.op === "E") { add(x - width, y - height); add(x + width, y + height); }
+        else { add(x, y); add(x + width, y + height); }
+      }
+    }
+    return result;
+  }
+
+  function normalizePDFLayout(input, byID) {
+    if (!input || !Array.isArray(input.nodes) || input.edges != null && !Array.isArray(input.edges) || input.nodes.length !== byID.size || !byID.size) return null;
+    const nodes = new Map();
+    for (const node of input.nodes) {
+      const id = Number(node.id);
+      if (!byID.has(id) || nodes.has(id) || ![node.x, node.y, node.width, node.height].every(value => Number.isFinite(value)) || node.width <= 0 || node.height <= 0) return null;
+      nodes.set(id, {...node, id});
+    }
+    const edges = [];
+    for (const edge of input.edges || []) {
+      if (!byID.has(Number(edge.source)) || !byID.has(Number(edge.target))) return null;
+      const operations = [...(edge.draw || []), ...(edge.head || []), ...(edge.tail || []), ...(edge.labels || [])];
+      edges.push({...edge, source: Number(edge.source), target: Number(edge.target), bounds: operationBounds(operations)});
+    }
+    return {...input, nodes, edges};
+  }
+
+  function pdfFont(face) {
+    if (/times/i.test(face || "")) return '"Times New Roman", Georgia, serif';
+    if (/courier/i.test(face || "")) return '"Courier New", monospace';
+    if (/arial|helvetica/i.test(face || "")) return 'Arial, Helvetica, sans-serif';
+    return String(face || "Arial").replace(/[^a-z0-9 ,_-]/gi, "") + ", sans-serif";
+  }
+
+  // Graphviz JSON draw opcodes (not raw xdot's B/b case convention):
+  // https://graphviz.org/docs/outputs/json/ uses b for an unfilled edge spline.
+  function replayOperations(ctx, operations, defaults = {}) {
+    ctx.save();
+    let size = 14, face = "Times-Roman", fontchar = 0;
+    ctx.strokeStyle = defaults.stroke || "#000000"; ctx.fillStyle = defaults.fill || "#ffffff";
+    ctx.lineWidth = Math.max(.01, finite(defaults.penWidth, 1)); ctx.lineCap = "butt"; ctx.lineJoin = "round"; ctx.setLineDash([]);
+    function style(value) {
+      const width = /setlinewidth\(\s*([0-9.]+)\s*\)/.exec(value || "");
+      if (width) ctx.lineWidth = Math.max(.01, finite(width[1], 1));
+      if (/\bdashed\b/.test(value)) ctx.setLineDash([6, 6]);
+      else if (/\bdotted\b/.test(value)) { ctx.setLineDash([1, 5]); ctx.lineCap = "round"; }
+      else if (/\bsolid\b/.test(value)) { ctx.setLineDash([]); ctx.lineCap = "butt"; }
+      if (/\bbold\b/.test(value) && !width) ctx.lineWidth = 2;
+    }
+    function color(operation) {
+      let result = operation.color === "none" ? "transparent" : operation.color;
+      if (operation.grad === "linear" && operation.p0 && operation.p1) result = ctx.createLinearGradient(...operation.p0.slice(0, 2), ...operation.p1.slice(0, 2));
+      else if (operation.grad === "radial" && operation.p0 && operation.p1) result = ctx.createRadialGradient(...operation.p0.slice(0, 3), ...operation.p1.slice(0, 3));
+      if (result && typeof result.addColorStop === "function") for (const stop of operation.stops || []) result.addColorStop(clamp(finite(stop.frac), 0, 1), stop.color === "none" ? "transparent" : stop.color);
+      return result || "#000000";
+    }
+    style(defaults.style || "");
+    for (const operation of operations || []) {
+      const points = operation.points || [], rect = operation.rect || [];
+      switch (operation.op) {
+        case "c": ctx.strokeStyle = color(operation); break;
+        case "C": ctx.fillStyle = color(operation); break;
+        case "S": style(operation.style || ""); break;
+        case "F": size = Math.max(.1, finite(operation.size, 14)); face = operation.face || "Times-Roman"; break;
+        case "t": fontchar = finite(operation.fontchar); break;
+        case "b": case "B":
+          if (points.length < 2) break;
+          ctx.beginPath(); ctx.moveTo(points[0][0], points[0][1]);
+          for (let i = 1; i + 2 < points.length; i += 3) ctx.bezierCurveTo(...points[i], ...points[i + 1], ...points[i + 2]);
+          if (operation.op === "B") { ctx.closePath(); ctx.fill(); }
+          ctx.stroke(); break;
+        case "p": case "P": case "L":
+          if (points.length < 2) break;
+          ctx.beginPath(); ctx.moveTo(...points[0]); for (let i = 1; i < points.length; i++) ctx.lineTo(...points[i]);
+          if (operation.op !== "L") ctx.closePath();
+          if (operation.op === "P") ctx.fill(); ctx.stroke(); break;
+        case "e": case "E":
+          if (rect.length < 4) break;
+          ctx.beginPath(); ctx.ellipse(rect[0], rect[1], Math.abs(rect[2]), Math.abs(rect[3]), 0, 0, Math.PI * 2);
+          if (operation.op === "E") ctx.fill(); ctx.stroke(); break;
+        case "T": {
+          if (!operation.pt) break;
+          const text = String(operation.text || ""), width = Math.max(0, finite(operation.width));
+          ctx.save(); ctx.fillStyle = ctx.strokeStyle; ctx.font = (fontchar & 2 ? "italic " : "") + (fontchar & 1 ? "bold " : "") + size + "px " + pdfFont(face);
+          ctx.textAlign = operation.align === "r" ? "right" : operation.align === "l" ? "left" : "center"; ctx.textBaseline = "alphabetic";
+          const cacheKey = ctx.font + "\n" + text;
+          let measured = defaults.metrics && defaults.metrics.get(cacheKey);
+          if (measured == null) { measured = ctx.measureText(text).width; if (defaults.metrics) defaults.metrics.set(cacheKey, measured); }
+          ctx.translate(operation.pt[0], operation.pt[1]);
+          if (width > 0 && measured > 0) ctx.scale(width / measured, 1);
+          ctx.fillText(text, 0, 0);
+          if (fontchar & (4 | 32 | 64)) {
+            const actual = measured || width, x = operation.align === "r" ? -actual : operation.align === "l" ? 0 : -actual / 2;
+            ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(.5, size / 14); ctx.setLineDash([]);
+            for (const [flag, y] of [[4, size * .12], [32, -size * .3], [64, -size * .85]]) if (fontchar & flag) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + actual, y); ctx.stroke(); }
+          }
+          ctx.restore(); break;
+        }
+      }
+    }
+    ctx.restore();
   }
 
   const worldPoint = (camera, point) => ({x: (point.x - camera.x) / camera.scale, y: (point.y - camera.y) / camera.scale});
@@ -89,8 +218,8 @@
 
   function createApp(document, window, raw) {
     const graph = normalizeGraph(raw), $ = id => document.getElementById(id), canvas = $("graph-canvas"), ctx = canvas.getContext("2d", {alpha: true});
-    const state = {camera: {x: 0, y: 0, scale: 1}, width: 800, height: 600, minScale: .001, selected: null, hovered: null, ages: new Set(graph.stacks), zones: true, hiddenZones: false, zone: null, dialog: false, search: [], searchIndex: -1};
-    const pointers = new Map(), ageInputs = new Map(), cache = new Map(), imageQueue = [], zoneRectangles = new Map();
+    const state = {camera: {x: 0, y: 0, scale: 1}, width: 800, height: 600, minScale: .001, mode: graph.pdfLayout ? "pdf" : "atlas", pdfImages: true, selected: null, hovered: null, ages: new Set(graph.stacks), zones: true, hiddenZones: false, zone: null, dialog: false, search: [], searchIndex: -1};
+    const pointers = new Map(), ageInputs = new Map(), cache = new Map(), imageQueue = [], zoneRectangles = new Map(), pdfTextMetrics = new Map();
     let animation = null, activeImages = 0, gesture = null, drag = null, multiTouch = false, frameID = 0;
     const requestFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : callback => window.setTimeout(callback, 16);
     const visible = node => state.ages.has(node.stack);
@@ -109,16 +238,40 @@
     }
     function fit() {
       const nodes = graph.nodes.filter(visible);
-      state.camera = fitCamera(boundsFor(nodes), state.width, state.height, state.width > 520 ? 190 : 110);
+      let bounds = boundsFor(nodes);
+      if (state.mode === "pdf" && state.ages.size === graph.stacks.length) {
+        const source = graph.pdfLayout.bounds;
+        if (source && [source.minX, source.minY, source.maxX, source.maxY].every(Number.isFinite) && source.maxX > source.minX && source.maxY > source.minY) bounds = source;
+      }
+      state.camera = fitCamera(bounds, state.width, state.height, state.width > 520 ? 190 : 110);
       state.minScale = Math.min(.02, state.camera.scale * .25); schedule();
     }
     function zoom(factor, anchor = {x: state.width / 2, y: state.height / 2}) {
-      state.camera = zoomAt(state.camera, factor, anchor, state.minScale, 5); schedule();
+      state.camera = zoomAt(state.camera, factor, anchor, state.minScale, state.mode === "pdf" ? 12 : 5); schedule();
     }
     function focusNode(node) {
-      state.camera.scale = clamp(Math.max(state.camera.scale, 1), state.minScale, 2.5);
+      state.camera.scale = state.mode === "pdf" ? clamp(Math.max(state.camera.scale, 220 / node.width), state.minScale, 8) : clamp(Math.max(state.camera.scale, 1), state.minScale, 2.5);
       state.camera.x = (state.width + (state.width > 520 ? 170 : 0)) / 2 - node.x * state.camera.scale;
       state.camera.y = state.height / 2 - node.y * state.camera.scale; schedule();
+    }
+    function setLayout(mode, refit = true) {
+      if (mode !== "pdf" || !graph.pdfLayout) mode = "atlas";
+      state.mode = mode; state.hovered = null; pointers.clear(); drag = gesture = null; canvas.classList.remove("is-dragging");
+      for (const node of graph.nodes) {
+        const geometry = mode === "pdf" ? graph.pdfLayout.nodes.get(node.id) : node.atlas;
+        node.x = geometry.x; node.y = geometry.y; node.width = geometry.width; node.height = geometry.height;
+      }
+      graph.colors = mode === "pdf" ? graph.pdfColors : graph.atlasColors;
+      for (const node of graph.nodes) node.color = graph.colors.get(node.stack);
+      $("map-surface").classList.toggle("is-pdf", mode === "pdf"); $("map-surface").classList.toggle("has-layouts", !!graph.pdfLayout);
+      $("layout-tools").hidden = !graph.pdfLayout; $("pdf-images-control").hidden = mode !== "pdf";
+      $("pdf-layout").setAttribute("aria-pressed", String(mode === "pdf")); $("atlas-layout").setAttribute("aria-pressed", String(mode === "atlas"));
+      $("atlas-legend").hidden = mode === "pdf"; $("pdf-legend").hidden = mode !== "pdf";
+      canvas.setAttribute("aria-label", (mode === "pdf" ? "Original PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
+      renderFilters();
+      if (state.selected) { renderReferences(state.selected, "incoming"); renderReferences(state.selected, "outgoing"); }
+      if (!$("search-results").hidden && $("graph-search").value.trim()) renderSearch();
+      if (refit) fit();
     }
     function imageFor(url) {
       if (!url) return null;
@@ -222,23 +375,72 @@
       if (!state.selected) return false;
       return graph.incoming.get(state.selected.id).some(edge => edge.source === id) || graph.outgoing.get(state.selected.id).some(edge => edge.target === id);
     }
+    function drawPDFEdge(edge, viewport) {
+      if (!visible(graph.byID.get(edge.source)) || !visible(graph.byID.get(edge.target))) return;
+      const bounds = edge.bounds;
+      if (bounds && (bounds.maxX < viewport.minX || bounds.minX > viewport.maxX || bounds.maxY < viewport.minY || bounds.minY > viewport.maxY)) return;
+      const defaults = {stroke: edge.color, fill: edge.color, penWidth: edge.penWidth, style: edge.style, metrics: pdfTextMetrics};
+      for (const operations of [edge.draw, edge.head, edge.tail, edge.labels]) replayOperations(ctx, operations, defaults);
+    }
+    function drawPDFNode(node) {
+      const drawing = graph.pdfLayout.nodes.get(node.id), x = node.x - node.width / 2, y = node.y - node.height / 2;
+      if (/\binvis\b/.test(drawing.style || "")) return;
+      const defaults = {stroke: drawing.stroke, fill: drawing.fill, penWidth: drawing.penWidth, style: drawing.style, metrics: pdfTextMetrics};
+      ctx.globalAlpha = 1;
+      if (drawing.draw && drawing.draw.length) replayOperations(ctx, drawing.draw, defaults);
+      else { roundedRect(x, y, node.width, node.height, Math.min(4, node.height / 3)); ctx.fillStyle = drawing.fill || "#eeeeee"; ctx.fill(); ctx.strokeStyle = drawing.stroke || "#000000"; ctx.lineWidth = drawing.penWidth || 1; ctx.stroke(); }
+      let compact = false;
+      if (state.pdfImages && node.thumbnail && node.width * state.camera.scale >= 95 && node.height * state.camera.scale >= 30 && node.width > 38 && node.height > 12) {
+        const entry = imageFor(node.thumbnail);
+        if (entry && entry.loaded && entry.image.naturalWidth) {
+          const thumbWidth = Math.min(42, node.width * .29, (node.height - 6) * 1.5), thumbHeight = node.height - 6;
+          const ratio = Math.min(thumbWidth / entry.image.naturalWidth, thumbHeight / entry.image.naturalHeight), width = entry.image.naturalWidth * ratio, height = entry.image.naturalHeight * ratio;
+          ctx.save(); ctx.beginPath(); ctx.rect(x + 2, y + 2, node.width - 4, node.height - 4); ctx.clip();
+          ctx.drawImage(entry.image, x + 4 + (thumbWidth - width) / 2, y + 3 + (thumbHeight - height) / 2, width, height);
+          const textOperations = (drawing.labels || []).filter(operation => operation.op === "T");
+          const lines = textOperations.length ? textOperations.map(operation => String(operation.text || "")) : [node.name, node.assetName || node.originalName].filter(Boolean);
+          const font = (drawing.labels || []).find(operation => operation.op === "F"), size = Math.min(finite(font && font.size, 10), (node.height - 5) / Math.max(1, lines.length) / 1.15);
+          ctx.font = size + "px " + pdfFont(font && font.face); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = drawing.fontColor || "#000000";
+          const textX = x + thumbWidth + 9, textWidth = node.width - thumbWidth - 13, lineHeight = size * 1.15;
+          lines.forEach((line, index) => ctx.fillText(fitText(line, textWidth), textX, node.y + (index - (lines.length - 1) / 2) * lineHeight));
+          ctx.restore(); compact = true;
+        }
+      }
+      if (!compact) {
+        if (drawing.labels && drawing.labels.length) replayOperations(ctx, drawing.labels, {...defaults, stroke: drawing.fontColor || "#000000"});
+        else { ctx.font = "10px Arial, sans-serif"; ctx.fillStyle = drawing.fontColor || "#000000"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(fitText(node.name, node.width - 6), node.x, node.y); }
+      }
+      const selected = state.selected && node.id === state.selected.id;
+      if (selected || state.hovered === node.id) {
+        ctx.save(); ctx.setLineDash([]); ctx.lineWidth = (selected ? 2 : 1) / state.camera.scale; ctx.strokeStyle = selected ? "#9c6f1a" : "#477a69";
+        roundedRect(x - 3 / state.camera.scale, y - 3 / state.camera.scale, node.width + 6 / state.camera.scale, node.height + 6 / state.camera.scale, 3 / state.camera.scale); ctx.stroke(); ctx.restore();
+      }
+    }
     function draw() {
       if (!ctx) return;
       frameID++;
       const dpr = canvas.width / state.width, camera = state.camera;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, state.width, state.height);
-      ctx.globalAlpha = .12; ctx.strokeStyle = "#7c8b67"; ctx.lineWidth = .5;
-      const grid = 38, ox = ((camera.x % grid) + grid) % grid, oy = ((camera.y % grid) + grid) % grid;
-      ctx.beginPath();
-      for (let x = ox; x < state.width; x += grid) { ctx.moveTo(x, 0); ctx.lineTo(x, state.height); }
-      for (let y = oy; y < state.height; y += grid) { ctx.moveTo(0, y); ctx.lineTo(state.width, y); }
-      ctx.stroke();
+      if (state.mode === "pdf") { ctx.globalAlpha = 1; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, state.width, state.height); }
+      else {
+        ctx.globalAlpha = .12; ctx.strokeStyle = "#7c8b67"; ctx.lineWidth = .5;
+        const grid = 38, ox = ((camera.x % grid) + grid) % grid, oy = ((camera.y % grid) + grid) % grid;
+        ctx.beginPath();
+        for (let x = ox; x < state.width; x += grid) { ctx.moveTo(x, 0); ctx.lineTo(x, state.height); }
+        for (let y = oy; y < state.height; y += grid) { ctx.moveTo(0, y); ctx.lineTo(state.width, y); }
+        ctx.stroke();
+      }
       const p1 = worldPoint(camera, {x: -30, y: -30}), p2 = worldPoint(camera, {x: state.width + 30, y: state.height + 30}), viewport = {minX: p1.x, minY: p1.y, maxX: p2.x, maxY: p2.y};
       ctx.setTransform(dpr * camera.scale, 0, 0, dpr * camera.scale, dpr * camera.x, dpr * camera.y);
-      for (const edge of graph.edges) drawEdge(edge, viewport);
+      if (state.mode === "pdf") {
+        replayOperations(ctx, graph.pdfLayout.draw, {metrics: pdfTextMetrics});
+        for (const edge of graph.pdfLayout.edges) drawPDFEdge(edge, viewport);
+      } else for (const edge of graph.edges) drawEdge(edge, viewport);
       const nodes = graph.nodes.filter(node => visible(node) && intersects(node, viewport));
-      for (const node of nodes) if (!state.selected || node.id !== state.selected.id) drawNode(node);
-      if (state.selected && visible(state.selected) && intersects(state.selected, viewport)) drawNode(state.selected);
+      const renderer = state.mode === "pdf" ? drawPDFNode : drawNode;
+      for (const node of nodes) if (!state.selected || node.id !== state.selected.id) renderer(node);
+      if (state.selected && visible(state.selected) && intersects(state.selected, viewport)) renderer(state.selected);
+      if (state.mode === "pdf") replayOperations(ctx, graph.pdfLayout.labels, {metrics: pdfTextMetrics});
       // Keep every visible thumbnail. A hard cap smaller than the viewport's
       // node count would evict/reload those same images on every repaint.
       for (const [url, entry] of cache) {
@@ -247,7 +449,7 @@
       }
       ctx.globalAlpha = 1; ctx.setLineDash([]);
       $("zoom-level").textContent = Math.round(camera.scale * 100) + "%";
-      $("view-status").textContent = formatNumber(graph.nodes.filter(visible).length) + " nodes · zoom in to reveal pictures";
+      $("view-status").textContent = formatNumber(graph.nodes.filter(visible).length) + " nodes · " + (state.mode === "pdf" ? state.pdfImages ? "PDF layout · zoom for pictures" : "PDF layout · original labels" : "zoom in to reveal pictures");
       $("map-empty").hidden = state.ages.size !== 0 || !graph.nodes.length;
     }
 
@@ -421,7 +623,7 @@
       pointers.set(event.pointerId, position);
       if (pointers.size >= 2 && gesture) {
         const [a, b] = [...pointers.values()], mid = {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2};
-        const scale = clamp(gesture.scale * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance, state.minScale, 5);
+        const scale = clamp(gesture.scale * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance, state.minScale, state.mode === "pdf" ? 12 : 5);
         state.camera = {scale, x: mid.x - gesture.world.x * scale, y: mid.y - gesture.world.y * scale};
       } else if (drag) {
         const dx = position.x - drag.start.x, dy = position.y - drag.start.y;
@@ -458,6 +660,8 @@
       }
     });
     $("zoom-in").addEventListener("click", () => zoom(1.35)); $("zoom-out").addEventListener("click", () => zoom(1 / 1.35)); $("fit-graph").addEventListener("click", fit);
+    $("pdf-layout").addEventListener("click", () => setLayout("pdf")); $("atlas-layout").addEventListener("click", () => setLayout("atlas"));
+    $("pdf-images").addEventListener("change", () => { state.pdfImages = $("pdf-images").checked; schedule(); });
     $("home-link").addEventListener("click", event => { event.preventDefault(); fit(); });
     $("all-ages").addEventListener("click", () => setAges(graph.stacks)); $("no-ages").addEventListener("click", () => setAges([]));
     $("clear-selection").addEventListener("click", clearSelection); $("show-zones").addEventListener("change", updateZones); $("show-hidden-zones").addEventListener("change", updateZones); $("clear-zone").addEventListener("click", clearZone);
@@ -472,14 +676,14 @@
     $("graph-summary").textContent = formatNumber(graph.nodes.length) + " nodes · " + graph.stacks.length + " Ages";
     $("conditional-legend").hidden = !graph.edges.some(edge => has(edge, "conditional") || has(edge, "zip"));
     if (!graph.nodes.length) { $("welcome-panel").querySelector("h1").textContent = "No graph data."; $("view-status").textContent = "No nodes were exported"; }
-    renderFilters(); resize(true);
+    setLayout(state.mode, false); resize(true);
     const initial = dock || graph.nodes.find(node => node.image);
     if (initial) selectNode(initial.id);
     if (typeof window.ResizeObserver === "function") new window.ResizeObserver(() => resize()).observe(canvas); else window.addEventListener("resize", () => resize());
-    return {graph, state, selectNode, clearSelection, fit, zoom, setAges, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache};
+    return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache};
   }
 
-  const api = {normalizeGraph, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, createApp};
+  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, createApp};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (global.document && global.document.getElementById("graph-canvas")) {
     global.DeMystifyAtlas = api;

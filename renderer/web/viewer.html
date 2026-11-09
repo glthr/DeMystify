@@ -26,8 +26,12 @@
     </header>
 
     <main class="atlas-main">
-      <section class="map" aria-label="Interactive graph">
+      <section id="map-surface" class="map" aria-label="Interactive graph">
         <canvas id="graph-canvas" tabindex="0" aria-label="Card graph. Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card."></canvas>
+        <div id="layout-tools" class="layout-tools" hidden>
+          <div class="layout-switch" role="group" aria-label="Graph layout"><button id="pdf-layout" aria-pressed="false" title="Original PDF node sizes and routed edges">PDF graph</button><button id="atlas-layout" aria-pressed="false" title="Larger picture cards in the image atlas">Image atlas</button></div>
+          <label id="pdf-images-control" class="pdf-images-control"><input id="pdf-images" type="checkbox" checked>Images</label>
+        </div>
         <aside class="map-tools">
           <details class="tool-panel age-panel" open>
             <summary><span class="eyebrow">EXPLORE BY AGE</span><span class="summary-chevron">⌄</span></summary>
@@ -36,13 +40,19 @@
           </details>
           <details class="tool-panel legend-panel">
             <summary><span class="eyebrow">READ THE CONNECTIONS</span><span class="summary-chevron">⌄</span></summary>
-            <div class="legend-rows">
+            <div id="atlas-legend" class="legend-rows">
               <div><i class="legend-line"></i><span>Ordinary reference</span></div>
               <div><i class="legend-line cross"></i><span>Between Ages</span></div>
               <div><i class="legend-line backtracking"></i><span>Saved-return entry</span></div>
               <div><i class="legend-line restrictive"></i><span>Paired return reference</span></div>
               <div><i class="legend-line disabled"></i><span>Commented / disabled</span></div>
               <div id="conditional-legend" hidden><i class="legend-line conditional"></i><span>Conditional / Zip reference</span></div>
+            </div>
+            <div id="pdf-legend" class="legend-rows" hidden>
+              <div><span class="pdf-line-sample"><i class="legend-line pdf-ordinary"></i></span><span>Ordinary reference</span></div>
+              <div><span class="pdf-line-sample"><i class="legend-line pdf-return"></i></span><span>Saved-return entry</span></div>
+              <div><span class="pdf-line-sample"><i class="legend-line pdf-disabled"></i></span><span>Disabled: tee / dashed</span></div>
+              <p class="pdf-legend-note">Original PDF colors, arrowheads, source/sink fills and page borders are retained. Age and paired-reference colors vary.</p>
             </div>
             <p class="legend-note">Every extracted record is retained. Lines describe static references; they do not guarantee a playable route.</p>
           </details>

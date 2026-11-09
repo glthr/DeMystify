@@ -7,6 +7,7 @@ import (
 
 	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/hypercard"
+	pdflayout "github.com/glthr/DeMystify/renderer/layout"
 )
 
 // Options selects optional local artwork and original card geometry. No
@@ -15,6 +16,7 @@ type Options struct {
 	AssetsDir string
 	InputDir  string // Protected original input directory, when known by the caller.
 	Corpus    *hypercard.Corpus
+	PDFLayout *pdflayout.Drawing // Optional Graphviz drawing, prepared by the caller.
 }
 
 // Report describes the completed, local HTML export.
@@ -29,9 +31,10 @@ type Report struct {
 }
 
 type graphData struct {
-	Nodes []webNode `json:"nodes"`
-	Edges []webEdge `json:"edges"`
-	Meta  webMeta   `json:"meta"`
+	Nodes     []webNode          `json:"nodes"`
+	Edges     []webEdge          `json:"edges"`
+	Meta      webMeta            `json:"meta"`
+	PDFLayout *pdflayout.Drawing `json:"pdfLayout,omitempty"`
 }
 
 type webNode struct {
@@ -98,6 +101,7 @@ type webMeta struct {
 	LayoutAlgorithm string        `json:"layoutAlgorithm"`
 	Groups          []layoutGroup `json:"groups"`
 	Zones           int           `json:"zones"`
+	DefaultLayout   string        `json:"defaultLayout"`
 }
 
 func collectData(metadata *common.Metadata, corpus *hypercard.Corpus) (graphData, error) {
@@ -159,7 +163,7 @@ func collectData(metadata *common.Metadata, corpus *hypercard.Corpus) (graphData
 		return strings.Join(a.Attributes, "\x00") < strings.Join(b.Attributes, "\x00")
 	})
 	data.Meta = webMeta{Cards: metadata.TotalCards, Stacks: metadata.TotalStacks,
-		Nodes: len(data.Nodes), Edges: len(data.Edges), LayoutAlgorithm: "deterministic grouped force with rectangle packing"}
+		Nodes: len(data.Nodes), Edges: len(data.Edges), LayoutAlgorithm: "deterministic grouped force with rectangle packing", DefaultLayout: "atlas"}
 	if corpus != nil {
 		if err := addZones(&data, corpus); err != nil {
 			return graphData{}, err
