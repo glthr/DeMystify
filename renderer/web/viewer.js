@@ -2,7 +2,7 @@
   "use strict";
 
   const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79"];
-  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved-return entry", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
+  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
   const HIGHLIGHTS = [
     {id: "source", label: "Sources", flag: "source", description: "Uses the exported source flag. Source, sink and isolate flags may overlap."},
@@ -76,6 +76,14 @@
   function highlightCounts(nodes, ages, selected) {
     const visible = nodes.filter(node => ages.has(node.stack));
     return {visible: visible.length, matched: visible.filter(node => matchesHighlights(node, selected)).length};
+  }
+
+  // Graphviz's `inv` marker has its wide end at the card boundary and points
+  // back along the connection. Both ends mark saved-return entries in the PDF.
+  function arrowPolygon(x, y, angle, size, inverted = false) {
+    const along = {x: Math.cos(angle) * size, y: Math.sin(angle) * size}, across = {x: -Math.sin(angle) * size * .44, y: Math.cos(angle) * size * .44};
+    const base = inverted ? {x, y} : {x: x - along.x, y: y - along.y};
+    return [inverted ? [x - along.x, y - along.y] : [x, y], [base.x + across.x, base.y + across.y], [base.x - across.x, base.y - across.y]];
   }
 
   function grayColor(value, role = "stroke", mode = "pdf") {
@@ -312,7 +320,7 @@
       $("layout-tools").hidden = !graph.pdfLayout; $("pdf-images-control").hidden = mode !== "pdf";
       $("pdf-layout").setAttribute("aria-pressed", String(mode === "pdf")); $("atlas-layout").setAttribute("aria-pressed", String(mode === "atlas"));
       $("atlas-legend").hidden = mode === "pdf"; $("pdf-legend").hidden = mode !== "pdf";
-      canvas.setAttribute("aria-label", (mode === "pdf" ? "Original PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
+      canvas.setAttribute("aria-label", (mode === "pdf" ? "Shared PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
       renderFilters();
       updateHighlightCounts();
       if (state.selected) { renderReferences(state.selected, "incoming"); renderReferences(state.selected, "outgoing"); }
@@ -397,13 +405,14 @@
       }
       return {color, dash, alpha, related};
     }
-    function arrow(x, y, angle, size, edge) {
-      if (has(edge, "restrictivetransitivitytail")) return;
+    function arrow(x, y, angle, size, edge, tail = false) {
+      if (!tail && has(edge, "restrictivetransitivitytail")) return;
       ctx.beginPath();
-      if (has(edge, "disabled")) {
+      if (!tail && has(edge, "disabled")) {
         ctx.moveTo(x + Math.sin(angle) * size * .6, y - Math.cos(angle) * size * .6); ctx.lineTo(x - Math.sin(angle) * size * .6, y + Math.cos(angle) * size * .6); ctx.stroke();
       } else {
-        ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(angle - .45) * size, y - Math.sin(angle - .45) * size); ctx.lineTo(x - Math.cos(angle + .45) * size, y - Math.sin(angle + .45) * size); ctx.closePath(); ctx.fill();
+        const points = arrowPolygon(x, y, angle, size, has(edge, "backtracking"));
+        ctx.moveTo(...points[0]); ctx.lineTo(...points[1]); ctx.lineTo(...points[2]); ctx.closePath(); ctx.fill();
       }
     }
     function drawEdge(edge, viewport) {
@@ -416,7 +425,11 @@
       if (a.id === b.id) {
         const radius = 24 + Math.abs(edge.parallel) * 9, x = a.x + a.width * .28, y = a.y - a.height / 2;
         ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.bezierCurveTo(x - radius, y - radius * 2, x + radius * 2, y - radius * 2, x + 16, y); ctx.stroke();
-        if (scale > .24) arrow(x + 16, y, 2.1, 6 / Math.max(.6, scale), edge);
+        if (scale > .24 || appearance.related) {
+          const size = 6 / Math.max(.6, scale);
+          arrow(x + 16, y, Math.atan2(radius * 2, 16 - radius * 2), size, edge);
+          if (has(edge, "backtracking")) arrow(x - 12, y, Math.atan2(radius * 2, radius - 12), size, edge, true);
+        }
         return;
       }
       const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
@@ -426,7 +439,11 @@
       const boundary = (node, toward) => { const dx = toward.x - node.x, dy = toward.y - node.y; const ratio = Math.min(node.width / 2 / (Math.abs(dx) || .001), node.height / 2 / (Math.abs(dy) || .001)); return {x: node.x + dx * ratio, y: node.y + dy * ratio}; };
       const start = boundary(a, control), end = boundary(b, control);
       ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.quadraticCurveTo(control.x, control.y, end.x, end.y); ctx.stroke();
-      if (scale > .24 || appearance.related) arrow(end.x, end.y, Math.atan2(end.y - control.y, end.x - control.x), 6 / Math.max(.6, scale), edge);
+      if (scale > .24 || appearance.related) {
+        const size = 6 / Math.max(.6, scale);
+        arrow(end.x, end.y, Math.atan2(end.y - control.y, end.x - control.x), size, edge);
+        if (has(edge, "backtracking")) arrow(start.x, start.y, Math.atan2(start.y - control.y, start.x - control.x), size, edge, true);
+      }
     }
     function drawNode(node) {
       const scale = state.camera.scale, selected = state.selected && node.id === state.selected.id, hover = node.id === state.hovered, isMuted = muted(node);
@@ -814,7 +831,7 @@
     return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setHighlights, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache, grayCache, grayBudget: {buffers: MAX_GRAY_BUFFERS, pixels: MAX_GRAY_PIXELS, edge: MAX_GRAY_EDGE}};
   }
 
-  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, matchesHighlights, highlightCounts, grayColor, HIGHLIGHTS, createApp};
+  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, matchesHighlights, highlightCounts, grayColor, arrowPolygon, HIGHLIGHTS, createApp};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (global.document && global.document.getElementById("graph-canvas")) {
     global.DeMystifyAtlas = api;

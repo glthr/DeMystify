@@ -99,6 +99,27 @@ function fixture() {
 }
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < .00001, `${actual} differs from ${expected}`);
 
+test("saved-return entries have inward-pointing inverted triangles at both atlas endpoints", () => {
+  const data = fixture(); data.nodes = data.nodes.slice(0, 2); data.edges = [{source: 1, target: 2, attributes: ["intraAge", "backtracking"]}];
+  const h = harness(data); h.app.state.camera = {x: 200, y: 200, scale: 1};
+  const triangles = () => {
+    h.canvasCalls.length = 0; h.app.draw(); const result = [];
+    for (let i = 0; i < h.canvasCalls.length - 5; i++) {
+      const part = h.canvasCalls.slice(i, i + 6);
+      if (part.map(call => call[0]).join(",") === "beginPath,moveTo,lineTo,lineTo,closePath,fill") result.push(part.slice(1, 4).map(call => call.slice(1)));
+    }
+    return result;
+  };
+  let markers = triangles(); assert.equal(markers.length, 2);
+  const [head, tail] = markers;
+  near(head[1][0], 230); near(head[2][0], 230); assert.ok(head[0][0] < head[1][0], "head points away from destination into the connection");
+  near(tail[1][0], 90); near(tail[2][0], 90); assert.ok(tail[0][0] > tail[1][0], "tail points away from source into the connection");
+  assert.match(h.get("outgoing-list").textContent, /Saved return · inverted arrows/);
+  h.app.graph.edges[0].flags.delete("backtracking"); markers = triangles(); assert.equal(markers.length, 1); assert.ok(markers[0][0][0] > markers[0][1][0]);
+  h.app.graph.edges[0].flags.add("backtracking"); h.app.graph.edges[0].flags.add("disabled"); assert.equal(triangles().length, 1, "disabled head keeps its tee; saved-return tail remains inverted");
+  h.app.graph.edges[0].flags.delete("disabled"); h.app.graph.edges[0].flags.add("restrictivetransitivitytail"); assert.equal(triangles().length, 1, "paired-return tail suppresses its head only");
+});
+
 test("initial overview selects genuine dock picture and visible stored zones without changing fit", () => {
   const h = harness(fixture());
   assert.equal(h.app.state.selected.id, 1); assert.equal(h.get("selection-panel").hidden, false);
