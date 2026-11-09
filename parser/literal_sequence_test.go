@@ -82,6 +82,9 @@ func TestLiteralSequenceSupportsResolvedNamesCommentsAndVisualEffects(t *testing
 		"quoted names":  "go card \"Transit\"\n-- ordinary explanation\n\nvisual effect dissolve fast\ngo card \"Destination\"",
 		"static names":  "go card Transit\nvs right\ngo card Destination",
 		"trailing note": "go card id 2 -- entered here\nvs left -- visual-only convention\ngo to card id 3",
+		// Both spellings pass the same literal direction to the same command.
+		"quoted direction": "go card id 2\nvs \"left\"\ngo to card id 3",
+		"quoted and cased": "go card id 2\nVS \"Right\" -- visual-only convention\ngo to card id 3",
 	} {
 		t.Run(name, func(t *testing.T) {
 			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+script+"\nend mouseUp"))
@@ -121,7 +124,7 @@ func TestLiteralSequenceRejectsControlFlowAndUnresolvedContexts(t *testing.T) {
 }
 
 func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
-	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "wait until ready", "vs direction", "put navigator() into state"} {
+	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "wait until ready", "vs direction", `vs "direction"`, `vs "left" & suffix`, `vs "left", 2`, "put navigator() into state"} {
 		t.Run(command, func(t *testing.T) {
 			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\ngo card id 4\nend mouseUp"))
 			edges := sequenceEdges(metadata)

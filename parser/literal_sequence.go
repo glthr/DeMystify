@@ -9,8 +9,9 @@ import (
 
 var (
 	sequenceLiteralGo = regexp.MustCompile(`(?i)^go(?:\s+to)?\s+card\s+(?:id\s+[0-9]+|"[^"]+"|[a-z][a-z0-9_]*)$`)
-	sequenceVS        = regexp.MustCompile(`(?i)^vs\s+(?:left|right|up|down)$`)
-	sequenceVisual    = regexp.MustCompile(`(?i)^visual\s+effect\s+(?:cut|plain|dissolve|(?:scroll|wipe)\s+(?:left|right|up|down))(?:\s+(?:very\s+)?(?:fast|slow))?$`)
+	// The direction is one literal word; scripts spell it with or without quotes.
+	sequenceVS     = regexp.MustCompile(`(?i)^vs\s+(?:left|right|up|down|"(?:left|right|up|down)")$`)
+	sequenceVisual = regexp.MustCompile(`(?i)^visual\s+effect\s+(?:cut|plain|dissolve|(?:scroll|wipe)\s+(?:left|right|up|down))(?:\s+(?:very\s+)?(?:fast|slow))?$`)
 )
 
 // literalSequence tracks static order only. It does not execute a handler or

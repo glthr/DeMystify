@@ -1833,7 +1833,7 @@ digraph G {
   "368" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:96173\nSirrus SouthDesk-s"];
   "369" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:96441\nVillage 1-w"];
   "370" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:96569\nVillage 1-e"];
-  "371" [color="#FF4500", fillcolor="#FFA07A", label="Channelwood Age:96885\nElevatorEntered", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
+  "371" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:96885\nElevatorEntered"];
   "372" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:9721\nPumphousePath 6-Up"];
   "373" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:97270\nElevatorEntered"];
   "374" [color="#ADC99D", fillcolor="#d9fcc5", label="Channelwood Age:9781\nPumphousePath 5-Up"];
@@ -3807,7 +3807,6 @@ digraph G {
   "64" -> "62" [];
   "65" -> "67" [];
   "66" -> "64" [];
-  "67" -> "118" [];
   "67" -> "371" [];
   "68" -> "66" [];
   "69" -> "71" [];
@@ -3912,7 +3911,6 @@ digraph G {
   "151" -> "256" [];
   "154" -> "150" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "154" -> "321" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
-  "155" -> "317" [];
   "155" -> "371" [];
   "156" -> "160" [];
   "158" -> "176" [];
@@ -4127,6 +4125,8 @@ digraph G {
   "365" -> "361" [];
   "369" -> "155" [];
   "370" -> "160" [];
+  "371" -> "118" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
+  "371" -> "317" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "372" -> "374" [];
   "373" -> "318" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "374" -> "8" [];

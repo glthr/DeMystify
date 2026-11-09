@@ -35,7 +35,7 @@ func TestOriginalMystImport(t *testing.T) {
 	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
-	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 57 || isolated != 19 {
+	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 56 || isolated != 19 {
 		t.Fatalf("unexpected source/sink/isolated counts: %d/%d/%d", sources, sinks, isolated)
 	}
 	for _, pair := range [][2]string{
@@ -55,6 +55,17 @@ func TestOriginalMystImport(t *testing.T) {
 		weight, exists := g.Weight(from, to)
 		if !fromExists || !toExists || !exists || weight != 1 {
 			t.Errorf("missing named-card transition %s -> %s", pair[0], pair[1])
+		}
+	}
+	// An intermediate elevator view continues to the level chosen by its caller,
+	// whether the script spells the transition as vs left or vs "left".
+	for _, pair := range [][2]string{
+		{"Channelwood Age:45661", "Channelwood Age:44320"},
+		{"Channelwood Age:96885", "Channelwood Age:36337"},
+		{"Channelwood Age:96885", "Channelwood Age:84124"},
+	} {
+		if !g.HasEdge(pair[0], pair[1]) {
+			t.Errorf("missing ordered continuation %s -> %s", pair[0], pair[1])
 		}
 	}
 	verifySharedStackHandlerEntries(t, g)
