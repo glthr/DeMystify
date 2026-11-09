@@ -12,6 +12,11 @@ const pdfFilePath = "generated/graph.pdf"
 // RenderPDF generates a PDF visualization using Neato
 // NOTE: it would be great to replace this system call with a function call (library)
 func RenderPDF(dotFilePath string) error {
+	// Graphviz does not accept "--"; absolute paths keep leading dashes literal.
+	dotInputPath, err := filepath.Abs(dotFilePath)
+	if err != nil {
+		return fmt.Errorf("resolving DOT input path: %w", err)
+	}
 	if err := os.MkdirAll(filepath.Dir(pdfFilePath), 0755); err != nil {
 		return fmt.Errorf("creating PDF output directory: %w", err)
 	}
@@ -28,7 +33,7 @@ func RenderPDF(dotFilePath string) error {
 		"-Tpdf",
 		"-Goverlap=false",
 		"-Gdpi=600",
-		dotFilePath, "-o", output.Name())
+		dotInputPath, "-o", output.Name())
 	cmdOutput, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to generate PDF: %w\nOutput: %s", err, cmdOutput)
