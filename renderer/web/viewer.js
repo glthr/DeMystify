@@ -510,10 +510,15 @@
           ctx.drawImage(image, x + 4 + (thumbWidth - width) / 2, y + 3 + (thumbHeight - height) / 2, width, height);
           const textOperations = (drawing.labels || []).filter(operation => operation.op === "T");
           const lines = textOperations.length ? textOperations.map(operation => String(operation.text || "")) : [node.name, node.assetName || node.originalName].filter(Boolean);
-          const font = (drawing.labels || []).find(operation => operation.op === "F"), size = Math.min(finite(font && font.size, 10), (node.height - 5) / Math.max(1, lines.length) / 1.15);
-          ctx.font = size + "px " + pdfFont(font && font.face); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = isMuted ? grayColor(drawing.fontColor || "#000000") : drawing.fontColor || "#000000";
-          const textX = x + thumbWidth + 9, textWidth = node.width - thumbWidth - 13, lineHeight = size * 1.15;
-          lines.forEach((line, index) => ctx.fillText(fitText(line, textWidth), textX, node.y + (index - (lines.length - 1) / 2) * lineHeight));
+          const font = (drawing.labels || []).find(operation => operation.op === "F"), base = Math.min(finite(font && font.size, 10), (node.height - 5) / Math.max(1, lines.length) / 1.15), family = pdfFont(font && font.face);
+          const textX = x + thumbWidth + 9, textWidth = node.width - thumbWidth - 13;
+          // The box was sized for its label alone. Beside a thumbnail, shrink the label
+          // before cutting it, so that card IDs stay readable; truncate only below 55%.
+          ctx.font = base + "px " + family;
+          const shrink = clamp(textWidth / Math.max(1, ...lines.map(line => ctx.measureText(line).width)), .55, 1), fitted = lines.map(line => fitText(line, textWidth / shrink));
+          const size = base * shrink, lineHeight = size * 1.15;
+          ctx.font = size + "px " + family; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = isMuted ? grayColor(drawing.fontColor || "#000000") : drawing.fontColor || "#000000";
+          fitted.forEach((line, index) => ctx.fillText(line, textX, node.y + (index - (lines.length - 1) / 2) * lineHeight));
           ctx.restore(); compact = true;
         }
       }

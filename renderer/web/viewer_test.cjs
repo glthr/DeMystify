@@ -304,6 +304,21 @@ test("PDF images stay inside original boxes; Images off replays original labels 
   assert.ok(h.canvasPaints.some(paint => paint.method === "fillText" && paint.args[0] === "Original label"));
 });
 
+test("PDF labels beside a thumbnail shrink to stay complete and are cut only at the size floor", () => {
+  const data = pdfFixture(), long = "Channelwood Age:100894 (an unusually long original card name)";
+  data.pdfLayout.nodes[1].labels[2].text = long;
+  const h = harness(data), labels = id => { h.app.selectNode(id, true); h.flush(); for (const image of [...h.requestedImages]) image.finish(); h.canvasPaints.length = 0; h.app.draw(); return h.canvasPaints.filter(paint => paint.method === "fillText" && paint.args[1] > h.app.graph.byID.get(id).x - h.app.graph.byID.get(id).width / 2 + 10 && paint.args[1] < h.app.graph.byID.get(id).x); };
+  const complete = labels(1);
+  assert.deepEqual(complete.map(paint => paint.args[0]), ["Myst:8336", "Original label"], "both lines stay complete");
+  for (const paint of complete) { const size = parseFloat(paint.font); assert.ok(size < 10 && size >= 5.5, "label shrinks within the floor: " + paint.font); assert.match(paint.font, /Arial/); }
+  // 84 - thumbnail (84 * .29) - 13 leaves 46.64 units for a 77-unit line in this harness.
+  near(parseFloat(complete[0].font), 10 * (84 - 84 * .29 - 13) / 77);
+  const cut = labels(2);
+  assert.equal(cut.length, 2); near(parseFloat(cut[0].font), 5.5);
+  assert.ok(cut[0].args[0].endsWith("…") && long.startsWith(cut[0].args[0].slice(0, -1)) && cut[0].args[0].length > 12, "an over-long line is still cut: " + cut[0].args[0]);
+  assert.equal(cut[1].args[0], "Original label");
+});
+
 test("PDF routed-curve culling uses full control-point bounds rather than endpoints", () => {
   const h = harness(pdfFixture()); h.app.state.camera = {scale: 1, x: -600, y: 0}; h.canvasCalls.length = 0; h.app.draw();
   assert.ok(h.canvasCalls.some(call => call[0] === "bezierCurveTo" && call[1] === 700 && call[2] === -120 && call[3] === 850 && call[4] === 510));
