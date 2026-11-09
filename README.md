@@ -6,9 +6,9 @@ DeMystify is an unofficial open-source project graph-based analysis of the class
 
 ## The Myst Graph
 
-The Myst Graph represents the game's cards as a network–a graph–showing how they are connected. This visualization helps us understand the game’s structure in a new way. The corrected generator produces 1,364 nodes and 3,232 non-disabled directed connections from the fresh stack conversion (3,231 from the saved XML snapshot), before reverse pairs are combined for display. The original visualization accompanying the articles had 3,189 connections. [Graph changes](GRAPH_CHANGES.md) explains the first audit; [the second audit](AUDIT_ROUND_2.md) documents the raw-stack conversion and input difference. [Model refinements](MODEL_REFINEMENTS.md) explains the revised source definition, caller links, individual self-reference evidence and separate conditional Zip layer.
+The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,232 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the converted input files.
 
-The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled and backtracking edges. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game. [The continued code review](AUDIT_CONTINUATION.md) documents additional import/API/rendering fixes that preserve the default graph.
+The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled and backtracking edges. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
 
 ## Generate the Myst Graph
 
