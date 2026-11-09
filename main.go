@@ -28,7 +28,7 @@ Options:
   --assets directory         Decoded view images and optional images.json mappings
   --web-output directory     Browser export directory (default generated/web)
   --web-layout auto|pdf|atlas Browser placement (default auto: PDF when Neato is available)
-  --layout ages|original     Shared PDF graph arrangement (default ages)
+  --layout original|ages     Shared PDF graph arrangement (default original)
 
 HTML exports open offline. The PDF layout requires Neato during generation;
 --web-layout atlas uses the built-in layout without Neato.
@@ -46,7 +46,7 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
 	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
 	flags.StringVar(&options.webLayout, "web-layout", "auto", "browser placement")
-	flags.StringVar(&options.arrangement, "layout", "ages", "shared PDF graph arrangement")
+	flags.StringVar(&options.arrangement, "layout", "original", "shared PDF graph arrangement")
 	if err := flags.Parse(args); err != nil {
 		return options, fmt.Errorf("%s\n%w", usage, err)
 	}

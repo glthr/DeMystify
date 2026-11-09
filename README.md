@@ -63,7 +63,7 @@ Use **Highlight nodes** to emphasize sources, sinks, isolated nodes, active self
 go run . --format html --web-layout pdf --assets "/path/to/views" "/path/to/Myst Files"
 ```
 
-The default `--layout ages` arrangement groups cards by Age and chooses between two organic placements to reduce crossings within each Age. Small disconnected components stay near their own Age. Use `--layout original` to retain the original placement. This option controls the PDF and the browser's **PDF graph** together; the built-in **Image atlas** keeps its separate placement. DOT-only generation skips placement.
+The default `--layout original` preserves the original organic graph arrangement. An optional `--layout ages` arrangement separates Ages, chooses between two organic placements to reduce crossings within each Age, and keeps small disconnected components near their own Age. This option controls the PDF and the browser's **PDF graph** together; the built-in **Image atlas** keeps its separate placement. DOT-only generation skips placement.
 
 When HTML and PDF are generated together, both use the same Graphviz layout pass, including node boxes, curved connections and arrowheads. The PDF contains labels; the browser can display pictures inside those same boxes. The browser stores its drawing locally and needs no Graphviz installation when opened.
 
