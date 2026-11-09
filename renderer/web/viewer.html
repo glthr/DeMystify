@@ -38,6 +38,12 @@
             <div class="age-actions"><button id="all-ages">Show all</button><button id="no-ages">Clear</button></div>
             <div id="age-filters" class="age-filters"></div>
           </details>
+          <details class="tool-panel highlight-panel">
+            <summary><span class="highlight-summary-copy"><span class="eyebrow">HIGHLIGHT NODES</span><span id="highlight-summary" class="highlight-summary">All visible nodes</span></span><span class="summary-chevron">⌄</span></summary>
+            <p id="highlight-description" class="highlight-description">Match any checked category. Other nodes stay gray.</p>
+            <div id="node-highlights" class="node-highlights" role="group" aria-label="Highlight nodes matching any selected category" aria-describedby="highlight-description"></div>
+            <div class="highlight-footer"><span><span class="highlight-stat-label">Emphasized</span><output id="highlight-count" aria-live="polite">All visible</output></span><button id="clear-highlights" aria-label="Clear node highlights">Clear</button></div>
+          </details>
           <details class="tool-panel legend-panel">
             <summary><span class="eyebrow">READ THE CONNECTIONS</span><span class="summary-chevron">⌄</span></summary>
             <div id="atlas-legend" class="legend-rows">

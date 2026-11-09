@@ -4,6 +4,17 @@
   const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79"];
   const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved-return entry", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
+  const HIGHLIGHTS = [
+    {id: "source", label: "Sources", flag: "source", description: "Uses the exported source flag. Source, sink and isolate flags may overlap."},
+    {id: "sink", label: "Sinks", flag: "sink", description: "Uses the exported sink flag. Source, sink and isolate flags may overlap."},
+    {id: "isolated", label: "Isolated", flag: "isolated", description: "Uses the exported isolate flag; no categories are inferred again."},
+    {id: "selfReference", label: "Self-references", description: "At least one non-disabled raw reference record connects this node to itself."},
+    {id: "bluePage", label: "Blue page cards", flag: "containsbluepage", description: "Cards with the exported blue-page flag."},
+    {id: "redPage", label: "Red page cards", flag: "containsredpage", description: "Cards with the exported red-page flag."},
+    {id: "whitePage", label: "White page cards", flag: "containswhitepage", description: "Cards with the exported white-page flag."},
+    {id: "virtual", label: "Absent targets", flag: "virtual", description: "Referenced targets absent from the imported input."},
+    {id: "stack", label: "Stacks", flag: "stack", description: "Stack abstractions, separate from individual cards."}
+  ];
   const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
   const attribute = value => String(value || "").replace(/[^a-z]/gi, "").toLowerCase().replace(/^is(?=card|stack|virtual|source|sink|isolated)/, "");
@@ -41,6 +52,8 @@
       parallel.get(key).push(edge); edges.push(edge); incoming.get(target.id).push(edge); outgoing.get(source.id).push(edge);
     }
     for (const group of parallel.values()) group.forEach((edge, index) => { edge.parallel = index - (group.length - 1) / 2; });
+    for (const node of nodes) { node.highlightKinds = new Set(HIGHLIGHTS.filter(kind => kind.flag && has(node, kind.flag)).map(kind => kind.id)); node.highlightMatch = true; }
+    for (const edge of edges) if (edge.source === edge.target && !has(edge, "disabled")) edge.from.highlightKinds.add("selfReference");
     const graph = {nodes, byID, edges, stacks, colors, atlasColors: colors, incoming, outgoing, meta: raw.meta || {}};
     graph.pdfLayout = normalizePDFLayout(raw.pdfLayout, byID);
     graph.pdfColors = new Map();
@@ -54,6 +67,34 @@
       graph.pdfColors.set(stack, [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || colors.get(stack));
     }
     return graph;
+  }
+
+  function matchesHighlights(node, selected) {
+    return selected.size === 0 || [...selected].some(kind => node.highlightKinds.has(kind));
+  }
+
+  function highlightCounts(nodes, ages, selected) {
+    const visible = nodes.filter(node => ages.has(node.stack));
+    return {visible: visible.length, matched: visible.filter(node => matchesHighlights(node, selected)).length};
+  }
+
+  function grayColor(value, role = "stroke", mode = "pdf") {
+    const text = String(value || "").toLowerCase();
+    if (text === "transparent" || text === "none") return "#00000000";
+    const names = {black: "#000000", white: "#ffffff", gray: "#808080", grey: "#808080", red: "#ff0000", blue: "#0000ff", green: "#008000"};
+    const hex = (names[text] || text).match(/^#([a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})$/i);
+    let rgb = [128, 128, 128], alpha = "";
+    if (hex) {
+      const raw = hex[1].length <= 4 ? [...hex[1]].map(char => char + char).join("") : hex[1];
+      rgb = [0, 2, 4].map(offset => parseInt(raw.slice(offset, offset + 2), 16)); alpha = raw.slice(6);
+    } else {
+      const match = text.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/);
+      if (match) { rgb = match.slice(1, 4).map(Number); if (match[4] != null) alpha = Math.round(clamp(Number(match[4]), 0, 1) * 255).toString(16).padStart(2, "0"); }
+    }
+    const luminance = .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+    const level = mode === "atlas" ? role === "edge" ? 94 : Math.round(95 + luminance * .25) : role === "edge" ? Math.round(185 + luminance * .16) : role === "fill" ? Math.round(180 + luminance * .25) : Math.round(145 + luminance * .22);
+    const channel = clamp(level, 0, 255).toString(16).padStart(2, "0");
+    return "#" + channel.repeat(3) + alpha;
   }
 
   function operationBounds(operations) {
@@ -108,7 +149,8 @@
   function replayOperations(ctx, operations, defaults = {}) {
     ctx.save();
     let size = 14, face = "Times-Roman", fontchar = 0;
-    ctx.strokeStyle = defaults.stroke || "#000000"; ctx.fillStyle = defaults.fill || "#ffffff";
+    const mapped = (value, role) => defaults.colorMap ? defaults.colorMap(value, role) : value;
+    ctx.strokeStyle = mapped(defaults.stroke || "#000000", "stroke"); ctx.fillStyle = mapped(defaults.fill || "#ffffff", "fill");
     ctx.lineWidth = Math.max(.01, finite(defaults.penWidth, 1)); ctx.lineCap = "butt"; ctx.lineJoin = "round"; ctx.setLineDash([]);
     function style(value) {
       const width = /setlinewidth\(\s*([0-9.]+)\s*\)/.exec(value || "");
@@ -118,19 +160,19 @@
       else if (/\bsolid\b/.test(value)) { ctx.setLineDash([]); ctx.lineCap = "butt"; }
       if (/\bbold\b/.test(value) && !width) ctx.lineWidth = 2;
     }
-    function color(operation) {
-      let result = operation.color === "none" ? "transparent" : operation.color;
+    function color(operation, role) {
+      let result = mapped(operation.color === "none" ? "transparent" : operation.color, role);
       if (operation.grad === "linear" && operation.p0 && operation.p1) result = ctx.createLinearGradient(...operation.p0.slice(0, 2), ...operation.p1.slice(0, 2));
       else if (operation.grad === "radial" && operation.p0 && operation.p1) result = ctx.createRadialGradient(...operation.p0.slice(0, 3), ...operation.p1.slice(0, 3));
-      if (result && typeof result.addColorStop === "function") for (const stop of operation.stops || []) result.addColorStop(clamp(finite(stop.frac), 0, 1), stop.color === "none" ? "transparent" : stop.color);
+      if (result && typeof result.addColorStop === "function") for (const stop of operation.stops || []) result.addColorStop(clamp(finite(stop.frac), 0, 1), mapped(stop.color === "none" ? "transparent" : stop.color, role));
       return result || "#000000";
     }
     style(defaults.style || "");
     for (const operation of operations || []) {
       const points = operation.points || [], rect = operation.rect || [];
       switch (operation.op) {
-        case "c": ctx.strokeStyle = color(operation); break;
-        case "C": ctx.fillStyle = color(operation); break;
+        case "c": ctx.strokeStyle = color(operation, "stroke"); break;
+        case "C": ctx.fillStyle = color(operation, "fill"); break;
         case "S": style(operation.style || ""); break;
         case "F": size = Math.max(.1, finite(operation.size, 14)); face = operation.face || "Times-Roman"; break;
         case "t": fontchar = finite(operation.fontchar); break;
@@ -218,11 +260,14 @@
 
   function createApp(document, window, raw) {
     const graph = normalizeGraph(raw), $ = id => document.getElementById(id), canvas = $("graph-canvas"), ctx = canvas.getContext("2d", {alpha: true});
-    const state = {camera: {x: 0, y: 0, scale: 1}, width: 800, height: 600, minScale: .001, mode: graph.pdfLayout ? "pdf" : "atlas", pdfImages: true, selected: null, hovered: null, ages: new Set(graph.stacks), zones: true, hiddenZones: false, zone: null, dialog: false, search: [], searchIndex: -1};
-    const pointers = new Map(), ageInputs = new Map(), cache = new Map(), imageQueue = [], zoneRectangles = new Map(), pdfTextMetrics = new Map();
-    let animation = null, activeImages = 0, gesture = null, drag = null, multiTouch = false, frameID = 0;
+    const state = {camera: {x: 0, y: 0, scale: 1}, width: 800, height: 600, minScale: .001, mode: graph.pdfLayout ? "pdf" : "atlas", pdfImages: true, selected: null, hovered: null, ages: new Set(graph.stacks), highlights: new Set(), highlightCount: {visible: graph.nodes.length, matched: graph.nodes.length}, zones: true, hiddenZones: false, zone: null, dialog: false, search: [], searchIndex: -1};
+    const pointers = new Map(), ageInputs = new Map(), highlightInputs = new Map(), highlightLabels = new Map(), cache = new Map(), grayCache = new Map(), imageQueue = [], zoneRectangles = new Map(), pdfTextMetrics = new Map();
+    const MAX_GRAY_BUFFERS = 128, MAX_GRAY_PIXELS = 2000000, MAX_GRAY_EDGE = 192;
+    let animation = null, activeImages = 0, gesture = null, drag = null, multiTouch = false, frameID = 0, grayPixels = 0, neededGrayImages = new Set();
     const requestFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : callback => window.setTimeout(callback, 16);
     const visible = node => state.ages.has(node.stack);
+    const muted = node => state.highlights.size > 0 && !node.highlightMatch;
+    const edgeMuted = edge => state.highlights.size > 0 && !graph.byID.get(edge.source).highlightMatch && !graph.byID.get(edge.target).highlightMatch;
     const element = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = String(text); return node; };
     const announce = text => { $("sr-announcement").textContent = text; };
     const point = event => { const rect = canvas.getBoundingClientRect(); return {x: event.clientX - rect.left, y: event.clientY - rect.top}; };
@@ -269,6 +314,7 @@
       $("atlas-legend").hidden = mode === "pdf"; $("pdf-legend").hidden = mode !== "pdf";
       canvas.setAttribute("aria-label", (mode === "pdf" ? "Original PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
       renderFilters();
+      updateHighlightCounts();
       if (state.selected) { renderReferences(state.selected, "incoming"); renderReferences(state.selected, "outgoing"); }
       if (!$("search-results").hidden && $("graph-search").value.trim()) renderSearch();
       if (refit) fit();
@@ -279,6 +325,42 @@
       const entry = {url, image: null, loaded: false, failed: false, lastSeen: frameID};
       cache.set(url, entry); imageQueue.push(entry); pumpImages();
       return entry;
+    }
+    function releaseGray(entry) {
+      if (!entry.gray) return;
+      grayPixels -= entry.gray.width * entry.gray.height; entry.gray.width = entry.gray.height = 0;
+      entry.gray = null; grayCache.delete(entry.url);
+    }
+    function grayImage(entry) {
+      if (entry.gray) return entry.gray;
+      if (entry.grayFailed || !entry.loaded || !entry.image.naturalWidth) return null;
+      const ratio = Math.min(1, MAX_GRAY_EDGE / Math.max(entry.image.naturalWidth, entry.image.naturalHeight));
+      const width = Math.max(1, Math.round(entry.image.naturalWidth * ratio)), height = Math.max(1, Math.round(entry.image.naturalHeight * ratio));
+      for (const old of grayCache.values()) {
+        if (grayCache.size < MAX_GRAY_BUFFERS && grayPixels + width * height <= MAX_GRAY_PIXELS) break;
+        if (!neededGrayImages.has(old.url)) releaseGray(old);
+      }
+      if (grayCache.size >= MAX_GRAY_BUFFERS || grayPixels + width * height > MAX_GRAY_PIXELS) return null;
+      const buffer = document.createElement("canvas"); buffer.width = width; buffer.height = height;
+      try {
+        const context = buffer.getContext("2d");
+        if (!context) throw new Error("Offscreen canvas unavailable");
+        context.drawImage(entry.image, 0, 0, width, height);
+        // Compositing works with file:// images even when pixel reads are
+        // prohibited. No getImageData, putImageData, or ctx.filter is used.
+        context.globalCompositeOperation = "saturation";
+        if (context.globalCompositeOperation !== "saturation") throw new Error("Saturation compositing unavailable");
+        context.fillStyle = "#808080"; context.fillRect(0, 0, width, height);
+        context.globalCompositeOperation = "destination-in"; context.drawImage(entry.image, 0, 0, width, height);
+        context.globalCompositeOperation = "source-over";
+      } catch (_) {
+        entry.grayFailed = true; buffer.width = buffer.height = 0; return null;
+      }
+      entry.gray = buffer; grayPixels += width * height; grayCache.set(entry.url, entry); return buffer;
+    }
+    function drawableImage(entry, isMuted) { return isMuted ? grayImage(entry) : entry.image; }
+    function wantsThumbnail(node) {
+      return node.thumbnail && (state.mode === "pdf" ? state.pdfImages && node.width * state.camera.scale >= 95 && node.height * state.camera.scale >= 30 && node.width > 38 && node.height > 12 : node.height > 80 && node.width * state.camera.scale >= 86);
     }
     function pumpImages() {
       while (activeImages < 4 && imageQueue.length) {
@@ -309,6 +391,10 @@
       if (has(edge, "backtracking")) color = "#ac94bf";
       if (has(edge, "conditional") || has(edge, "zip")) { color = "#7aada3"; dash = [7, 5]; }
       if (has(edge, "disabled")) { color = "#8d8875"; dash = [5, 5]; alpha *= .7; }
+      if (state.highlights.size) {
+        if (edgeMuted(edge)) { color = grayColor(color, "edge", "atlas"); alpha = 1; }
+        else alpha = has(edge, "disabled") ? .65 : .9;
+      }
       return {color, dash, alpha, related};
     }
     function arrow(x, y, angle, size, edge) {
@@ -343,32 +429,35 @@
       if (scale > .24 || appearance.related) arrow(end.x, end.y, Math.atan2(end.y - control.y, end.x - control.x), 6 / Math.max(.6, scale), edge);
     }
     function drawNode(node) {
-      const scale = state.camera.scale, selected = state.selected && node.id === state.selected.id, hover = node.id === state.hovered;
+      const scale = state.camera.scale, selected = state.selected && node.id === state.selected.id, hover = node.id === state.hovered, isMuted = muted(node);
       const x = node.x - node.width / 2, y = node.y - node.height / 2;
-      ctx.globalAlpha = state.selected && !selected && !isNeighbor(node.id) ? .38 : 1;
+      ctx.globalAlpha = state.highlights.size ? 1 : state.selected && !selected && !isNeighbor(node.id) ? .38 : 1;
       ctx.setLineDash([]);
       if (node.width * scale < 18) {
-        ctx.fillStyle = selected ? "#f4d790" : node.color; ctx.beginPath(); ctx.arc(node.x, node.y, Math.max(1.6 / scale, 3), 0, Math.PI * 2); ctx.fill(); return;
+        ctx.fillStyle = isMuted ? "#777777" : selected ? "#f4d790" : node.color; ctx.beginPath(); ctx.arc(node.x, node.y, Math.max(1.6 / scale, 3), 0, Math.PI * 2); ctx.fill();
+        if (isMuted && selected) { ctx.strokeStyle = "#d6b879"; ctx.lineWidth = 1.5 / scale; ctx.stroke(); } return;
       }
-      roundedRect(x, y, node.width, node.height, 5); ctx.fillStyle = selected ? "#3a3c29" : "#253026"; ctx.fill();
-      ctx.strokeStyle = selected ? "#f0d28a" : hover ? "#d4d6b6" : node.color; ctx.lineWidth = (selected ? 2.2 : .8) / Math.max(.6, scale);
+      roundedRect(x, y, node.width, node.height, 5); ctx.fillStyle = isMuted ? "#2e2e2e" : selected ? "#3a3c29" : "#253026"; ctx.fill();
+      ctx.strokeStyle = selected ? "#f0d28a" : isMuted ? hover ? "#aaaaaa" : "#747474" : hover ? "#d4d6b6" : node.color; ctx.lineWidth = (selected ? 2.2 : .8) / Math.max(.6, scale);
       if (has(node, "virtual")) ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = node.color; ctx.fillRect(x + 5, y + 5, 2, 12);
+      ctx.fillStyle = isMuted ? "#888888" : node.color; ctx.fillRect(x + 5, y + 5, 2, 12);
       if (node.width * scale < 60) return;
-      ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillStyle = "#d4ddc6";
+      ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillStyle = isMuted ? "#a0a0a0" : "#d4ddc6";
       ctx.fillText(fitText(node.name, node.width - 21), x + 12, y + 5);
       if (node.height > 80 && node.width * scale >= 86) {
         const top = y + 24, width = node.width - 12, height = node.height - 46, entry = imageFor(node.thumbnail);
-        ctx.fillStyle = "#131c15"; ctx.fillRect(x + 6, top, width, height);
+        ctx.fillStyle = isMuted ? "#222222" : "#131c15"; ctx.fillRect(x + 6, top, width, height);
         if (entry && entry.loaded && entry.image.naturalWidth) {
           const ratio = Math.min(width / entry.image.naturalWidth, height / entry.image.naturalHeight), iw = entry.image.naturalWidth * ratio, ih = entry.image.naturalHeight * ratio;
-          ctx.drawImage(entry.image, x + 6 + (width - iw) / 2, top + (height - ih) / 2, iw, ih);
+          const image = drawableImage(entry, isMuted);
+          if (image) ctx.drawImage(image, x + 6 + (width - iw) / 2, top + (height - ih) / 2, iw, ih);
+          else { ctx.font = "9px -apple-system, sans-serif"; ctx.fillStyle = "#777777"; ctx.textAlign = "center"; ctx.fillText("Picture muted", node.x, top + height / 2 - 4); ctx.textAlign = "left"; }
         } else {
-          ctx.font = "9px -apple-system, sans-serif"; ctx.fillStyle = "#77866c"; ctx.textAlign = "center";
+          ctx.font = "9px -apple-system, sans-serif"; ctx.fillStyle = isMuted ? "#777777" : "#77866c"; ctx.textAlign = "center";
           ctx.fillText(node.thumbnail ? entry && entry.failed ? "Picture unavailable" : "Loading picture…" : "No local picture", node.x, top + height / 2 - 4); ctx.textAlign = "left";
         }
       }
-      ctx.font = "9px -apple-system, sans-serif"; ctx.fillStyle = "#97a78a";
+      ctx.font = "9px -apple-system, sans-serif"; ctx.fillStyle = isMuted ? "#777777" : "#97a78a";
       ctx.fillText(fitText(node.assetName || node.originalName || node.stack, node.width - 15), x + 7, y + node.height - 15);
     }
     function isNeighbor(id) {
@@ -380,27 +469,30 @@
       const bounds = edge.bounds;
       if (bounds && (bounds.maxX < viewport.minX || bounds.minX > viewport.maxX || bounds.maxY < viewport.minY || bounds.minY > viewport.maxY)) return;
       const defaults = {stroke: edge.color, fill: edge.color, penWidth: edge.penWidth, style: edge.style, metrics: pdfTextMetrics};
+      if (edgeMuted(edge)) defaults.colorMap = color => grayColor(color, "edge", "pdf");
       for (const operations of [edge.draw, edge.head, edge.tail, edge.labels]) replayOperations(ctx, operations, defaults);
     }
     function drawPDFNode(node) {
-      const drawing = graph.pdfLayout.nodes.get(node.id), x = node.x - node.width / 2, y = node.y - node.height / 2;
+      const drawing = graph.pdfLayout.nodes.get(node.id), x = node.x - node.width / 2, y = node.y - node.height / 2, isMuted = muted(node);
       if (/\binvis\b/.test(drawing.style || "")) return;
       const defaults = {stroke: drawing.stroke, fill: drawing.fill, penWidth: drawing.penWidth, style: drawing.style, metrics: pdfTextMetrics};
+      if (isMuted) defaults.colorMap = (color, role) => grayColor(color, role, "pdf");
       ctx.globalAlpha = 1;
       if (drawing.draw && drawing.draw.length) replayOperations(ctx, drawing.draw, defaults);
-      else { roundedRect(x, y, node.width, node.height, Math.min(4, node.height / 3)); ctx.fillStyle = drawing.fill || "#eeeeee"; ctx.fill(); ctx.strokeStyle = drawing.stroke || "#000000"; ctx.lineWidth = drawing.penWidth || 1; ctx.stroke(); }
+      else { roundedRect(x, y, node.width, node.height, Math.min(4, node.height / 3)); ctx.fillStyle = isMuted ? grayColor(drawing.fill, "fill") : drawing.fill || "#eeeeee"; ctx.fill(); ctx.strokeStyle = isMuted ? grayColor(drawing.stroke) : drawing.stroke || "#000000"; ctx.lineWidth = drawing.penWidth || 1; ctx.stroke(); }
       let compact = false;
       if (state.pdfImages && node.thumbnail && node.width * state.camera.scale >= 95 && node.height * state.camera.scale >= 30 && node.width > 38 && node.height > 12) {
         const entry = imageFor(node.thumbnail);
-        if (entry && entry.loaded && entry.image.naturalWidth) {
+        const image = entry && entry.loaded && entry.image.naturalWidth && drawableImage(entry, isMuted);
+        if (image) {
           const thumbWidth = Math.min(42, node.width * .29, (node.height - 6) * 1.5), thumbHeight = node.height - 6;
           const ratio = Math.min(thumbWidth / entry.image.naturalWidth, thumbHeight / entry.image.naturalHeight), width = entry.image.naturalWidth * ratio, height = entry.image.naturalHeight * ratio;
           ctx.save(); ctx.beginPath(); ctx.rect(x + 2, y + 2, node.width - 4, node.height - 4); ctx.clip();
-          ctx.drawImage(entry.image, x + 4 + (thumbWidth - width) / 2, y + 3 + (thumbHeight - height) / 2, width, height);
+          ctx.drawImage(image, x + 4 + (thumbWidth - width) / 2, y + 3 + (thumbHeight - height) / 2, width, height);
           const textOperations = (drawing.labels || []).filter(operation => operation.op === "T");
           const lines = textOperations.length ? textOperations.map(operation => String(operation.text || "")) : [node.name, node.assetName || node.originalName].filter(Boolean);
           const font = (drawing.labels || []).find(operation => operation.op === "F"), size = Math.min(finite(font && font.size, 10), (node.height - 5) / Math.max(1, lines.length) / 1.15);
-          ctx.font = size + "px " + pdfFont(font && font.face); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = drawing.fontColor || "#000000";
+          ctx.font = size + "px " + pdfFont(font && font.face); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = isMuted ? grayColor(drawing.fontColor || "#000000") : drawing.fontColor || "#000000";
           const textX = x + thumbWidth + 9, textWidth = node.width - thumbWidth - 13, lineHeight = size * 1.15;
           lines.forEach((line, index) => ctx.fillText(fitText(line, textWidth), textX, node.y + (index - (lines.length - 1) / 2) * lineHeight));
           ctx.restore(); compact = true;
@@ -408,11 +500,11 @@
       }
       if (!compact) {
         if (drawing.labels && drawing.labels.length) replayOperations(ctx, drawing.labels, {...defaults, stroke: drawing.fontColor || "#000000"});
-        else { ctx.font = "10px Arial, sans-serif"; ctx.fillStyle = drawing.fontColor || "#000000"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(fitText(node.name, node.width - 6), node.x, node.y); }
+        else { ctx.font = "10px Arial, sans-serif"; ctx.fillStyle = isMuted ? grayColor(drawing.fontColor || "#000000") : drawing.fontColor || "#000000"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(fitText(node.name, node.width - 6), node.x, node.y); }
       }
       const selected = state.selected && node.id === state.selected.id;
       if (selected || state.hovered === node.id) {
-        ctx.save(); ctx.setLineDash([]); ctx.lineWidth = (selected ? 2 : 1) / state.camera.scale; ctx.strokeStyle = selected ? "#9c6f1a" : "#477a69";
+        ctx.save(); ctx.setLineDash([]); ctx.lineWidth = (selected ? 2 : 1) / state.camera.scale; ctx.strokeStyle = selected ? "#9c6f1a" : isMuted ? "#888888" : "#477a69";
         roundedRect(x - 3 / state.camera.scale, y - 3 / state.camera.scale, node.width + 6 / state.camera.scale, node.height + 6 / state.camera.scale, 3 / state.camera.scale); ctx.stroke(); ctx.restore();
       }
     }
@@ -437,6 +529,7 @@
         for (const edge of graph.pdfLayout.edges) drawPDFEdge(edge, viewport);
       } else for (const edge of graph.edges) drawEdge(edge, viewport);
       const nodes = graph.nodes.filter(node => visible(node) && intersects(node, viewport));
+      neededGrayImages = new Set(nodes.filter(node => muted(node) && wantsThumbnail(node)).map(node => node.thumbnail));
       const renderer = state.mode === "pdf" ? drawPDFNode : drawNode;
       for (const node of nodes) if (!state.selected || node.id !== state.selected.id) renderer(node);
       if (state.selected && visible(state.selected) && intersects(state.selected, viewport)) renderer(state.selected);
@@ -445,11 +538,12 @@
       // node count would evict/reload those same images on every repaint.
       for (const [url, entry] of cache) {
         if (cache.size <= 96) break;
-        if (entry.lastSeen !== frameID && (entry.loaded || entry.failed)) cache.delete(url);
+        if (entry.lastSeen !== frameID && (entry.loaded || entry.failed)) { releaseGray(entry); cache.delete(url); }
       }
+      for (const entry of grayCache.values()) if (!neededGrayImages.has(entry.url)) releaseGray(entry);
       ctx.globalAlpha = 1; ctx.setLineDash([]);
       $("zoom-level").textContent = Math.round(camera.scale * 100) + "%";
-      $("view-status").textContent = formatNumber(graph.nodes.filter(visible).length) + " nodes · " + (state.mode === "pdf" ? state.pdfImages ? "PDF layout · zoom for pictures" : "PDF layout · original labels" : "zoom in to reveal pictures");
+      $("view-status").textContent = (state.highlights.size ? formatNumber(state.highlightCount.matched) + " / " + formatNumber(state.highlightCount.visible) + " highlighted" : formatNumber(state.highlightCount.visible) + " nodes") + " · " + (state.mode === "pdf" ? state.pdfImages ? "PDF layout · zoom for pictures" : "PDF layout · original labels" : "zoom in to reveal pictures");
       $("map-empty").hidden = state.ages.size !== 0 || !graph.nodes.length;
     }
 
@@ -465,9 +559,41 @@
     function filtersChanged() {
       for (const [stack, input] of ageInputs) input.checked = state.ages.has(stack);
       if (state.selected && !visible(state.selected)) clearSelection();
+      updateHighlightCounts();
       fit();
     }
     function setAges(ages) { state.ages = new Set(ages.filter(age => graph.stacks.includes(age))); filtersChanged(); }
+    function renderHighlightFilters() {
+      const host = $("node-highlights"); host.replaceChildren();
+      for (const kind of HIGHLIGHTS) {
+        const label = element("label", "highlight-option"), input = element("input"), count = element("span", "highlight-category-count");
+        input.type = "checkbox"; input.setAttribute("aria-label", "Highlight " + kind.label.toLowerCase()); input.setAttribute("aria-description", kind.description); label.title = kind.description;
+        input.addEventListener("change", () => setHighlights([...highlightInputs].filter(([, control]) => control.checked).map(([id]) => id)));
+        label.append(input, element("span", "highlight-name", kind.label), count); host.append(label); highlightInputs.set(kind.id, input); highlightLabels.set(kind.id, count);
+      }
+    }
+    function updateHighlightCounts() {
+      state.highlightCount = highlightCounts(graph.nodes, state.ages, state.highlights);
+      const {visible: total, matched} = state.highlightCount;
+      $("highlight-summary").textContent = state.highlights.size ? formatNumber(matched) + " / " + formatNumber(total) + " visible · match any" : "All " + formatNumber(total) + " visible nodes";
+      $("highlight-count").textContent = formatNumber(matched) + " / " + formatNumber(total) + " visible";
+      $("clear-highlights").disabled = !state.highlights.size;
+      for (const kind of HIGHLIGHTS) {
+        const input = highlightInputs.get(kind.id), label = highlightLabels.get(kind.id);
+        if (input) input.checked = state.highlights.has(kind.id);
+        if (label) label.textContent = graph.nodes.filter(node => visible(node) && node.highlightKinds.has(kind.id)).length;
+      }
+    }
+    function setHighlights(kinds) {
+      state.highlights = new Set(kinds.filter(id => HIGHLIGHTS.some(kind => kind.id === id)));
+      for (const node of graph.nodes) node.highlightMatch = matchesHighlights(node, state.highlights);
+      if (!state.highlights.size) for (const entry of grayCache.values()) releaseGray(entry);
+      updateHighlightCounts();
+      if (state.selected) { renderSelectedTags(state.selected); renderReferences(state.selected, "incoming"); renderReferences(state.selected, "outgoing"); }
+      if (!$("search-results").hidden && $("graph-search").value.trim()) renderSearch();
+      announce(state.highlights.size ? state.highlightCount.matched + " of " + state.highlightCount.visible + " visible nodes match any selected category. Other nodes remain gray and selectable." : "Node highlights cleared. All visible nodes retain their original colors.");
+      schedule();
+    }
     function renderSearch() {
       state.search = searchNodes(graph.nodes, $("graph-search").value); state.searchIndex = -1;
       const host = $("search-results"); host.replaceChildren();
@@ -476,7 +602,7 @@
       if (!state.search.length) { host.append(element("p", "search-empty", "No cards match. Try a card ID, original name, or picture name.")); return; }
       state.search.forEach((node, index) => {
         const button = element("button", "search-result"), dot = element("span", "result-dot"), copy = element("span", "result-copy");
-        button.id = "search-result-" + index; button.setAttribute("role", "option"); button.setAttribute("aria-selected", "false"); dot.style.background = node.color;
+        button.id = "search-result-" + index; button.setAttribute("role", "option"); button.setAttribute("aria-selected", "false"); dot.style.background = muted(node) ? "#888888" : node.color;
         copy.append(element("strong", "", node.name), element("small", "", node.assetName || node.originalName || "Card view")); button.append(dot, copy, element("span", "result-age", node.stack.replace(/ Age$/, "")));
         button.addEventListener("click", () => { selectNode(node.id, true); closeSearch(); }); host.append(button);
       });
@@ -499,7 +625,7 @@
       if (!records.length) { host.append(element("p", "references-empty", "No extracted " + direction + " references.")); return; }
       for (const edge of records) {
         const other = direction === "incoming" ? edge.from : edge.to, button = element("button", "reference-row"), copy = element("span", "ref-copy"), dot = element("span", "ref-dot");
-        copy.append(element("strong", "", other.name), element("small", "", edgeLabel(edge))); dot.style.background = other.color;
+        copy.append(element("strong", "", other.name), element("small", "", edgeLabel(edge))); dot.style.background = muted(other) ? "#888888" : other.color;
         button.append(element("span", "ref-arrow", direction === "incoming" ? "↙" : "↗"), copy, dot);
         button.setAttribute("aria-label", other.name + ", " + edgeLabel(edge)); button.addEventListener("click", () => selectNode(other.id, true)); host.append(button);
       }
@@ -556,14 +682,18 @@
       if (!state.zones) { state.zone = null; $("zone-detail").hidden = true; }
       if (state.selected) { renderPicture($("selected-picture"), state.selected); if (state.dialog) renderPicture($("dialog-picture"), state.selected); }
     }
+    function renderSelectedTags(node) {
+      $("selected-tags").replaceChildren();
+      for (const flag of node.flags) if (NODE_LABELS[flag]) $("selected-tags").append(element("span", "tag" + (flag === "virtual" ? " warning" : ""), NODE_LABELS[flag]));
+      if (muted(node)) $("selected-tags").append(element("span", "tag subdued", "Outside highlight"));
+    }
     function selectNode(id, focus = false) {
       const node = graph.byID.get(Number(id)); if (!node) return;
       state.selected = node; state.zone = null;
       if (!visible(node)) { state.ages.add(node.stack); const input = ageInputs.get(node.stack); if (input) input.checked = true; }
       $("welcome-panel").hidden = true; $("selection-panel").hidden = false; $("zone-detail").hidden = true;
       $("selected-age").textContent = node.stack; $("selected-name").textContent = node.name;
-      $("selected-tags").replaceChildren();
-      for (const flag of node.flags) if (NODE_LABELS[flag]) $("selected-tags").append(element("span", "tag" + (flag === "virtual" ? " warning" : ""), NODE_LABELS[flag]));
+      updateHighlightCounts(); renderSelectedTags(node);
       $("show-zones").disabled = !node.zones.length;
       $("dialog-show-zones").disabled = !node.zones.length;
       $("show-zones").checked = $("dialog-show-zones").checked = state.zones;
@@ -664,6 +794,7 @@
     $("pdf-images").addEventListener("change", () => { state.pdfImages = $("pdf-images").checked; schedule(); });
     $("home-link").addEventListener("click", event => { event.preventDefault(); fit(); });
     $("all-ages").addEventListener("click", () => setAges(graph.stacks)); $("no-ages").addEventListener("click", () => setAges([]));
+    $("clear-highlights").addEventListener("click", () => setHighlights([]));
     $("clear-selection").addEventListener("click", clearSelection); $("show-zones").addEventListener("change", updateZones); $("show-hidden-zones").addEventListener("change", updateZones); $("clear-zone").addEventListener("click", clearZone);
     $("dialog-show-zones").addEventListener("change", () => { $("show-zones").checked = $("dialog-show-zones").checked; updateZones(); });
     $("dialog-show-hidden-zones").addEventListener("change", () => { $("show-hidden-zones").checked = $("dialog-show-hidden-zones").checked; updateZones(); });
@@ -676,14 +807,14 @@
     $("graph-summary").textContent = formatNumber(graph.nodes.length) + " nodes · " + graph.stacks.length + " Ages";
     $("conditional-legend").hidden = !graph.edges.some(edge => has(edge, "conditional") || has(edge, "zip"));
     if (!graph.nodes.length) { $("welcome-panel").querySelector("h1").textContent = "No graph data."; $("view-status").textContent = "No nodes were exported"; }
-    setLayout(state.mode, false); resize(true);
+    renderHighlightFilters(); setLayout(state.mode, false); resize(true);
     const initial = dock || graph.nodes.find(node => node.image);
     if (initial) selectNode(initial.id);
     if (typeof window.ResizeObserver === "function") new window.ResizeObserver(() => resize()).observe(canvas); else window.addEventListener("resize", () => resize());
-    return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache};
+    return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setHighlights, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache, grayCache, grayBudget: {buffers: MAX_GRAY_BUFFERS, pixels: MAX_GRAY_PIXELS, edge: MAX_GRAY_EDGE}};
   }
 
-  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, createApp};
+  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, matchesHighlights, highlightCounts, grayColor, HIGHLIGHTS, createApp};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (global.document && global.document.getElementById("graph-canvas")) {
     global.DeMystifyAtlas = api;

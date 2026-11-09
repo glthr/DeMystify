@@ -37,7 +37,11 @@ class Element {
   setPointerCapture() {}
   showModal() { this.open = true; }
   close() { this.open = false; this.dispatch("close"); }
-  getContext() { return this.ownerDocument.context; }
+  getContext() {
+    if (this.id === "graph-canvas") return this.ownerDocument.context;
+    if (!this.context) { this.context = this.ownerDocument.newCanvasContext(); this.ownerDocument.offscreenContexts.push({canvas: this, ...this.context}); }
+    return this.context.context;
+  }
 }
 const all = root => root.children.flatMap(child => [child, ...all(child)]);
 const descendants = (root, tag) => all(root).filter(element => element.tagName === tag.toUpperCase());
@@ -47,7 +51,22 @@ function harness(data) {
   const document = new Element("document", null); document.ownerDocument = document; document.ids = new Map(); document.activeElement = null;
   document.getElementById = key => document.ids.get(key); document.createElement = tag => new Element(tag, document); document.createElementNS = (_, tag) => new Element(tag, document);
   const canvasCalls = [], canvasPaints = [];
-  document.context = new Proxy({measureText: text => ({width: String(text).length * 5.5})}, {get(target, key) { if (!(key in target)) target[key] = (...args) => { canvasCalls.push([key, ...args]); if (["stroke", "fill", "fillRect", "fillText", "drawImage"].includes(key)) canvasPaints.push({method: key, fill: target.fillStyle, stroke: target.strokeStyle, alpha: target.globalAlpha, font: target.font, args}); }; return target[key]; }});
+  document.offscreenContexts = [];
+  document.newCanvasContext = (calls = [], paints = []) => {
+    const saved = [], values = {globalCompositeOperation: "source-over", globalAlpha: 1};
+    const methods = {measureText: text => ({width: String(text).length * 5.5}), save: () => saved.push({...values}), restore: () => { const previous = saved.pop(); for (const key of Object.keys(values)) delete values[key]; Object.assign(values, previous); }};
+    const context = new Proxy(methods, {
+      get(target, key) {
+        if (key === "getImageData" || key === "putImageData") return () => { throw new Error("Offline images must never be read as pixels"); };
+        if (key in values) return values[key];
+        if (!(key in target)) target[key] = (...args) => { calls.push([key, ...args]); if (["stroke", "fill", "fillRect", "fillText", "drawImage"].includes(key)) paints.push({method: key, fill: values.fillStyle, stroke: values.strokeStyle, alpha: values.globalAlpha, composite: values.globalCompositeOperation, font: values.font, args}); };
+        return target[key];
+      },
+      set(_, key, value) { if (key === "filter") throw new Error("ctx.filter is not an offline grayscale dependency"); values[key] = value; return true; }
+    });
+    return {context, calls, paints};
+  };
+  document.context = document.newCanvasContext(canvasCalls, canvasPaints).context;
   const stack = [document], voidTags = new Set(["meta", "link", "input", "br", "hr", "img"]);
   for (const match of html.matchAll(/<\/?([a-z][a-z0-9-]*)([^>]*)>/gi)) {
     const tag = match[1].toLowerCase();
@@ -66,7 +85,7 @@ function harness(data) {
   const app = window.DeMystifyAtlas.app;
   const flush = () => { for (let n = 0; frames.length && n < 30; n++) frames.shift()(); assert.ok(frames.length < 30, "render loop must settle without image loads"); };
   flush();
-  return {window, document, app, api: window.DeMystifyAtlas, get: id => document.getElementById(id), requestedImages, canvasCalls, canvasPaints, flush};
+  return {window, document, app, api: window.DeMystifyAtlas, get: id => document.getElementById(id), requestedImages, canvasCalls, canvasPaints, offscreenContexts: document.offscreenContexts, flush};
 }
 
 function fixture() {
@@ -270,4 +289,141 @@ test("Graphviz gradients keep normalized endpoint geometry and color-stop fracti
   const h = harness(fixture()), trace = operationContext();
   h.api.replayOperations(trace.context, [{op: "C", grad: "linear", p0: [2, 3], p1: [20, 30], stops: [{frac: 0, color: "#ffffff"}, {frac: 1, color: "#000000"}]}, {op: "P", points: [[0, 0], [1, 0], [1, 1]]}]);
   const fill = trace.paints.find(paint => paint.op === "fill").fillStyle; assert.deepEqual(fill.args, [2, 3, 20, 30]); assert.deepEqual(fill.stops, [{frac: 0, color: "#ffffff"}, {frac: 1, color: "#000000"}]);
+});
+
+function topologyFixture() {
+  const data = fixture();
+  data.nodes[0].attributes.push("source", "containsBluePage");
+  data.nodes[1].attributes.push("sink", "containsRedPage");
+  data.nodes[2].attributes.push("source", "sink", "isolated", "containsWhitePage");
+  data.nodes.push({id: 4, name: "Myst", stack: "Myst", x: 1300, y: 600, attributes: ["stack"]}, {id: 5, name: "Myst:999", stack: "Myst", x: 1600, y: 700, attributes: ["card"]});
+  data.edges[3].attributes = []; // Self-references come from raw endpoints, not an attribute.
+  data.edges.push({source: 5, target: 5, attributes: ["disabled", "selfReference"]});
+  return data;
+}
+
+test("highlight categories use exact exported flags and OR unions, with active raw loops only", () => {
+  const h = harness(topologyFixture()), graph = h.app.graph;
+  assert.equal(h.api.HIGHLIGHTS.length, 9);
+  const count = kinds => h.api.highlightCounts(graph.nodes, new Set(graph.stacks), new Set(kinds));
+  assert.equal(count([]).matched, 5); assert.equal(count(["source"]).matched, 2); assert.equal(count(["sink"]).matched, 2);
+  assert.equal(count(["source", "sink"]).matched, 3, "overlapping isolate is counted once");
+  assert.equal(count(["source", "bluePage"]).matched, 2); assert.equal(count(["isolated"]).matched, 1);
+  assert.equal(count(["selfReference"]).matched, 1); assert.equal(graph.byID.get(1).highlightKinds.has("selfReference"), true);
+  assert.equal(graph.byID.get(5).highlightKinds.has("selfReference"), false, "disabled-only loop must not match");
+  assert.equal(graph.byID.get(5).highlightKinds.has("isolated"), false, "do not re-infer graph flags");
+  for (const kind of ["bluePage", "redPage", "whitePage", "virtual", "stack"]) assert.equal(count([kind]).matched, 1);
+});
+
+test("accessible highlight controls show visible union counts and Clear restores all without moving nodes", () => {
+  const h = harness(topologyFixture()), geometry = h.app.graph.nodes.map(node => [node.x, node.y, node.width, node.height]), camera = {...h.app.state.camera};
+  assert.equal(h.get("highlight-count").textContent, "5 / 5 visible"); assert.equal(h.get("clear-highlights").disabled, true);
+  const options = h.get("node-highlights").children;
+  assert.equal(options.length, 9); assert.match(options[3].children[0].getAttribute("aria-description"), /non-disabled raw/);
+  options[0].children[0].checked = true; options[0].children[0].dispatch("change");
+  options[1].children[0].checked = true; options[1].children[0].dispatch("change"); h.flush();
+  assert.equal(h.get("highlight-count").textContent, "3 / 5 visible"); assert.match(h.get("highlight-summary").textContent, /match any/);
+  assert.equal(h.app.state.highlightCount.matched, 3); assert.deepEqual(h.app.graph.nodes.map(node => [node.x, node.y, node.width, node.height]), geometry);
+  near(h.app.state.camera.scale, camera.scale); near(h.app.state.camera.x, camera.x);
+  h.app.setAges(["Myst"]); assert.equal(h.get("highlight-count").textContent, "2 / 4 visible");
+  h.app.setAges([]); assert.equal(h.get("highlight-count").textContent, "0 / 0 visible");
+  h.app.setAges(h.app.graph.stacks); h.get("clear-highlights").dispatch("click");
+  assert.equal(h.app.state.highlights.size, 0); assert.equal(h.get("highlight-count").textContent, "5 / 5 visible"); assert.ok(h.app.graph.nodes.every(node => node.highlightMatch));
+});
+
+test("highlight choice survives layout and Age changes; gray nodes remain clickable and searchable", () => {
+  const data = pdfFixture(); data.nodes[0].attributes.push("source");
+  const h = harness(data); h.app.setHighlights(["source"]); h.app.setAges(["Myst"]); h.app.setLayout("atlas"); h.flush();
+  assert.equal(h.app.state.highlights.has("source"), true); assert.equal(h.app.state.highlightCount.visible, 2); assert.equal(h.app.state.highlightCount.matched, 1);
+  const canvas = h.get("graph-canvas"), position = h.app.screenPoint(h.app.graph.byID.get(2));
+  canvas.dispatch("pointerdown", {clientX: position.x, clientY: position.y}); canvas.dispatch("pointerup", {clientX: position.x, clientY: position.y});
+  assert.equal(h.app.state.selected.id, 2); assert.equal(h.app.graph.byID.get(2).highlightMatch, false); assert.match(h.get("selected-tags").textContent, /Outside highlight/);
+  assert.equal(descendants(h.get("selected-picture"), "img")[0].src, "images/full-2.png", "inspector keeps the genuine full picture");
+  h.app.setLayout("pdf"); assert.equal(h.app.state.selected.id, 2); assert.equal(h.app.state.highlightCount.matched, 1);
+  const search = h.get("graph-search"); search.value = "31832"; search.dispatch("input"); search.dispatch("keydown", {key: "Enter"});
+  assert.equal(h.app.state.selected.id, 3); assert.equal(h.app.graph.byID.get(3).highlightMatch, false); assert.equal(h.app.state.ages.size, 2);
+  assert.equal(h.app.state.highlightCount.visible, 3); assert.equal(h.app.state.highlightCount.matched, 1);
+});
+
+const neutralHex = value => /^#([0-9a-f]{2})\1\1(?:[0-9a-f]{2})?$/i.test(value);
+test("PDF muting maps fill, border, text and unrelated routes to gray without changing their geometry", () => {
+  const data = pdfFixture(); data.nodes[0].attributes.push("source");
+  data.edges.push({source: 2, target: 3, attributes: ["backtracking"]});
+  data.pdfLayout.edges.push({source: 2, target: 3, color: "#5375b9", draw: [{op: "c", color: "#5375b9"}, {op: "b", points: [[320, 270], [310, 280], [160, 300], [120, 300]]}]});
+  const h = harness(data); h.get("pdf-images").checked = false; h.get("pdf-images").dispatch("change");
+  const geometry = h.app.graph.nodes.map(node => [node.x, node.y, node.width, node.height]);
+  h.app.setHighlights(["source"]); h.app.selectNode(2); h.canvasPaints.length = h.canvasCalls.length = 0; h.app.draw();
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fill" && paint.fill === "#d9fcc5"), "matching source keeps its original fill");
+  assert.ok(!h.canvasPaints.some(paint => paint.method === "fill" && ["#ff9955", "#ffffba"].includes(paint.fill)), "selected nonmatching node stays gray");
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fill" && paint.fill === h.api.grayColor("#ff9955", "fill")));
+  assert.ok(h.canvasPaints.some(paint => paint.method === "stroke" && paint.stroke === h.api.grayColor("#5375b9", "edge")));
+  assert.ok(h.canvasPaints.some(paint => paint.method === "stroke" && paint.stroke === "#000000"), "matching neighborhood route retains its style");
+  assert.ok(h.canvasPaints.filter(paint => paint.method === "fillText").every(paint => neutralHex(paint.fill)));
+  assert.ok(h.canvasCalls.some(call => call[0] === "bezierCurveTo" && call[1] === 310 && call[2] === 280 && call[5] === 120));
+  assert.deepEqual(h.app.graph.nodes.map(node => [node.x, node.y, node.width, node.height]), geometry);
+});
+
+test("atlas muting keeps unmatched selected body, labels and unrelated edges gray", () => {
+  const data = fixture(); data.nodes[0].attributes.push("source"); data.edges.push({source: 2, target: 3, attributes: ["backtracking"]});
+  const h = harness(data); h.app.setHighlights(["source"]); h.app.selectNode(2); h.app.state.camera = {x: 100, y: 100, scale: .7}; h.canvasPaints.length = 0; h.app.draw();
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fill" && paint.fill === "#2e2e2e"));
+  assert.ok(h.canvasPaints.some(paint => paint.method === "fillText" && paint.args[0] === "Myst:42" && paint.fill === "#a0a0a0"));
+  assert.ok(h.canvasPaints.some(paint => paint.method === "stroke" && paint.stroke === h.api.grayColor("#ac94bf", "edge", "atlas")));
+  assert.ok(h.canvasPaints.some(paint => paint.method === "stroke" && paint.stroke === "#728268"));
+  assert.equal(h.app.graph.byID.get(2).highlightMatch, false); assert.ok(!h.canvasPaints.some(paint => paint.method === "fill" && paint.fill === "#3a3c29"));
+});
+
+test("offline gray thumbnails use cached compositing buffers without pixel reads or ctx.filter", () => {
+  const data = fixture(); data.nodes[0].attributes.push("source");
+  const h = harness(data); h.app.state.camera = {x: 100, y: 200, scale: 1}; h.app.setHighlights(["source"]); h.flush();
+  for (const image of [...h.requestedImages]) image.finish(); h.flush();
+  const entry = h.app.imageCache.get("images/thumb-2.png"), buffer = entry.gray;
+  assert.ok(buffer); assert.equal(h.offscreenContexts.length, 1);
+  const paints = h.offscreenContexts[0].paints;
+  assert.deepEqual(paints.map(paint => paint.composite), ["source-over", "saturation", "destination-in"]);
+  assert.ok(h.canvasPaints.some(paint => paint.method === "drawImage" && paint.args[0] === buffer));
+  assert.ok(!h.canvasPaints.some(paint => paint.method === "drawImage" && paint.args[0] === entry.image), "unmatched full-color image is never drawn on the graph");
+  h.app.draw(); h.app.draw(); assert.equal(entry.gray, buffer); assert.equal(h.offscreenContexts.length, 1);
+  const requests = h.requestedImages.length; h.app.setHighlights([]); h.flush();
+  assert.equal(h.app.grayCache.size, 0); assert.equal(buffer.width, 0); assert.equal(h.requestedImages.length, requests);
+});
+
+test("gray buffer memory stays bounded for 150 visible thumbnails and overflow stays neutral", () => {
+  const nodes = Array.from({length: 150}, (_, index) => ({id: index, name: "Myst:" + index, stack: "Myst", image: "images/full-" + index + ".png", thumbnail: "images/thumb-" + index + ".png", x: index % 5, y: index % 7, width: 180, height: 132, attributes: ["card"]}));
+  const h = harness({nodes, edges: []}); h.app.setHighlights(["source"]);
+  for (let round = 0; round < 50; round++) { for (const image of [...h.requestedImages]) image.finish(); h.flush(); }
+  assert.equal(h.requestedImages.length, 150); assert.ok(h.app.grayCache.size > 0 && h.app.grayCache.size <= h.app.grayBudget.buffers);
+  const pixels = [...h.app.grayCache.values()].reduce((total, entry) => total + entry.gray.width * entry.gray.height, 0);
+  assert.ok(pixels <= h.app.grayBudget.pixels); assert.ok(h.canvasPaints.some(paint => paint.method === "fillText" && paint.args[0] === "Picture muted"));
+  const allocated = h.offscreenContexts.length; h.app.draw(); h.app.draw(); assert.equal(h.offscreenContexts.length, allocated, "visible cache must not thrash at the cap");
+  assert.ok(h.canvasPaints.filter(paint => paint.method === "drawImage").every(paint => paint.args[0].tagName === "CANVAS"));
+  h.app.state.camera.x = -10000; h.app.draw(); assert.equal(h.app.grayCache.size, 0, "offscreen grayscale buffers are released");
+});
+
+test("PDF thumbnails use gray buffers inside the original box even when the unmatched card is selected", () => {
+  const data = pdfFixture(); data.nodes[0].attributes.push("source");
+  const h = harness(data); h.app.setHighlights(["source"]); h.app.selectNode(2, true); h.flush();
+  for (const image of [...h.requestedImages]) image.finish(); h.flush();
+  const entry = h.app.imageCache.get("images/thumb-2.png"); assert.ok(entry.gray);
+  const images = h.canvasPaints.filter(paint => paint.method === "drawImage" && paint.args[0] === entry.gray); assert.ok(images.length);
+  for (const image of images) { const [, x, y, width, height] = image.args; assert.ok(x >= 274 && y >= 245 && x + width <= 366 && y + height <= 275); }
+  assert.equal(h.app.graph.byID.get(2).width, 92); assert.equal(h.app.graph.byID.get(2).highlightMatch, false);
+  assert.ok(!h.canvasPaints.some(paint => paint.method === "drawImage" && paint.args[0] === entry.image));
+});
+
+test("unavailable grayscale compositing uses an honest neutral placeholder", () => {
+  const h = harness(fixture());
+  h.document.newCanvasContext = () => ({context: null, calls: [], paints: []});
+  h.app.setHighlights(["source"]); h.app.state.camera = {x: 100, y: 200, scale: 1}; h.app.draw();
+  for (const image of [...h.requestedImages]) image.finish(); h.flush();
+  assert.equal(h.app.grayCache.size, 0); assert.ok(h.canvasPaints.some(paint => paint.method === "fillText" && paint.args[0] === "Picture muted"));
+  assert.ok(!h.canvasPaints.some(paint => paint.method === "drawImage"));
+});
+
+test("PDF grayscale mapper also desaturates gradient stops and retains transparent alpha", () => {
+  const h = harness(fixture()), trace = operationContext();
+  h.api.replayOperations(trace.context, [{op: "C", grad: "linear", p0: [2, 3], p1: [20, 30], stops: [{frac: 0, color: "#ff6600"}, {frac: 1, color: "#0000ff80"}]}, {op: "P", points: [[0, 0], [1, 0], [1, 1]]}], {colorMap: h.api.grayColor});
+  const fill = trace.paints.find(paint => paint.op === "fill").fillStyle;
+  assert.ok(fill.stops.every(stop => neutralHex(stop.color))); assert.match(fill.stops[1].color, /80$/);
+  assert.equal(h.api.grayColor("transparent"), "#00000000"); assert.equal(h.api.grayColor("#fffffe00"), "#c9c9c900");
 });
