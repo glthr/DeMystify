@@ -151,6 +151,23 @@ test("wheel zoom is anchored at cursor; controls and keyboard update the camera"
   h.document.dispatch("keydown", {key: "/"}); assert.equal(h.document.activeElement, h.get("graph-search"));
 });
 
+test("shortcuts stay active after a checkbox takes focus; text entry keeps its own keys", () => {
+  const h = harness(fixture()), search = h.get("graph-search"), box = descendants(h.get("age-filters"), "input")[0];
+  assert.equal(box.type, "checkbox"); box.focus(); // Browsers such as Chrome focus a clicked checkbox.
+  let x = h.app.state.camera.x, scale = h.app.state.camera.scale;
+  assert.equal(h.document.dispatch("keydown", {key: "ArrowLeft"}).defaultPrevented, true); near(h.app.state.camera.x, x + 45);
+  h.document.dispatch("keydown", {key: "+"}); assert.ok(h.app.state.camera.scale > scale);
+  h.document.dispatch("keydown", {key: "f"}); near(h.app.state.camera.scale, scale);
+  h.get("show-zones").focus(); h.document.dispatch("keydown", {key: "Escape"}); assert.equal(h.app.state.selected, null);
+  box.focus(); h.document.dispatch("keydown", {key: "/"}); assert.equal(h.document.activeElement, search);
+  x = h.app.state.camera.x; scale = h.app.state.camera.scale; h.app.selectNode(1);
+  for (const key of ["ArrowLeft", "+", "-", "f", "/", "Escape"]) assert.notEqual(h.document.dispatch("keydown", {key}).defaultPrevented, true, key + " belongs to the search field");
+  near(h.app.state.camera.x, x); near(h.app.state.camera.scale, scale); assert.equal(h.app.state.selected.id, 1);
+  for (const [tagName, type, isContentEditable, typing] of [["INPUT", "text", false, true], ["INPUT", "", false, true], ["INPUT", "search", false, true], ["INPUT", "number", false, true], ["TEXTAREA", "", false, true], ["SELECT", "", false, true], ["DIV", "", true, true],
+    ["INPUT", "checkbox", false, false], ["INPUT", "radio", false, false], ["INPUT", "BUTTON", false, false], ["BUTTON", "submit", false, false], ["CANVAS", "", false, false]]) assert.equal(h.api.typingTarget({tagName, type, isContentEditable}), typing, tagName + " " + type);
+  assert.equal(h.api.typingTarget(null), false);
+});
+
 test("drag pans without selecting; canvas click and neighbor references select nodes", () => {
   const h = harness(fixture()), canvas = h.get("graph-canvas"), original = {...h.app.state.camera};
   canvas.dispatch("pointerdown", {clientX: 850, clientY: 580}); canvas.dispatch("pointermove", {clientX: 885, clientY: 560}); canvas.dispatch("pointerup", {clientX: 885, clientY: 560});

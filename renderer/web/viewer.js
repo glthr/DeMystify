@@ -21,6 +21,8 @@
   const has = (object, name) => object.flags.has(name);
   const formatNumber = value => finite(value).toLocaleString("en-US");
   const safeImagePath = value => typeof value === "string" && value && !/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value) && !value.includes("\0") ? value : null;
+  // Text entry owns printable keys, arrows and Escape. A focused checkbox or button does not.
+  const typingTarget = element => !!element && (element.isContentEditable === true || element.tagName === "TEXTAREA" || element.tagName === "SELECT" || element.tagName === "INPUT" && !/^(?:checkbox|radio|button|submit|reset)$/i.test(element.type || ""));
 
   function normalizeGraph(raw = {}) {
     const nodes = [], byID = new Map();
@@ -794,8 +796,7 @@
     $("graph-search").addEventListener("focus", () => { if ($("graph-search").value.trim()) renderSearch(); });
     document.addEventListener("pointerdown", event => { if (!$("graph-search").parentNode.contains(event.target)) closeSearch(); });
     document.addEventListener("keydown", event => {
-      const tag = document.activeElement && document.activeElement.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement && document.activeElement.isContentEditable) return;
+      if (typingTarget(document.activeElement)) return;
       if (event.key === "/") { event.preventDefault(); $("graph-search").focus(); return; }
       if (event.key === "Escape") { if (state.dialog) { closeDialog($("picture-dialog")); state.dialog = false; } else if ($("help-dialog").open) closeDialog($("help-dialog")); else clearSelection(); return; }
       if ($("picture-dialog").open || $("help-dialog").open) return;
@@ -833,7 +834,7 @@
     return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setHighlights, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache, grayCache, grayBudget: {buffers: MAX_GRAY_BUFFERS, pixels: MAX_GRAY_PIXELS, edge: MAX_GRAY_EDGE}};
   }
 
-  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, matchesHighlights, highlightCounts, grayColor, arrowPolygon, HIGHLIGHTS, createApp};
+  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, typingTarget, matchesHighlights, highlightCounts, grayColor, arrowPolygon, HIGHLIGHTS, createApp};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (global.document && global.document.getElementById("graph-canvas")) {
     global.DeMystifyAtlas = api;
