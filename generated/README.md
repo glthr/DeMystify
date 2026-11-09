@@ -1,6 +1,6 @@
 # Generated graph editions
 
-`graph.dot` and `myst_graph.pdf` are the regenerated full graph from the fresh six-stack conversion documented in [the model review](../MODEL_REFINEMENTS.md). The graph contains 1,364 nodes and 3,232 non-disabled directed pairs. The app was run from the refined model code, `1405523`, on November 8, 2026.
+`graph.dot` and `myst_graph.pdf` are the regenerated full graph from the fresh six-stack conversion documented in [the model review](../MODEL_REFINEMENTS.md). The graph contains 1,364 nodes and 3,232 non-disabled directed pairs. The app was rerun on November 9, 2026 with the fixes in [the continued code review](../AUDIT_CONTINUATION.md), based on `8c62f0d`. The DOT remains byte-identical to the November 8 edition; only the PDF publication date changes.
 
 The PDF retains the vector graph at native size and reproduces the original publication margins, Times-Roman title/subtitle, black border and linked footer. The footer dates this regeneration; it does not label a new game release. The formatting command and optional dependencies are documented in the [README](../README.md#add-the-publication-border-header-and-footer).
 
