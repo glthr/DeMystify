@@ -150,6 +150,53 @@ func TestShortestPathsExcludeBacktracking(t *testing.T) {
 	}
 }
 
+func TestOrderedContinuationsAreDisplayedButNotTraversed(t *testing.T) {
+	// A's handler shows B, then C. A keeps its own references; B continues to C.
+	g, nodes := newTestGraph(t, 4)
+	for _, e := range []*common.Edge{
+		{Source: nodes[0], Target: nodes[1]},
+		{Source: nodes[0], Target: nodes[2]},
+		{Source: nodes[1], Target: nodes[2], Attributes: []common.EdgeAttribute{common.SequenceContinuation}},
+		{Source: nodes[3], Target: nodes[1]},
+	} {
+		if err := g.addEdgeWithAttributes(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if weight, ok := g.Weight(1, 2); !ok || !math.IsInf(weight, 1) {
+		t.Fatalf("continuation weight = %v, %v; want a displayed edge of infinite cost", weight, ok)
+	}
+	for _, sink := range g.FindNodesWithNoOutgoingEdges() {
+		if sink.ID == 1 {
+			t.Fatal("an intermediate view with a continuation was still flagged as a sink")
+		}
+	}
+	if got, err := g.ComputeShortestPath(0, 2, nil); err != nil || got.Distance != 1 || !reflect.DeepEqual(got.Path, []int64{0, 2}) {
+		t.Fatalf("caller route = %+v, %v; want its own single reference", got, err)
+	}
+	// Another caller of the shared view does not inherit this destination.
+	if got, err := g.ComputeShortestPath(3, 2, nil); err == nil {
+		t.Fatalf("a second caller reached the first caller's destination: %+v", got)
+	}
+	if _, ok := g.ComputeAllShortestPaths()[1][2]; ok {
+		t.Fatal("continuation-only route included in all shortest paths")
+	}
+	// The intermediate card's own reference to the same view remains usable.
+	if err := g.addEdgeWithAttributes(&common.Edge{Source: nodes[1], Target: nodes[2]}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := g.ComputeShortestPath(3, 2, nil); err != nil || got.Distance != 2 {
+		t.Fatalf("ordinary parallel reference was hidden by the continuation: %+v, %v", got, err)
+	}
+	// Marking an existing reference as a continuation removes it from routes.
+	if !g.AddEdgeAttribute(3, 1, common.SequenceContinuation) {
+		t.Fatal("attribute was not added")
+	}
+	if got, err := g.ComputeShortestPath(3, 2, nil); err == nil {
+		t.Fatalf("a newly marked continuation was still traversed: %+v", got)
+	}
+}
+
 func TestParallelEdgesDoNotHideUsableRoutes(t *testing.T) {
 	for _, attrs := range []common.EdgeAttribute{common.Backtracking, common.Disabled} {
 		for _, reverse := range []bool{false, true} {

@@ -194,13 +194,17 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse command %q: %w", line.Line, err)
 		}
-		sequence.observe(lineIndex, line, link)
+		continuation := sequence.observe(lineIndex, line, link)
 		if link != nil {
 			link.IsDisabled = line.IsDisabled
 			if pushed && !link.IsDisabled {
 				p.pushedLinks[link] = true
 			}
 			links = append(links, link)
+			handlers = append(handlers, handlerID)
+		}
+		if continuation != nil {
+			links = append(links, continuation)
 			handlers = append(handlers, handlerID)
 		}
 	}

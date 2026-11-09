@@ -58,14 +58,17 @@ func TestOriginalMystImport(t *testing.T) {
 		}
 	}
 	// An intermediate elevator view continues to the level chosen by its caller,
-	// whether the script spells the transition as vs left or vs "left".
+	// whether the script spells the transition as vs left or vs "left". The
+	// caller keeps its own reference to that level.
 	for _, pair := range [][2]string{
 		{"Channelwood Age:45661", "Channelwood Age:44320"},
 		{"Channelwood Age:96885", "Channelwood Age:36337"},
 		{"Channelwood Age:96885", "Channelwood Age:84124"},
+		{"Channelwood Age:23467", "Channelwood Age:36337"},
+		{"Channelwood Age:46136", "Channelwood Age:84124"},
 	} {
 		if !g.HasEdge(pair[0], pair[1]) {
-			t.Errorf("missing ordered continuation %s -> %s", pair[0], pair[1])
+			t.Errorf("missing sequence reference %s -> %s", pair[0], pair[1])
 		}
 	}
 	verifySharedStackHandlerEntries(t, g)
@@ -80,7 +83,13 @@ func TestOriginalMystImport(t *testing.T) {
 		reachable          bool
 	}{
 		{"Myst", "Dunny Age", 8336, 11088, 24, true},
+		{"Selenitic Age", "Channelwood Age", 26154, 88814, 130, true},
 		{"Myst", "Myst", 28679, 44018, 14, true},
+		// A view shared by two callers does not join their routes: reaching the
+		// other elevator level still takes the ride, and path search does not
+		// continue from the intermediate view itself.
+		{"Channelwood Age", "Channelwood Age", 23467, 84124, 4, true},
+		{"Channelwood Age", "Channelwood Age", 96885, 84124, 0, false},
 		{"Dunny Age", "Dunny Age", 7365, 11283, 0, false},
 		{"Dunny Age", "Dunny Age", 5200, 5119, localDistance, true},
 	} {
@@ -119,9 +128,9 @@ func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
 		}
 		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
 		case "on mouseup 5119 end mouseup":
-			return 3224, 3243, false
+			return 3241, 3260, false
 		case "on mouseup go to card id 5119 end mouseup":
-			return 3225, 3244, true
+			return 3242, 3261, true
 		}
 	}
 	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")

@@ -2826,6 +2826,7 @@ digraph G {
   "1361" [color="#FF4500", fillcolor="#FFA07A", label="Mechanical Age:17673 (virtual)", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
   "1362" [color="#FF4500", fillcolor="#FFA07A", label="Mechanical Age:20348 (virtual)", penwidth=1.5, tooltip="Sink node (no outgoing connections)"];
   "1363" [fillcolor="#FFFF99", label="Selenitic Age:31832 (virtual)", tooltip="Isolated node"];
+  "430" -> "430" [arrowhead="normal", constraint=false, minlen=2];
   "438" -> "438" [arrowhead="tee", color="#CCCCCC", constraint=false, minlen=2, style="dashed", tooltip="Disabled edge"];
   "508" -> "508" [arrowhead="normal", constraint=false, minlen=2];
   "511" -> "511" [arrowhead="normal", constraint=false, minlen=2];
@@ -3122,6 +3123,7 @@ digraph G {
   "436" -> "499" [dir=both];
   "437" -> "498" [dir=both];
   "437" -> "499" [dir=both];
+  "437" -> "544" [dir=both];
   "438" -> "505" [dir=both];
   "438" -> "567" [dir=both];
   "438" -> "570" [dir=both];
@@ -3807,6 +3809,7 @@ digraph G {
   "64" -> "62" [];
   "65" -> "67" [];
   "66" -> "64" [];
+  "67" -> "118" [];
   "67" -> "371" [];
   "68" -> "66" [];
   "69" -> "71" [];
@@ -3894,6 +3897,7 @@ digraph G {
   "136" -> "140" [];
   "136" -> "142" [];
   "137" -> "135" [];
+  "138" -> "150" [];
   "138" -> "154" [];
   "139" -> "141" [];
   "140" -> "138" [];
@@ -3911,6 +3915,7 @@ digraph G {
   "151" -> "256" [];
   "154" -> "150" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "154" -> "321" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
+  "155" -> "317" [];
   "155" -> "371" [];
   "156" -> "160" [];
   "158" -> "176" [];
@@ -4032,6 +4037,7 @@ digraph G {
   "265" -> "267" [];
   "266" -> "264" [];
   "267" -> "282" [];
+  "267" -> "318" [];
   "267" -> "373" [];
   "268" -> "266" [];
   "269" -> "284" [];
@@ -4052,6 +4058,7 @@ digraph G {
   "284" -> "289" [];
   "285" -> "154" [];
   "285" -> "286" [];
+  "285" -> "321" [];
   "286" -> "288" [];
   "287" -> "283" [];
   "288" -> "291" [];
@@ -4092,6 +4099,7 @@ digraph G {
   "321" -> "283" [];
   "323" -> "324" [];
   "326" -> "336" [];
+  "328" -> "14" [];
   "328" -> "325" [];
   "328" -> "376" [];
   "334" -> "314" [];
@@ -4145,6 +4153,7 @@ digraph G {
   "393" -> "407" [];
   "394" -> "398" [];
   "395" -> "400" [];
+  "395" -> "401" [];
   "396" -> "382" [];
   "397" -> "398" [];
   "400" -> "401" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
@@ -4159,6 +4168,7 @@ digraph G {
   "408" -> "391" [];
   "409" -> "410" [];
   "410" -> "405" [];
+  "410" -> "406" [];
   "411" -> "391" [];
   "412" -> "457" [];
   "412" -> "476" [];
@@ -4275,10 +4285,12 @@ digraph G {
   "504" -> "537" [];
   "504" -> "543" [];
   "505" -> "506" [];
+  "507" -> "499" [];
   "508" -> "547" [];
   "509" -> "503" [];
   "510" -> "427" [];
   "511" -> "551" [];
+  "512" -> "531" [];
   "512" -> "568" [];
   "513" -> "514" [];
   "514" -> "572" [];
@@ -4310,7 +4322,6 @@ digraph G {
   "542" -> "614" [];
   "543" -> "457" [];
   "544" -> "436" [];
-  "544" -> "437" [];
   "544" -> "528" [];
   "546" -> "499" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "547" -> "443" [];
@@ -4345,6 +4356,8 @@ digraph G {
   "569" -> "577" [];
   "570" -> "562" [];
   "571" -> "567" [];
+  "572" -> "567" [];
+  "572" -> "570" [];
   "572" -> "574" [];
   "573" -> "528" [];
   "574" -> "567" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
@@ -4489,6 +4502,7 @@ digraph G {
   "701" -> "952" [];
   "705" -> "706" [];
   "706" -> "707" [];
+  "707" -> "759" [];
   "707" -> "814" [];
   "708" -> "709" [];
   "709" -> "710" [];
@@ -4557,6 +4571,7 @@ digraph G {
   "760" -> "761" [];
   "761" -> "763" [];
   "762" -> "763" [];
+  "763" -> "759" [];
   "763" -> "814" [];
   "764" -> "765" [];
   "764" -> "766" [];
@@ -4773,6 +4788,7 @@ digraph G {
   "948" -> "945" [tooltip="Ordered literal continuation (static script order; lifecycle handlers not evaluated)"];
   "948" -> "947" [];
   "949" -> "941" [];
+  "949" -> "945" [];
   "951" -> "699" [];
   "951" -> "734" [];
   "952" -> "953" [];

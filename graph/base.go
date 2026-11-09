@@ -88,7 +88,7 @@ func (g *MystGraph) addEdgeWithAttributes(edge *common.Edge) error {
 	switch {
 	case edge.IsOfType(common.Disabled):
 		return g.addDisabledEdge(edge)
-	case edge.IsOfType(common.Backtracking):
+	case notTraversed(edge):
 		return g.AddEdge(edge, math.Inf(1))
 	default:
 		return g.AddEdge(edge, 1.0)

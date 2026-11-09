@@ -98,9 +98,12 @@ func (s *literalSequence) overridden(name string) bool {
 	return s.shared[name] != 0 || s.local[name] != 0 || s.current != nil && s.cardDeclarations(s.current)[name] != 0
 }
 
-func (s *literalSequence) observe(index int, line ScriptLine, link *HyperCardLink) {
+// observe returns the ordered continuation recorded for this line, if any. The
+// handler's own card keeps its reference to every card it requests; the step
+// from the view requested just before is recorded beside that reference.
+func (s *literalSequence) observe(index int, line ScriptLine, link *HyperCardLink) *HyperCardLink {
 	if s == nil {
-		return
+		return nil
 	}
 	handler, eligible := s.eligible[index]
 	if !eligible || handler != s.handler {
@@ -109,7 +112,7 @@ func (s *literalSequence) observe(index int, line ScriptLine, link *HyperCardLin
 		s.handler = handler
 	}
 	if !eligible || s.suppressed {
-		return
+		return nil
 	}
 	command, commented := normalizeCommand(line.Line)
 	command = strings.TrimSpace(command)
@@ -120,33 +123,36 @@ func (s *literalSequence) observe(index int, line ScriptLine, link *HyperCardLin
 		if len(fields) > 0 && (strings.EqualFold(fields[0], "go") || strings.EqualFold(fields[0], "push") || strings.EqualFold(fields[0], "pop")) {
 			s.current = nil
 		}
-		return
+		return nil
 	}
 	if command == "" {
-		return
+		return nil
 	}
 	if sequenceLiteralGo.MatchString(command) && link != nil && !link.IsDisabled && !link.IsNotImplemented && link.TransitivityRank == common.DefaultTransitivity {
 		target, ok := link.Target.(*HyperCardCard)
 		if s.overridden("go") {
 			s.current = nil
 			s.suppressed = true
-			return
+			return nil
 		}
 		if !ok || target.Stack != s.owner.Stack {
 			s.current = nil
-			return
+			return nil
 		}
-		if s.current != nil {
-			link.Source = s.current
-			link.IsSequenceContinuation = true
+		// Requesting the owner first, or the same view twice, is not a step
+		// between two views: the owner's own reference already records it.
+		var continuation *HyperCardLink
+		if s.current != nil && s.current != s.owner && s.current != target {
+			continuation = &HyperCardLink{Source: s.current, Target: target, IsSequenceContinuation: true}
 		}
 		s.current = target
-		return
+		return continuation
 	}
 	// VS is an explicit visual-only convention of this abstraction, not an
 	// inferred summary of arbitrary external handlers. Imported overrides win.
 	if sequenceVS.MatchString(command) && !s.overridden("vs") || sequenceVisual.MatchString(command) && !s.overridden("visual") {
-		return
+		return nil
 	}
 	s.current = nil
+	return nil
 }
