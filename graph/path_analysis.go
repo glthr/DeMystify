@@ -159,6 +159,9 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 			weight, _ := pa.g.Weight(path[i-1], path[i])
 			shortestPath.Distance += weight
 		}
+		if math.IsInf(shortestPath.Distance, 1) {
+			return nil, fmt.Errorf("path distance overflows from %d to %d", from, to)
+		}
 
 		return &shortestPath, nil
 	}

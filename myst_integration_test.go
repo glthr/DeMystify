@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/xml"
+	"fmt"
+	"math"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
 	"github.com/glthr/DeMystify/parser"
 )
@@ -32,7 +35,7 @@ func TestOriginalMystImport(t *testing.T) {
 	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
-	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 36 || sinks != 62 || isolated != 18 {
+	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 63 || isolated != 19 {
 		t.Fatalf("unexpected source/sink/isolated counts: %d/%d/%d", sources, sinks, isolated)
 	}
 	for _, pair := range [][2]string{
@@ -42,6 +45,8 @@ func TestOriginalMystImport(t *testing.T) {
 		{"Myst:28552", "Myst:23444"},
 		{"Myst:55938", "Myst:23444"},
 		{"Myst:77008", "Myst:23444"},
+		{"Myst:72560", "Myst:23444"},
+		{"Myst:77588", "Myst:23444"},
 		{"Selenitic Age:59926", "Selenitic Age:62357"},
 		{"Stoneship Age:53570", "Stoneship Age:25833"},
 	} {
@@ -52,6 +57,7 @@ func TestOriginalMystImport(t *testing.T) {
 			t.Errorf("missing named-card transition %s -> %s", pair[0], pair[1])
 		}
 	}
+	verifySharedStackHandlerEntries(t, g)
 	localDistance := float64(3)
 	if fresh {
 		localDistance = 1
@@ -102,11 +108,51 @@ func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
 		}
 		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
 		case "on mouseup 5119 end mouseup":
-			return 3214, 3227, false
+			return 3231, 3244, false
 		case "on mouseup go to card id 5119 end mouseup":
-			return 3215, 3228, true
+			return 3232, 3245, true
 		}
 	}
 	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")
 	return 0, 0, false
+}
+
+func verifySharedStackHandlerEntries(t *testing.T, g *graph.MystGraph) {
+	t.Helper()
+	targets := make(map[string]bool)
+	for target, callers := range map[int][]int{
+		86839: {13703, 19143, 20137, 21498, 26492, 33578},
+		87249: {17667, 32368, 2465, 24265, 29197, 34505},
+		87418: {14360, 19870, 20934, 22077, 27330, 35578},
+	} {
+		toName := fmt.Sprintf("Channelwood Age:%d", target)
+		targets[toName] = true
+		if g.HasEdge("Channelwood Age", toName) {
+			t.Errorf("handler definition became a world move to %s", toName)
+		}
+		for _, caller := range callers {
+			fromName := fmt.Sprintf("Channelwood Age:%d", caller)
+			from, fromExists := g.GetNodeID(fromName)
+			to, toExists := g.GetNodeID(toName)
+			weight, exists := g.Weight(from, to)
+			if !fromExists || !toExists || !exists || !math.IsInf(weight, 1) {
+				t.Errorf("missing contextual entry %s -> %s", fromName, toName)
+			}
+			if g.HasEdge(toName, fromName) {
+				t.Errorf("invented unconditional return %s -> %s", toName, fromName)
+			}
+		}
+	}
+	entries := 0
+	for _, edge := range g.Metadata.Edges {
+		if targets[edge.Target.Name] {
+			entries++
+			if !edge.Source.IsOfType(common.IsCard) || !edge.IsOfType(common.Backtracking) {
+				t.Errorf("incorrect close-up entry: %+v", edge)
+			}
+		}
+	}
+	if entries != 18 {
+		t.Errorf("got %d close-up entries, want exactly 18 callers", entries)
+	}
 }

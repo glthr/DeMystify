@@ -13,10 +13,6 @@ type Generator struct {
 	nodeStyles  map[int64]nodeStyle
 	stackColors map[string]nodeColors
 	customPath  []int64
-	// from -> to -> edges
-	edgesMap map[int64]map[int64][]common.Edge
-	// pre-calculated custom path edges for fast lookup
-	customPathEdgeSet map[string]bool
 }
 
 // nodeStyle contains styling attributes for a node

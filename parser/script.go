@@ -19,7 +19,8 @@ type ScriptLine struct {
 }
 
 var (
-	numericCardPositionPattern  = regexp.MustCompile(`^[0-9]+$`)
+	// HyperTalk numbers allow a decimal point and leading minus (Apple reference, p. 44).
+	numericCardPositionPattern  = regexp.MustCompile(`^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$`)
 	goToNamedCardOfStackPattern = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"\s+of\s+stack\s+"([^"]+)"`)
 	goToCardOfStackPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
 	goToNamedCardPattern        = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"`)
@@ -69,6 +70,9 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	}
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
 		return link, err
+	}
+	if link := p.handleGoToUnquotedCardName(source, command); link != nil {
+		return link, nil
 	}
 	if !disabled {
 		if handled := p.handlePopCard(source, command); handled {
@@ -122,7 +126,7 @@ func (p *Parser) handleGoToNamedCardOfStack(source any, command string) (*HyperC
 	if matches == nil {
 		return nil, nil
 	}
-	// Quoted integers denote card positions, which need stack-order resolution.
+	// Numeric strings are object numbers, not literal card names.
 	if numericCardPositionPattern.MatchString(strings.TrimSpace(matches[2])) {
 		return nil, nil
 	}
@@ -194,7 +198,7 @@ func (p *Parser) handleGoToNamedCard(source any, command string) (*HyperCardLink
 	if matches == nil {
 		return nil, nil
 	}
-	// Quoted integers denote card positions, which need stack-order resolution.
+	// Numeric strings are object numbers, not literal card names.
 	if numericCardPositionPattern.MatchString(strings.TrimSpace(matches[2])) {
 		return nil, nil
 	}

@@ -92,7 +92,6 @@ func TestNodeLabelEscapingAndPathStyling(t *testing.T) {
 func TestBidirectionalMergeRetainsParallelEdges(t *testing.T) {
 	g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge}, []common.EdgeAttribute{common.IntraAge})
 	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.Disabled}})
-	g.initializeEdgesMap()
 	output, err := g.Generate(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +104,6 @@ func TestBidirectionalMergeRetainsParallelEdges(t *testing.T) {
 func TestCustomPathPreservesReverseAndParallelEdges(t *testing.T) {
 	g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge}, []common.EdgeAttribute{common.IntraAge})
 	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.Disabled}})
-	g.initializeEdgesMap()
 	output, err := g.Generate([]int64{metadata.Nodes[0].GraphID, metadata.Nodes[1].GraphID})
 	if err != nil {
 		t.Fatal(err)

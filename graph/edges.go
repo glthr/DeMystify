@@ -56,7 +56,14 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 	// Re-adding an identical edge updates its weight; distinct parallel edges
 	// retain separate lines rather than overwriting line zero.
 	if edge.IsOfType(common.Disabled) {
-		g.Graph.RemoveLine(edge.Source.GraphID, edge.Target.GraphID, int64(lineID))
+		// Gonum cannot remove a line whose source/target ID set was never allocated.
+		lines := g.Graph.WeightedLines(edge.Source.GraphID, edge.Target.GraphID)
+		for lines.Next() {
+			if lines.WeightedLine().ID() == int64(lineID) {
+				g.Graph.RemoveLine(edge.Source.GraphID, edge.Target.GraphID, int64(lineID))
+				break
+			}
+		}
 	} else {
 		if edge.IsOfType(common.Backtracking) {
 			weight = math.Inf(1)

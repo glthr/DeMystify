@@ -66,6 +66,9 @@ func (g *MystGraph) GetNodeStack(id int64) (string, bool) {
 
 // SetNameMapping sets or updates the ID to name mapping
 func (g *MystGraph) SetNameMapping(idToName map[int64]string) {
+	if idToName == nil {
+		idToName = make(map[int64]string)
+	}
 	g.IdNameMap = idToName
 }
 

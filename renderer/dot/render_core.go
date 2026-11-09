@@ -5,7 +5,7 @@ import (
 )
 
 // buildDOT generates the DOT string representation
-func (g *Generator) buildDOT() (string, error) {
+func (g *Generator) buildDOT() string {
 	var buf bytes.Buffer
 
 	buf.WriteString("/* Generated with DeMystify (github.com/glthr/DeMystify) */\n\n")
@@ -15,11 +15,11 @@ func (g *Generator) buildDOT() (string, error) {
 	g.writeGraphAttributes(&buf)
 	g.writeComponentClusters(&buf)
 	g.writeNodes(&buf)
-	g.writeEdges(&buf)
+	g.renderMetadataEdges(&buf)
 
 	buf.WriteString("}\n")
 
-	return buf.String(), nil
+	return buf.String()
 }
 
 // writeGraphAttributes adds global graph attributes to the DOT output

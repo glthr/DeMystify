@@ -13,6 +13,7 @@ type HyperCardStack struct {
 	Script      []HyperTalk
 	Cards       []HyperCardCard
 	IsPushStack bool
+	cardIDs     map[int]bool // explicit XML manifest; empty permits a partial import
 }
 
 // Background is used to get the image name
@@ -91,8 +92,9 @@ func ParseStackFile(filepath string) (*HyperCardStack, map[int]string, error) {
 	}
 
 	return &HyperCardStack{
-			Name:   s.Name,
-			Script: scripts,
+			Name:    s.Name,
+			Script:  scripts,
+			cardIDs: seenCards,
 		},
 		cardsIdNameMap,
 		nil

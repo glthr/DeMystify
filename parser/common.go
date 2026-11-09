@@ -14,11 +14,12 @@ import (
 const stackFileName = "stack_-1.xml"
 
 type Parser struct {
-	stacksDir   string
-	stacks      []*HyperCardStack
-	cards       []*HyperCardCard
-	links       []*HyperCardLink
-	pushedLinks map[*HyperCardLink]bool
+	stacksDir     string
+	stacks        []*HyperCardStack
+	cards         []*HyperCardCard
+	links         []*HyperCardLink
+	pushedLinks   map[*HyperCardLink]bool
+	stackHandlers map[*HyperCardStack]map[string]stackHandlerSummary
 }
 
 type HyperCardLink struct {
@@ -144,10 +145,19 @@ func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
 			if seenCards[card.ID] {
 				return fmt.Errorf("duplicate card ID %d in stack %q", card.ID, stack.Name)
 			}
+			if len(stack.cardIDs) != 0 && !stack.cardIDs[card.ID] {
+				return fmt.Errorf("card ID %d is absent from stack %q manifest", card.ID, stack.Name)
+			}
 			seenCards[card.ID] = true
 
 			p.cards = append(p.cards, card)
 		}
+		for id := range stack.cardIDs {
+			if !seenCards[id] {
+				return fmt.Errorf("missing card ID %d declared in stack %q manifest", id, stack.Name)
+			}
+		}
+		p.prepareStackHandlers(stack, stackPath.stackRootDir)
 	}
 	return nil
 }
@@ -156,7 +166,7 @@ func (p *Parser) identifyLinks() error {
 	var transitivityID int64
 	for _, stack := range p.stacks {
 		for _, script := range stack.Script {
-			links, err := p.identifyScriptLinks(stack, script, &transitivityID)
+			links, err := p.identifyScriptLinks(stack, p.withoutHandlerDefinitions(stack, script), &transitivityID)
 			if err != nil {
 				return fmt.Errorf("stack %s: %w", stack.Name, err)
 			}
@@ -171,6 +181,7 @@ func (p *Parser) identifyLinks() error {
 				return fmt.Errorf("card %s: %w", card.Name, err)
 			}
 			p.links = append(p.links, links...)
+			p.links = append(p.links, p.projectHandlerCalls(card, script)...)
 		}
 	}
 
