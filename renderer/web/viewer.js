@@ -2,7 +2,7 @@
   "use strict";
 
   const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79"];
-  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
+  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Scripted sequence · next step", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
   const HIGHLIGHTS = [
     {id: "source", label: "Sources", flag: "source", description: "Uses the exported source flag. Source, sink and isolate flags may overlap."},
@@ -643,7 +643,9 @@
       for (const edge of records) {
         const other = direction === "incoming" ? edge.from : edge.to, button = element("button", "reference-row"), copy = element("span", "ref-copy"), dot = element("span", "ref-dot");
         copy.append(element("strong", "", other.name), element("small", "", edgeLabel(edge))); dot.style.background = muted(other) ? "#888888" : other.color;
-        button.append(element("span", "ref-arrow", direction === "incoming" ? "↙" : "↗"), copy, dot);
+        const inverseHead = has(edge, "restrictivetransitivitytail") ? "" : has(edge, "disabled") ? "⊣" : "◀";
+        const marker = element("span", "ref-arrow" + (has(edge, "backtracking") ? " inverted" : ""), has(edge, "backtracking") ? "▶—" + inverseHead : direction === "incoming" ? "↙" : "↗");
+        marker.setAttribute("aria-hidden", "true"); button.append(marker, copy, dot);
         button.setAttribute("aria-label", other.name + ", " + edgeLabel(edge)); button.addEventListener("click", () => selectNode(other.id, true)); host.append(button);
       }
     }

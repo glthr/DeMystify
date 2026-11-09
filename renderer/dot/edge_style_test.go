@@ -62,3 +62,33 @@ func TestRestrictiveHeadDoesNotInheritTailState(t *testing.T) {
 		}
 	}
 }
+
+func TestSequenceContinuationAddsExplanationWithoutChangingArrowSemantics(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	edge := &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.IntraAge, common.SequenceContinuation}}
+	style := g.applyEdgeStyle(edge, false)
+	if !strings.Contains(style.tooltip, "Ordered literal continuation") || !strings.Contains(style.tooltip, "lifecycle handlers not evaluated") || style.arrowtail != "" || style.arrowhead != "" || style.bidirectional {
+		t.Fatalf("sequence explanation changed ordinary navigation semantics: %+v", style)
+	}
+	edge.Attributes = append(edge.Attributes, common.Disabled)
+	style = g.applyEdgeStyle(edge, true)
+	if style.arrowhead != "tee" || !strings.Contains(style.tooltip, "disabled") || !strings.Contains(style.tooltip, "Ordered literal continuation") {
+		t.Fatalf("path/disabled state lost its explanation or tee: %+v", style)
+	}
+}
+
+func TestSequenceContinuationsAreNotMergedIntoBidirectionalMoves(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	a, b := metadata.Nodes[0], metadata.Nodes[1]
+	metadata.Edges = []*common.Edge{
+		{Source: a, Target: b, Attributes: []common.EdgeAttribute{common.IntraAge, common.SequenceContinuation}},
+		{Source: b, Target: a, Attributes: []common.EdgeAttribute{common.IntraAge, common.SequenceContinuation}},
+	}
+	output, err := g.Generate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edgeLines(output)) != 2 || strings.Contains(output, "dir=both") {
+		t.Fatalf("opposite ordered steps were merged: %s", output)
+	}
+}

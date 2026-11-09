@@ -196,6 +196,7 @@ func edgeAttributes(attributes []common.EdgeAttribute) []string {
 			common.IntraAge: "intraAge", common.CrossAge: "crossAge", common.Disabled: "disabled",
 			common.SelfReference: "selfReference", common.NotImplemented: "notImplemented", common.Backtracking: "backtracking",
 			common.RestrictiveTransitivityTail: "restrictiveTransitivityTail", common.RestrictiveTransitivityHead: "restrictiveTransitivityHead",
+			common.SequenceContinuation: "sequenceContinuation",
 		}[attribute]
 		if !ok {
 			name = fmt.Sprintf("unknown:%d", attribute)

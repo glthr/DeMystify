@@ -42,6 +42,9 @@ const (
 	Backtracking
 	RestrictiveTransitivityTail
 	RestrictiveTransitivityHead
+	// SequenceContinuation follows an earlier literal go in one linear handler.
+	// It records static command order, not lifecycle or runtime reachability.
+	SequenceContinuation
 )
 
 type Edge struct {

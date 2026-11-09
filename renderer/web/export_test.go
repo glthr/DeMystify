@@ -70,6 +70,7 @@ func TestWriteOfflinePreservesAllEdgeRecordsAndEscapesData(t *testing.T) {
 		&common.Edge{Source: metadata.Nodes[1], Target: metadata.Nodes[2], Attributes: []common.EdgeAttribute{common.RestrictiveTransitivityTail}, TransitivityID: 7},
 		&common.Edge{Source: metadata.Nodes[2], Target: metadata.Nodes[0], Attributes: []common.EdgeAttribute{common.RestrictiveTransitivityHead}, TransitivityID: 7})
 	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[2], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.RestrictiveTransitivityHead}, TransitivityID: 0})
+	metadata.Edges = append(metadata.Edges, &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[2], Attributes: []common.EdgeAttribute{common.SequenceContinuation}})
 	before, _ := json.Marshal(metadata)
 	report, err := Write(filepath.Join(t.TempDir(), "atlas"), metadata, Options{})
 	if err != nil {
@@ -102,6 +103,9 @@ func TestWriteOfflinePreservesAllEdgeRecordsAndEscapesData(t *testing.T) {
 	}
 	if !bytes.Contains(html, []byte(`"attributes":["restrictiveTransitivityHead"],"transitivityId":0`)) {
 		t.Fatal("meaningful zero transitivity ID was lost")
+	}
+	if !bytes.Contains(html, []byte(`"attributes":["sequenceContinuation"]`)) {
+		t.Fatal("ordered navigation continuation was lost")
 	}
 	if !bytes.HasPrefix(html, []byte(ownershipMarker)) {
 		t.Fatal("export ownership marker missing")

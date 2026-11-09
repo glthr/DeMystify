@@ -138,6 +138,9 @@ func getEdgeAttributes(
 	if sourceStack == targetStack && link.IsBacktracking && link.TransitivityRank == common.DefaultTransitivity {
 		edgeTypes = append(edgeTypes, common.Backtracking)
 	}
+	if link.IsSequenceContinuation {
+		edgeTypes = append(edgeTypes, common.SequenceContinuation)
+	}
 
 	if link.TransitivityRank == common.Tail {
 		edgeTypes = append(edgeTypes, common.RestrictiveTransitivityTail)

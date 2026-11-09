@@ -99,6 +99,15 @@ function fixture() {
 }
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < .00001, `${actual} differs from ${expected}`);
 
+test("ordered navigation continuations remain distinct from inverted saved returns", () => {
+  const data = fixture(); data.edges = [{source: 1, target: 2, attributes: ["intraAge", "sequenceContinuation"]}];
+  const h = harness(data);
+  assert.match(h.get("outgoing-list").textContent, /Scripted sequence · next step/);
+  assert.equal(h.get("outgoing-list").children[0].children[0].textContent, "↗");
+  assert.doesNotMatch(h.get("outgoing-list").textContent, /Saved return/);
+  assert.equal(h.app.graph.edges.length, 1); assert.equal(h.app.graph.outgoing.get(2).length, 0);
+});
+
 test("saved-return entries have inward-pointing inverted triangles at both atlas endpoints", () => {
   const data = fixture(); data.nodes = data.nodes.slice(0, 2); data.edges = [{source: 1, target: 2, attributes: ["intraAge", "backtracking"]}];
   const h = harness(data); h.app.state.camera = {x: 200, y: 200, scale: 1};
@@ -115,6 +124,8 @@ test("saved-return entries have inward-pointing inverted triangles at both atlas
   near(head[1][0], 230); near(head[2][0], 230); assert.ok(head[0][0] < head[1][0], "head points away from destination into the connection");
   near(tail[1][0], 90); near(tail[2][0], 90); assert.ok(tail[0][0] > tail[1][0], "tail points away from source into the connection");
   assert.match(h.get("outgoing-list").textContent, /Saved return · inverted arrows/);
+  assert.equal(h.get("outgoing-list").children[0].children[0].textContent, "▶—◀");
+  h.app.selectNode(2); assert.equal(h.get("incoming-list").children[0].children[0].textContent, "▶—◀");
   h.app.graph.edges[0].flags.delete("backtracking"); markers = triangles(); assert.equal(markers.length, 1); assert.ok(markers[0][0][0] > markers[0][1][0]);
   h.app.graph.edges[0].flags.add("backtracking"); h.app.graph.edges[0].flags.add("disabled"); assert.equal(triangles().length, 1, "disabled head keeps its tee; saved-return tail remains inverted");
   h.app.graph.edges[0].flags.delete("disabled"); h.app.graph.edges[0].flags.add("restrictivetransitivitytail"); assert.equal(triangles().length, 1, "paired-return tail suppresses its head only");
