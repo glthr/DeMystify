@@ -28,6 +28,8 @@ go test -race ./...
 go vet ./...
 ```
 
+Pull requests run the same formatting, vet and test checks automatically, with the oldest supported Go version (`.github/workflows/ci.yml`). Graphviz is not installed there, so the checks that need `neato` only run locally.
+
 To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the converted stack directory. The test selects expected counts from the input script rather than the graph output. The game data is optional and must not be added to the repository.
 
 To compare native import with XML produced from the same originals, set both `DEMYSTIFY_NATIVE_TEST_DATA` (the directory of original stack data forks) and `DEMYSTIFY_TEST_DATA` (the corresponding XML directory), then run `go test -run TestNativeMystParity .`. This checks the decoded objects, graph records and generated DOT. Native parser fixtures and fuzz seeds in the repository are synthetic.
