@@ -17,7 +17,7 @@ const (
 )
 
 // Run uses the same Neato layout flags as PDF rendering. The JSON output uses
-// points regardless of the raster DPI, so the browser must not multiply by600.
+// points regardless of the raster DPI, so the browser must not multiply by 600.
 func Run(dot string) (Drawing, error) {
 	return RunContext(context.Background(), dot)
 }

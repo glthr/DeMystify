@@ -262,7 +262,7 @@ def main(argv=None):
     if ffmpeg is None:
         parser.error('FFmpeg is required only for this optional media extraction step')
     if not 1 <= args.workers <= 16:
-        parser.error('--workers must be between1and16')
+        parser.error('--workers must be between 1 and 16')
     try:
         prepare_output(output, source)
     except (OSError, ValueError) as error:
