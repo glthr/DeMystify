@@ -74,6 +74,8 @@ type Metadata struct {
 // GraphStats contains analysis results for a graph
 type GraphStats struct {
 	// path and connectivity analysis
+	// ShortestPaths is left nil by MystGraph.Process; callers that need every
+	// route assign the result of MystGraph.ComputeAllShortestPaths themselves.
 	ShortestPaths          map[int64]map[int64]ShortestPathInfo
 	MostSeparatedNodes     NodePairInfo
 	ConnectedComponents    [][]int64
