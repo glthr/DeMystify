@@ -46,6 +46,32 @@ func TestNumericLabelsKeepSecondaryNames(t *testing.T) {
 	}
 }
 
+func TestAnalysisPreservesNonCardSecondaryLabels(t *testing.T) {
+	for _, nodeType := range []common.NodeAttribute{common.IsStack, common.IsVirtual} {
+		for _, useNames := range []bool{false, true} {
+			g, metadata := newTestGenerator(t, []common.EdgeAttribute{common.IntraAge})
+			secondary := "Shared background"
+			node := metadata.Nodes[0]
+			node.Attributes = []common.NodeAttribute{nodeType}
+			node.SecondaryName = &secondary
+			g.graph.NodeMap[node.Name] = *node
+			g.graph.Process()
+			g.config.UseNodeNames = useNames
+			output, err := g.Generate(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			name := "0"
+			if useNames {
+				name = g.getDisplayName(*node)
+			}
+			if !strings.Contains(output, `label="`+name+`\nShared background"`) {
+				t.Fatalf("node type=%v, useNames=%v: analysis dropped secondary label", nodeType, useNames)
+			}
+		}
+	}
+}
+
 func TestAnalysisPreservesPageBorders(t *testing.T) {
 	for _, page := range []struct {
 		attrs []common.NodeAttribute
