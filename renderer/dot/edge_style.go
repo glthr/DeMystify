@@ -22,7 +22,12 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 		if style.tooltip != "" {
 			style.tooltip += "; "
 		}
-		style.tooltip += "Ordered literal continuation (static script order; lifecycle handlers not evaluated)"
+		style.tooltip += "Ordered literal continuation (static script order; not followed by path search)"
+		// A hollow head marks the automatic step. The calling card keeps its own
+		// reference to the same view, drawn with an ordinary arrow.
+		if style.arrowhead == "" {
+			style.arrowhead = "onormal"
+		}
 	}
 	return style
 }

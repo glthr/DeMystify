@@ -63,17 +63,44 @@ func TestRestrictiveHeadDoesNotInheritTailState(t *testing.T) {
 	}
 }
 
-func TestSequenceContinuationAddsExplanationWithoutChangingArrowSemantics(t *testing.T) {
+func TestSequenceContinuationUsesHollowArrowheadAndExplanation(t *testing.T) {
 	g, metadata := newTestGenerator(t)
 	edge := &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.IntraAge, common.SequenceContinuation}}
 	style := g.applyEdgeStyle(edge, false)
-	if !strings.Contains(style.tooltip, "Ordered literal continuation") || !strings.Contains(style.tooltip, "lifecycle handlers not evaluated") || style.arrowtail != "" || style.arrowhead != "" || style.bidirectional {
-		t.Fatalf("sequence explanation changed ordinary navigation semantics: %+v", style)
+	if !strings.Contains(style.tooltip, "Ordered literal continuation") || !strings.Contains(style.tooltip, "not followed by path search") || style.arrowtail != "" || style.arrowhead != "onormal" || style.bidirectional {
+		t.Fatalf("an automatic step was not marked as one: %+v", style)
+	}
+	if got := g.buildEdgeStyleString(style); !strings.Contains(got, `arrowhead="onormal"`) || strings.Contains(got, "dir=") {
+		t.Fatalf("unexpected DOT attributes for a continuation: %s", got)
 	}
 	edge.Attributes = append(edge.Attributes, common.Disabled)
 	style = g.applyEdgeStyle(edge, true)
 	if style.arrowhead != "tee" || !strings.Contains(style.tooltip, "disabled") || !strings.Contains(style.tooltip, "Ordered literal continuation") {
 		t.Fatalf("path/disabled state lost its explanation or tee: %+v", style)
+	}
+}
+
+func TestPathHighlightPrefersTheOrdinaryReferenceOverAContinuation(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	a, b := metadata.Nodes[0], metadata.Nodes[1]
+	// The intermediate card's own reference and a caller's continuation can
+	// join the same two cards; only the first is a route.
+	metadata.Edges = []*common.Edge{
+		{Source: a, Target: b, Attributes: []common.EdgeAttribute{common.IntraAge, common.SequenceContinuation}},
+		{Source: a, Target: b, Attributes: []common.EdgeAttribute{common.IntraAge}},
+	}
+	output, err := g.Generate([]int64{a.GraphID, b.GraphID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := edgeLines(output)
+	if len(lines) != 2 {
+		t.Fatalf("parallel records lost: %v", lines)
+	}
+	for _, line := range lines {
+		if strings.Contains(line, "Path edge") == strings.Contains(line, "onormal") {
+			t.Fatalf("the highlight was not given to the ordinary reference alone: %v", lines)
+		}
 	}
 }
 
