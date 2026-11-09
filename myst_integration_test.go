@@ -35,7 +35,7 @@ func TestOriginalMystImport(t *testing.T) {
 	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
-	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 63 || isolated != 19 {
+	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 57 || isolated != 19 {
 		t.Fatalf("unexpected source/sink/isolated counts: %d/%d/%d", sources, sinks, isolated)
 	}
 	for _, pair := range [][2]string{
@@ -108,9 +108,9 @@ func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
 		}
 		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
 		case "on mouseup 5119 end mouseup":
-			return 3231, 3244, false
+			return 3224, 3243, false
 		case "on mouseup go to card id 5119 end mouseup":
-			return 3232, 3245, true
+			return 3225, 3244, true
 		}
 	}
 	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")

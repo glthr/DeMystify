@@ -24,3 +24,10 @@ go.work.sum
 .idea
 
 generated/graph.pdf
+/generated/.graph-*.pdf
+/generated/.graph-*.json
+
+# Local browser exports can contain original game imagery and scripts.
+/generated/web/
+/generated/.web-*/
+/generated/.demystify-web-*/

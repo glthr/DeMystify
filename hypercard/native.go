@@ -117,7 +117,14 @@ func readNative(data []byte, name, path string) (Stack, error) {
 	if err != nil {
 		return Stack{}, err
 	}
-	stack := Stack{Name: name, Source: r.source(0), Script: stackScript}
+	width, height := int(stak.u16(442)), int(stak.u16(440))
+	if width == 0 {
+		width = 512
+	}
+	if height == 0 {
+		height = 342
+	}
+	stack := Stack{Name: name, Width: width, Height: height, Source: r.source(0), Script: stackScript}
 	backgrounds := make(map[int]Background)
 	for _, b := range r.order {
 		if b.kind != "BKGD" {
@@ -377,7 +384,7 @@ func (r *nativeReader) layer(b nativeBlock, card bool) (nativeLayer, error) {
 		if b.u16(pos+4)&0x0100 != 0 {
 			kind = "button"
 		}
-		_, afterName, err := r.stringAt(b, pos+30, pos+length)
+		partName, afterName, err := r.stringAt(b, pos+30, pos+length)
 		if err != nil {
 			return result, err
 		}
@@ -395,7 +402,10 @@ func (r *nativeReader) layer(b nativeBlock, card bool) (nativeLayer, error) {
 		if err != nil {
 			return result, err
 		}
-		result.parts = append(result.parts, Part{ID: id, Type: kind,
+		result.parts = append(result.parts, Part{ID: id, Type: kind, Name: partName.Text,
+			Rect: Rectangle{Top: int(int16(b.u16(pos + 6))), Left: int(int16(b.u16(pos + 8))),
+				Bottom: int(int16(b.u16(pos + 10))), Right: int(int16(b.u16(pos + 12)))},
+			Hidden: b.u16(pos+4)&0x0080 != 0, Enabled: kind != "button" || b.u16(pos+4)&0x0001 == 0,
 			Script: script, Source: r.source(b.offset + pos)})
 		pos += length
 		pos += pos % 2

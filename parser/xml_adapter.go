@@ -12,9 +12,45 @@ import (
 )
 
 type xmlPart struct {
-	ID     string `xml:"id"`
-	Type   string `xml:"type"`
-	Script string `xml:"script"`
+	ID      string              `xml:"id"`
+	Type    string              `xml:"type"`
+	Name    string              `xml:"name"`
+	Rect    hypercard.Rectangle `xml:"rect"`
+	Visible xmlBool             `xml:"visible"`
+	Enabled xmlBool             `xml:"enabled"`
+	Script  string              `xml:"script"`
+}
+
+// The converter writes either <true/>/<false/> children or Boolean text.
+// Missing presentation flags keep the historical visible/enabled defaults.
+type xmlBool struct {
+	value   bool
+	present bool
+}
+
+func (value *xmlBool) UnmarshalXML(decoder *xml.Decoder, start xml.StartElement) error {
+	var raw struct {
+		True  *struct{} `xml:"true"`
+		False *struct{} `xml:"false"`
+		Text  string    `xml:",chardata"`
+	}
+	if err := decoder.DecodeElement(&raw, &start); err != nil {
+		return err
+	}
+	value.present = true
+	switch {
+	case raw.True != nil && raw.False == nil:
+		value.value = true
+	case raw.False != nil && raw.True == nil:
+		value.value = false
+	default:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(raw.Text))
+		if err != nil {
+			return fmt.Errorf("invalid %s flag", start.Name.Local)
+		}
+		value.value = parsed
+	}
+	return nil
 }
 
 type xmlContent struct {
@@ -58,10 +94,24 @@ func xmlParts(parts []xmlPart, source hypercard.Source) []hypercard.Part {
 		// Part identity was optional in older XML exports. Missing/unsupported
 		// IDs do not turn an otherwise readable script into an import error.
 		id, _ := strconv.Atoi(strings.TrimSpace(part.ID))
-		result = append(result, hypercard.Part{ID: id, Type: part.Type, Source: source,
+		result = append(result, hypercard.Part{ID: id, Type: part.Type, Name: part.Name, Rect: xmlRectangle(part.Rect),
+			Hidden:  part.Visible.present && !part.Visible.value,
+			Enabled: !part.Enabled.present || part.Enabled.value, Source: source,
 			Script: hypercard.Script{Text: part.Script, Source: source}})
 	}
 	return result
+}
+
+func xmlRectangle(rect hypercard.Rectangle) hypercard.Rectangle {
+	// Some converted exports print signed QuickDraw coordinates as UInt16.
+	// Retain the original off-card geometry (for example, 65535 means -1).
+	signed := func(value int) int {
+		if value >= 32768 && value <= 65535 {
+			return int(int16(uint16(value)))
+		}
+		return value
+	}
+	return hypercard.Rectangle{Top: signed(rect.Top), Left: signed(rect.Left), Bottom: signed(rect.Bottom), Right: signed(rect.Right)}
 }
 
 func xmlContents(contents []xmlContent) []hypercard.Content {
@@ -78,16 +128,20 @@ func readXMLStack(path string) (hypercard.Stack, map[int]string, []Background, e
 		return hypercard.Stack{}, nil, nil, err
 	}
 	var input struct {
-		XMLName     xml.Name     `xml:"stack"`
-		Name        string       `xml:"name"`
-		ID          int          `xml:"id"`
-		CardCount   int          `xml:"cardCount"`
-		CardID      int          `xml:"cardID"`
-		ListID      int          `xml:"listID"`
-		CantModify  bool         `xml:"cantModify,omitempty"`
-		CantDelete  bool         `xml:"cantDelete,omitempty"`
-		CantAbort   bool         `xml:"cantAbort,omitempty"`
-		Script      string       `xml:"script"`
+		XMLName    xml.Name `xml:"stack"`
+		Name       string   `xml:"name"`
+		ID         int      `xml:"id"`
+		CardCount  int      `xml:"cardCount"`
+		CardID     int      `xml:"cardID"`
+		ListID     int      `xml:"listID"`
+		CantModify bool     `xml:"cantModify,omitempty"`
+		CantDelete bool     `xml:"cantDelete,omitempty"`
+		CantAbort  bool     `xml:"cantAbort,omitempty"`
+		Script     string   `xml:"script"`
+		CardSize   struct {
+			Width  int `xml:"width"`
+			Height int `xml:"height"`
+		} `xml:"cardSize"`
 		Backgrounds []Background `xml:"background"`
 		Cards       []CardInfo   `xml:"card"`
 	}
@@ -98,7 +152,14 @@ func readXMLStack(path string) (hypercard.Stack, map[int]string, []Background, e
 		return hypercard.Stack{}, nil, nil, fmt.Errorf("stack in %s requires a name", path)
 	}
 	source := xmlSource(path)
-	stack := hypercard.Stack{Name: input.Name, Source: source, Script: hypercard.Script{Text: input.Script, Source: source}}
+	width, height := input.CardSize.Width, input.CardSize.Height
+	if width == 0 {
+		width = 512
+	}
+	if height == 0 {
+		height = 342
+	}
+	stack := hypercard.Stack{Name: input.Name, Width: width, Height: height, Source: source, Script: hypercard.Script{Text: input.Script, Source: source}}
 	names, seen := make(map[int]string), make(map[int]bool)
 	for _, card := range input.Cards {
 		if card.ID <= 0 || seen[card.ID] {

@@ -1,0 +1,229 @@
+package parser
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/glthr/DeMystify/common"
+	"github.com/glthr/DeMystify/hypercard"
+)
+
+func sequenceCorpus(scripts ...string) hypercard.Corpus {
+	stack := hypercard.Stack{Name: "Example", BackgroundsComplete: true}
+	for id := 1; id <= 4; id++ {
+		stack.Cards = append(stack.Cards, hypercard.Card{ID: id})
+	}
+	stack.Cards[1].Name = "Transit"
+	stack.Cards[2].Name = "Destination"
+	for index, text := range scripts {
+		stack.Cards[0].Parts = append(stack.Cards[0].Parts, hypercard.Part{ID: index + 1, Script: hypercard.Script{Text: text}})
+	}
+	return hypercard.Corpus{Stacks: []hypercard.Stack{stack}}
+}
+
+func sequenceMetadata(t *testing.T, corpus hypercard.Corpus) *common.Metadata {
+	t.Helper()
+	p, err := NewParserFromCorpus(corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := p.Process()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return metadata
+}
+
+func sequenceEdges(metadata *common.Metadata) []*common.Edge {
+	var edges []*common.Edge
+	for _, edge := range metadata.Edges {
+		if edge.IsOfType(common.SequenceContinuation) {
+			edges = append(edges, edge)
+		}
+	}
+	return edges
+}
+
+func TestLiteralSequenceReplacesOwnerReferenceWithOrderedContinuation(t *testing.T) {
+	// Like a doorway preview followed by the actual interior, both literal go
+	// commands belong to the original button handler, not the preview card.
+	corpus := sequenceCorpus("on mouseUp\ngo to card id 2\nvs left\ngo to card id 3\nhc\nsoundidle\nopenElevator\nend mouseUp")
+	corpus.Stacks[0].Script.Text = "on openElevator\nput \"Elevator Window.MooV\" into movieName\nMovie movieName\nend openElevator"
+	before, err := json.Marshal(corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := sequenceMetadata(t, corpus)
+	if len(metadata.Edges) != 2 {
+		t.Fatalf("got %d edges, want the entry plus continuation", len(metadata.Edges))
+	}
+	entry, continuation := metadata.Edges[0], metadata.Edges[1]
+	if entry.Source.Name != "Example:1" || entry.Target.Name != "Example:2" || entry.IsOfType(common.SequenceContinuation) {
+		t.Fatalf("incorrect entry: %+v", entry)
+	}
+	if continuation.Source.Name != "Example:2" || continuation.Target.Name != "Example:3" || !continuation.IsOfType(common.SequenceContinuation) || continuation.IsOfType(common.Backtracking) {
+		t.Fatalf("incorrect static continuation: %+v", continuation)
+	}
+	for _, edge := range metadata.Edges {
+		if edge.Target.Name == "Example:1" || edge.Source.Name == "Example:1" && edge.Target.Name == "Example:3" {
+			t.Fatalf("invented a reverse or retained the owner's second-step reference: %+v", edge)
+		}
+	}
+	after, err := json.Marshal(corpus)
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("analysis changed original script evidence: %v", err)
+	}
+}
+
+func TestLiteralSequenceSupportsResolvedNamesCommentsAndVisualEffects(t *testing.T) {
+	for name, script := range map[string]string{
+		"three steps":   "go card id 2\ngo card id 3\ngo card id 4",
+		"quoted names":  "go card \"Transit\"\n-- ordinary explanation\n\nvisual effect dissolve fast\ngo card \"Destination\"",
+		"static names":  "go card Transit\nvs right\ngo card Destination",
+		"trailing note": "go card id 2 -- entered here\nvs left -- visual-only convention\ngo to card id 3",
+	} {
+		t.Run(name, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+script+"\nend mouseUp"))
+			edges := sequenceEdges(metadata)
+			want := 1
+			if name == "three steps" {
+				want = 2
+			}
+			if len(edges) != want || edges[0].Source.Name != "Example:2" || edges[0].Target.Name != "Example:3" {
+				t.Fatalf("unexpected continuations: %+v", edges)
+			}
+		})
+	}
+}
+
+func TestLiteralSequenceRejectsControlFlowAndUnresolvedContexts(t *testing.T) {
+	for name, body := range map[string]string{
+		"branches":     "if ready then\ngo card id 2\nelse\ngo card id 3\nend if",
+		"inline":       "if ready then go card id 2\ngo card id 3",
+		"loop":         "repeat with x = 1 to 2\ngo card id 2\ngo card id 3\nend repeat",
+		"join":         "go card id 2\nif ready then\nput 1 into state\nend if\ngo card id 3",
+		"dynamic go":   "global destination\ngo card id 2\ngo card destination\ngo card id 3",
+		"computed go":  "go card id 2\ngo card id offset + 2\ngo card id 3",
+		"current card": "go card id 2\ngo this card\ngo card id 3",
+		"remote stack": "go card id 2 of stack \"Example\"\ngo card id 3",
+		"continuation": "go card id 2\nput 1 ¬\ninto variable\ngo card id 3",
+		"terminal":     "go card id 2\nexit mouseUp\ngo card id 3",
+		"return":       "go card id 2\nreturn 1\ngo card id 3",
+	} {
+		t.Run(name, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+body+"\nend mouseUp"))
+			if len(sequenceEdges(metadata)) != 0 {
+				t.Fatal("unproven control flow acquired a continuation")
+			}
+		})
+	}
+}
+
+func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
+	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "wait until ready", "vs direction", "put navigator() into state"} {
+		t.Run(command, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\ngo card id 4\nend mouseUp"))
+			edges := sequenceEdges(metadata)
+			if len(edges) != 1 || edges[0].Source.Name != "Example:3" || edges[0].Target.Name != "Example:4" {
+				t.Fatalf("opaque call was crossed, or the following explicit run was lost: %+v", edges)
+			}
+		})
+	}
+}
+
+func TestLiteralSequenceDoesNotCrossPartsHandlersOrDisabledNavigation(t *testing.T) {
+	for name, scripts := range map[string][]string{
+		"parts":               {"on mouseUp\ngo card id 2\nend mouseUp", "on mouseUp\ngo card id 3\nend mouseUp"},
+		"handlers":            {"on first\ngo card id 2\nend first\non second\ngo card id 3\nend second"},
+		"commented handler":   {"--on mouseUp\ngo card id 2\ngo card id 3\nend mouseUp"},
+		"incomplete handler":  {"on mouseUp\ngo card id 2\ngo card id 3"},
+		"function":            {"function destination\ngo card id 2\ngo card id 3\nend destination"},
+		"disabled navigation": {"on mouseUp\ngo card id 2\n--go card id 4\ngo card id 3\nend mouseUp"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus(scripts...))
+			if len(sequenceEdges(metadata)) != 0 {
+				t.Fatal("independent or disabled navigation acquired a continuation")
+			}
+			if name == "disabled navigation" {
+				found := false
+				for _, edge := range metadata.Edges {
+					if edge.Target.Name == "Example:4" {
+						found = edge.Source.Name == "Example:1" && edge.IsOfType(common.Disabled)
+					}
+				}
+				if !found {
+					t.Fatal("disabled source reference was lost or moved")
+				}
+			}
+		})
+	}
+}
+
+func TestLiteralSequenceRefusesVisualOverridesAndUnverifiedScope(t *testing.T) {
+	for _, scope := range []string{"source-part", "source-card", "target-card", "background", "background-part", "stack", "unverified", "go-source", "go-target", "visual"} {
+		t.Run(scope, func(t *testing.T) {
+			corpus := sequenceCorpus("on mouseUp\ngo card id 2\nvs left\ngo card id 3\nend mouseUp")
+			script := hypercard.Script{Text: "on vs direction\ngo card id 4\nend vs"}
+			switch scope {
+			case "source-part":
+				corpus.Stacks[0].Cards[0].Parts = append(corpus.Stacks[0].Cards[0].Parts, hypercard.Part{ID: 2, Script: script})
+			case "source-card":
+				corpus.Stacks[0].Cards[0].Script = script
+			case "target-card":
+				corpus.Stacks[0].Cards[1].Script = script
+			case "stack":
+				corpus.Stacks[0].Script = script
+			case "background", "background-part":
+				for i := range corpus.Stacks[0].Cards {
+					corpus.Stacks[0].Cards[i].BackgroundID = 7
+				}
+				background := hypercard.Background{ID: 7}
+				if scope == "background" {
+					background.Script = script
+				} else {
+					background.Parts = []hypercard.Part{{ID: 1, Script: script}}
+				}
+				corpus.Stacks[0].Backgrounds = []hypercard.Background{background}
+			case "unverified":
+				corpus.Stacks[0].BackgroundsComplete = false
+			case "go-source", "go-target":
+				index := 0
+				if scope == "go-target" {
+					index = 1
+				}
+				corpus.Stacks[0].Cards[index].Script.Text = "on go destination\nend go"
+			case "visual":
+				corpus.Stacks[0].Cards[0].Parts[0].Script.Text = strings.Replace(corpus.Stacks[0].Cards[0].Parts[0].Script.Text, "vs left", "visual effect dissolve", 1)
+				corpus.Stacks[0].Script.Text = "on visual effect\nend visual"
+			}
+			if len(sequenceEdges(sequenceMetadata(t, corpus))) != 0 {
+				t.Fatal("overridden or unavailable command scope acquired a continuation")
+			}
+		})
+	}
+}
+
+func TestLiteralSequencePreservesSavedReturnAndRestrictivePairs(t *testing.T) {
+	corpus := sequenceCorpus("on mouseUp\npush card\ngo card id 2\nend mouseUp")
+	corpus.Stacks[0].Cards[1].Parts = []hypercard.Part{{ID: 1, Script: hypercard.Script{Text: "on mouseUp\nvd\npop card\nend mouseUp"}}}
+	metadata := sequenceMetadata(t, corpus)
+	if len(metadata.Edges) != 1 || !metadata.Edges[0].IsOfType(common.Backtracking) || len(sequenceEdges(metadata)) != 0 {
+		t.Fatal("ordinary push/pop entry changed")
+	}
+	corpus = sequenceCorpus("on mouseUp\npush card id 4 of stack \"Example\"\ngo card id 2\ngo card id 3\nend mouseUp")
+	metadata = sequenceMetadata(t, corpus)
+	if len(metadata.Edges) != 3 || len(sequenceEdges(metadata)) != 0 || !metadata.Edges[0].IsOfType(common.RestrictiveTransitivityTail) || !metadata.Edges[1].IsOfType(common.RestrictiveTransitivityHead) {
+		t.Fatal("saved return pair changed")
+	}
+}
+
+func TestLiteralSequenceDoesNotDeduplicateOrdinaryAndOrderedReferences(t *testing.T) {
+	corpus := sequenceCorpus("on mouseUp\ngo card id 2\ngo card id 3\nend mouseUp")
+	corpus.Stacks[0].Cards[1].Script.Text = "on mouseUp\ngo card id 3\nend mouseUp"
+	metadata := sequenceMetadata(t, corpus)
+	if len(metadata.Edges) != 3 || len(sequenceEdges(metadata)) != 1 {
+		t.Fatal("ordinary and ordered references with the same endpoints were conflated")
+	}
+}

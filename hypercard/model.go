@@ -22,6 +22,8 @@ type Script struct {
 
 type Stack struct {
 	Name                string
+	Width               int
+	Height              int
 	Source              Source
 	Script              Script
 	Cards               []Card
@@ -51,10 +53,22 @@ type Background struct {
 }
 
 type Part struct {
-	ID     int
-	Type   string
-	Script Script
-	Source Source
+	ID      int
+	Type    string
+	Name    string
+	Rect    Rectangle
+	Hidden  bool
+	Enabled bool
+	Script  Script
+	Source  Source
+}
+
+// Rectangle stores the original QuickDraw coordinates in card pixels.
+type Rectangle struct {
+	Top    int `xml:"top"`
+	Left   int `xml:"left"`
+	Bottom int `xml:"bottom"`
+	Right  int `xml:"right"`
 }
 
 type Content struct {

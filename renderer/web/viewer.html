@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>DeMystify · Card atlas</title>
+  <style>{{STYLE}}</style>
+</head>
+<body>
+  <div class="atlas">
+    <header class="topbar">
+      <a class="brand" href="#" id="home-link" aria-label="DeMystify, fit the graph">
+        <span class="brand-mark" aria-hidden="true">D</span>
+        <span><strong>DeMystify</strong><span class="eyebrow">THE CARD ATLAS</span></span>
+      </a>
+      <div class="search-wrap">
+        <label class="sr-only" for="graph-search">Search all Ages by card ID, name or picture</label>
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="graph-search" type="search" placeholder="Find a card, name or picture…" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-expanded="false">
+        <kbd class="search-key">/</kbd>
+        <div id="search-results" class="search-results" role="listbox" hidden></div>
+      </div>
+      <div class="topbar-meta"><span class="live-dot"></span><span id="graph-summary">Loading atlas</span></div>
+      <button class="icon-button help-button" id="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
+    </header>
+
+    <main class="atlas-main">
+      <section id="map-surface" class="map" aria-label="Interactive graph">
+        <canvas id="graph-canvas" tabindex="0" aria-label="Card graph. Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card."></canvas>
+        <div id="layout-tools" class="layout-tools" hidden>
+          <div class="layout-switch" role="group" aria-label="Graph layout"><button id="pdf-layout" aria-pressed="false" title="Original PDF node sizes and routed edges">PDF graph</button><button id="atlas-layout" aria-pressed="false" title="Larger picture cards in the image atlas">Image atlas</button></div>
+          <label id="pdf-images-control" class="pdf-images-control"><input id="pdf-images" type="checkbox" checked>Images</label>
+        </div>
+        <aside class="map-tools">
+          <details class="tool-panel age-panel" open>
+            <summary><span class="eyebrow">EXPLORE BY AGE</span><span class="summary-chevron">⌄</span></summary>
+            <div class="age-actions"><button id="all-ages">Show all</button><button id="no-ages">Clear</button></div>
+            <div id="age-filters" class="age-filters"></div>
+          </details>
+          <details class="tool-panel highlight-panel">
+            <summary><span class="highlight-summary-copy"><span class="eyebrow">HIGHLIGHT NODES</span><span id="highlight-summary" class="highlight-summary">All visible nodes</span></span><span class="summary-chevron">⌄</span></summary>
+            <p id="highlight-description" class="highlight-description">Match any checked category. Other nodes stay gray.</p>
+            <div id="node-highlights" class="node-highlights" role="group" aria-label="Highlight nodes matching any selected category" aria-describedby="highlight-description"></div>
+            <div class="highlight-footer"><span><span class="highlight-stat-label">Emphasized</span><output id="highlight-count" aria-live="polite">All visible</output></span><button id="clear-highlights" aria-label="Clear node highlights">Clear</button></div>
+          </details>
+          <details class="tool-panel legend-panel">
+            <summary><span class="eyebrow">READ THE CONNECTIONS</span><span class="summary-chevron">⌄</span></summary>
+            <div id="atlas-legend" class="legend-rows">
+              <div><i class="legend-line"></i><span>Ordinary reference</span></div>
+              <div><i class="legend-line cross"></i><span>Between Ages</span></div>
+              <div><i class="legend-line backtracking"></i><span>Saved return · inverted arrows</span></div>
+              <div><i class="legend-line restrictive"></i><span>Paired return reference</span></div>
+              <div><i class="legend-line disabled"></i><span>Commented / disabled</span></div>
+              <div id="conditional-legend" hidden><i class="legend-line conditional"></i><span>Conditional / Zip reference</span></div>
+            </div>
+            <div id="pdf-legend" class="legend-rows" hidden>
+              <div><span class="pdf-line-sample"><i class="legend-line pdf-ordinary"></i></span><span>Ordinary reference</span></div>
+              <div><span class="pdf-line-sample"><i class="legend-line pdf-return"></i></span><span>Saved return · inverted arrows</span></div>
+              <div><span class="pdf-line-sample"><i class="legend-line pdf-disabled"></i></span><span>Disabled: tee / dashed</span></div>
+              <p class="pdf-legend-note">Original PDF colors, arrowheads, source/sink fills and page borders are retained. Age and paired-reference colors vary.</p>
+            </div>
+            <p class="legend-note">Every extracted record is retained. Lines describe static references; they do not guarantee a playable route.</p>
+          </details>
+        </aside>
+        <div class="map-heading" aria-hidden="true"><span>PLACES, PICTURES &amp; REFERENCES</span><strong>A world between the cards.</strong></div>
+        <div class="map-bottom">
+          <div class="zoom-controls" aria-label="Map controls">
+            <button id="zoom-out" aria-label="Zoom out" title="Zoom out (−)">−</button>
+            <span id="zoom-level">100%</span>
+            <button id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+            <span class="control-divider"></span>
+            <button id="fit-graph" class="fit-button" title="Fit visible Ages (F)">Fit</button>
+          </div>
+          <span id="view-status" class="view-status"></span>
+        </div>
+        <div id="map-empty" class="map-empty" hidden><span class="empty-glyph">◇</span><h2>No Ages selected</h2><p>Choose an Age to bring its cards into view.</p></div>
+      </section>
+
+      <aside class="inspector" aria-label="Selected card">
+        <div id="welcome-panel" class="welcome-panel">
+          <span class="eyebrow">LOOK A LITTLE CLOSER</span>
+          <h1>Every view<br>has a story.</h1>
+          <p>Explore the cards, shared pictures and script references behind Myst.</p>
+          <button id="start-dock" class="primary-button">Begin at the dock <span aria-hidden="true">↗</span></button>
+          <div class="welcome-rule"></div>
+          <div class="welcome-stat"><strong id="card-count">—</strong><span>cards to explore</span></div>
+          <p class="quiet">Select a card to see its picture, stored interaction zones, and the references around it.</p>
+          <div class="interaction-tips"><span><b>Drag</b> to wander</span><span><b>Scroll</b> to look closer</span><span><b>/</b> to find a card</span></div>
+        </div>
+        <div id="selection-panel" class="selection-panel" hidden>
+          <header class="selection-header"><div><span id="selected-age" class="eyebrow"></span><h1 id="selected-name"></h1></div><button id="clear-selection" class="icon-button" aria-label="Clear selection">×</button></header>
+          <div id="selected-tags" class="tag-list"></div>
+          <div class="picture-toolbar"><span class="eyebrow">CARD VIEW</span><button id="expand-picture" class="text-button">Expand ↗</button></div>
+          <div id="selected-picture" class="picture-host"></div>
+          <div class="zone-controls"><label><input id="show-zones" type="checkbox" checked>Interactive zones</label><label id="hidden-zones-label" class="hidden-zones-label" hidden><input id="show-hidden-zones" type="checkbox">Include hidden</label></div>
+          <p id="zones-note" class="zones-note" hidden>Stored geometry only. Runtime visibility and behavior can change.</p>
+          <div id="zone-detail" class="zone-detail" hidden><div class="zone-detail-heading"><strong id="zone-name"></strong><button id="clear-zone" class="text-button">Clear</button></div><p id="zone-meta"></p><label for="zone-script" class="eyebrow">STORED SCRIPT · READ ONLY</label><pre id="zone-script"></pre></div>
+          <dl id="selected-facts" class="card-facts"></dl>
+          <section class="reference-section"><h2>Incoming <span id="incoming-count"></span></h2><div id="incoming-list" class="reference-list"></div></section>
+          <section class="reference-section"><h2>Outgoing <span id="outgoing-count"></span></h2><div id="outgoing-list" class="reference-list"></div></section>
+          <p class="inspector-footnote">A reference is not a promise of access. Puzzle state, message dispatch and saved returns are not executed here.</p>
+        </div>
+      </aside>
+    </main>
+    <div id="sr-announcement" class="sr-only" aria-live="polite"></div>
+  </div>
+
+  <dialog id="picture-dialog" class="picture-dialog">
+    <div class="dialog-shell"><header class="dialog-header"><div><span id="dialog-age" class="eyebrow"></span><h2 id="dialog-title">Card view</h2></div><button id="close-picture" class="icon-button" aria-label="Close enlarged view">×</button></header><div class="dialog-body"><div><div class="zone-controls"><label><input id="dialog-show-zones" type="checkbox" checked>Interactive zones</label><label id="dialog-hidden-zones-label" class="hidden-zones-label"><input id="dialog-show-hidden-zones" type="checkbox">Include hidden</label></div><div id="dialog-picture" class="picture-host large-picture"></div><p class="zones-note">Stored part rectangles, not live game controls. Runtime visibility can change.</p></div><aside id="dialog-zone" class="dialog-zone"><span class="eyebrow">INTERACTION ZONE</span><h3 id="dialog-zone-name">Select a zone</h3><p id="dialog-zone-meta">Hover over a rectangle or select it to inspect its stored script.</p><pre id="dialog-zone-script"></pre></aside></div></div>
+  </dialog>
+  <dialog id="help-dialog" class="help-dialog"><button id="close-help" class="icon-button" aria-label="Close shortcuts">×</button><span class="eyebrow">FIND YOUR WAY</span><h2>A few useful shortcuts.</h2><dl><dt>Drag / two fingers</dt><dd>Pan the atlas / pinch to zoom</dd><dt>Scroll, + or −</dt><dd>Zoom at the pointer or map center</dd><dt>Arrow keys</dt><dd>Move around the graph</dd><dt>F</dt><dd>Fit the selected Ages</dd><dt>/</dt><dd>Search every Age</dd><dt>Escape</dt><dd>Close a panel or clear the card</dd></dl><p>Connections and interaction zones are static source data. This viewer does not run the game.</p></dialog>
+  <script>window.DEMYSTIFY_GRAPH={{GRAPH_JSON}};</script>
+  <script>{{SCRIPT}}</script>
+</body>
+</html>

@@ -24,11 +24,12 @@ type Parser struct {
 }
 
 type HyperCardLink struct {
-	Source, Target   any // HyperCard stack or card
-	IsCrossAges      bool
-	IsNotImplemented bool // points to from another card, but does not exist
-	IsDisabled       bool // commented out script line
-	IsBacktracking   bool
+	Source, Target         any // HyperCard stack or card
+	IsCrossAges            bool
+	IsNotImplemented       bool // points to from another card, but does not exist
+	IsDisabled             bool // commented out script line
+	IsBacktracking         bool
+	IsSequenceContinuation bool
 
 	// Transitivity
 	TransitivityRank common.TransitivityRank
@@ -163,10 +164,11 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 	}
 	var links []*HyperCardLink
 	var handlers []int
+	sequence := p.newLiteralSequence(source, script)
 	handlerID := 0
 	handlerName := ""
 	pushed := false
-	for _, line := range script.lines {
+	for lineIndex, line := range script.lines {
 		// Handler declarations delimit independent sequences of commands.
 		// Nested `end if`/`end repeat` statements do not end a handler.
 		fields := strings.Fields(line.Line)
@@ -192,6 +194,7 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse command %q: %w", line.Line, err)
 		}
+		sequence.observe(lineIndex, line, link)
 		if link != nil {
 			link.IsDisabled = line.IsDisabled
 			if pushed && !link.IsDisabled {

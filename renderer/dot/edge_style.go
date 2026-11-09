@@ -17,6 +17,17 @@ func enrichTransitiveEdgeIDTooltip(tooltip *string, edge *common.Edge) {
 
 // applyEdgeStyle applies styling to an edge based on its attributes
 func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
+	style := g.applyNavigationStyle(edge, isOnCustomPath)
+	if edge.IsOfType(common.SequenceContinuation) {
+		if style.tooltip != "" {
+			style.tooltip += "; "
+		}
+		style.tooltip += "Ordered literal continuation (static script order; lifecycle handlers not evaluated)"
+	}
+	return style
+}
+
+func (g *Generator) applyNavigationStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := edgeStyle{}
 
 	// handle custom path styling first (the highest priority)
@@ -154,6 +165,10 @@ func (g *Generator) applyDisabledStyle(edge *common.Edge, style *edgeStyle) {
 
 // edgeAttributesMatch checks if two edges match in terms of their attributes
 func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
+	// Opposite ordered steps are separate records, not a bidirectional move.
+	if edge1.IsOfType(common.SequenceContinuation) || edge2.IsOfType(common.SequenceContinuation) {
+		return false
+	}
 	isEdge1Transitive := edge1.IsOfType(common.RestrictiveTransitivityTail) || edge1.IsOfType(common.RestrictiveTransitivityHead)
 	isEdge2Transitive := edge2.IsOfType(common.RestrictiveTransitivityTail) || edge2.IsOfType(common.RestrictiveTransitivityHead)
 

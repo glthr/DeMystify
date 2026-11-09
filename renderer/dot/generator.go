@@ -36,6 +36,14 @@ func NewGenerator(graph *graph.MystGraph, metadata *common.Metadata) *Generator 
 // Generate creates a DOT representation of the Myst Graph
 // NOTE: it would be preferable to use a library instead of performing string manipulations
 func (g *Generator) Generate(path []int64) (string, error) {
+	if err := g.prepare(path); err != nil {
+		return "", err
+	}
+	return g.buildDOT(), nil
+}
+
+// prepare creates render-local state shared by the original and flat outputs.
+func (g *Generator) prepare(path []int64) error {
 	g.customPath = append([]int64(nil), path...)
 	g.nodeStyles = make(map[int64]nodeStyle)
 
@@ -46,9 +54,9 @@ func (g *Generator) Generate(path []int64) (string, error) {
 
 	if g.config.IncludeAnalysis {
 		if err := g.applyAnalysisStyles(); err != nil {
-			return "", err
+			return err
 		}
 	}
 
-	return g.buildDOT(), nil
+	return nil
 }
