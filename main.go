@@ -24,7 +24,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("usage: go run main.go <xml_hypercard_files_directory_path>")
+		return fmt.Errorf("usage: go run . <hypercard_stacks_directory_path>")
 	}
 
 	// ensure that Neato is installed (to generate the PDF file)

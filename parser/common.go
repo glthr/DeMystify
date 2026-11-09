@@ -20,6 +20,7 @@ type Parser struct {
 	links         []*HyperCardLink
 	pushedLinks   map[*HyperCardLink]bool
 	stackHandlers map[*HyperCardStack]map[string]stackHandlerSummary
+	backgrounds   map[*HyperCardStack]backgroundScope
 }
 
 type HyperCardLink struct {
@@ -34,25 +35,17 @@ type HyperCardLink struct {
 	TransitivityID   int64
 }
 
+// NewParser detects native HyperCard data forks or an existing XML export.
 func NewParser(stacksDir string) (*Parser, error) {
-	p := &Parser{
-		stacksDir: stacksDir,
-	}
-
-	stacksPaths, err := p.getPaths()
+	corpus, err := LoadInput(stacksDir)
 	if err != nil {
 		return nil, err
 	}
-
-	if err = p.parseStacksAndCards(stacksPaths); err != nil {
-		return nil, err
+	p, err := NewParserFromCorpus(corpus)
+	if err == nil {
+		p.stacksDir = stacksDir
 	}
-
-	if err = p.identifyLinks(); err != nil {
-		return nil, err
-	}
-
-	return p, nil
+	return p, err
 }
 
 type Paths struct {
@@ -123,43 +116,6 @@ func findCardFiles(dir string) ([]string, error) {
 	}
 
 	return cardPaths, nil
-}
-
-func (p *Parser) parseStacksAndCards(stacksPaths []Paths) error {
-	for _, stackPath := range stacksPaths {
-		stack, cardIdNameMap, err := ParseStackFile(stackPath.stackFilepath)
-		if err != nil {
-			return err
-		}
-		if _, err := p.GetStackByName(stack.Name); err == nil {
-			return fmt.Errorf("duplicate stack name %q", stack.Name)
-		}
-		p.stacks = append(p.stacks, stack)
-
-		seenCards := make(map[int]bool, len(stackPath.cardsFilepaths))
-		for _, cardPath := range stackPath.cardsFilepaths {
-			card, parseErr := ParseSimpleCard(stack, cardPath, cardIdNameMap)
-			if parseErr != nil {
-				return parseErr
-			}
-			if seenCards[card.ID] {
-				return fmt.Errorf("duplicate card ID %d in stack %q", card.ID, stack.Name)
-			}
-			if len(stack.cardIDs) != 0 && !stack.cardIDs[card.ID] {
-				return fmt.Errorf("card ID %d is absent from stack %q manifest", card.ID, stack.Name)
-			}
-			seenCards[card.ID] = true
-
-			p.cards = append(p.cards, card)
-		}
-		for id := range stack.cardIDs {
-			if !seenCards[id] {
-				return fmt.Errorf("missing card ID %d declared in stack %q manifest", id, stack.Name)
-			}
-		}
-		p.prepareStackHandlers(stack, stackPath.stackRootDir)
-	}
-	return nil
 }
 
 func (p *Parser) identifyLinks() error {

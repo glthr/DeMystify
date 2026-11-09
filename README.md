@@ -6,7 +6,7 @@ DeMystify is an unofficial open-source project graph-based analysis of the class
 
 ## The Myst Graph
 
-The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,232 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the converted input files.
+The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,232 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
 
 The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled and backtracking edges. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
 
@@ -15,31 +15,14 @@ The analysis extracts links from supported HyperTalk commands without executing 
 ### Prerequisites
 
 *   A 1993 Myst CD-ROM (Macintosh)
-*   g++
 *   [Go](https://go.dev/doc/install)
 *   [Neato](https://graphviz.org/docs/layouts/neato/)
- 
-#### Convert the HyperCard Cards
 
-The Myst game uses HyperCard files, which need to be converted into a format that DeMystify can understand. This is done using the `stackimport` tool.
+Copy the six HyperCard stacks from the CD-ROM's `Myst Files` directory: `Channelwood Age`, `Dunny Age`, `Mechanical Age`, `Myst`, `Selenitic Age` and `Stoneship Age`. DeMystify reads these files directly into Go objects; no conversion tool or intermediate XML is required.
 
-*   **Get stackimport:** Download and install it from [https://github.com/uliwitness/stackimport](https://github.com/uliwitness/stackimport)
-*   **Compile stackimport:** 
+The native reader supports HyperCard 2.x format 10 data forks. It loads card and background identities, original card order, field text and stack/card/background/part HyperTalk scripts. It validates block boundaries and references and reports skipped blocks through `hypercard.Stack.Diagnostics`.
 
-    *   **Linux:** `$ g++ -o stackimport woba.cpp Tests.cpp picture.cpp main.cpp CStackFile.cpp CBuf.cpp byteutils.cpp -std=gnu++11`
-    *   **MacOS:** `$ g++ -o stackimport woba.cpp Tests.cpp picture.cpp main.cpp CStackFile.cpp CBuf.cpp byteutils.cpp snd2wav/snd2wav/snd2wav.cpp -std=gnu++11 -framework Carbon -framework CoreServices`
-
-*   **Copy the Myst Files:** Locate the `Myst Files` directory on your CD-ROM and copy it to a writable directory (*e.g.*, `Myst_decompiled_cards`).
-*   **Run stackimport:** Navigate to the directory containing the copied files and run the following commands:
-
-    ```bash
-    $ ./stackimport <path_to_stack>/Channelwood\ Age
-    $ ./stackimport <path_to_stack>/Dunny\ Age
-    $ ./stackimport <path_to_stack>/Mechanical\ Age
-    $ ./stackimport <path_to_stack>/Myst
-    $ ./stackimport <path_to_stack>/Selenitic\ Age
-    $ ./stackimport <path_to_stack>/Stoneship\ Age
-    ```
+It does not decode artwork, audio or movies, execute scripts, decrypt encrypted stacks, or open ISO/HFS images and MacBinary wrappers. OSA scripts are unsupported. Resource forks are unnecessary for the static graph. Neato is used to lay out and render the PDF.
 
 ### Generate the Myst Graph
 
@@ -47,12 +30,14 @@ The Myst game uses HyperCard files, which need to be converted into a format tha
 2.  **Run DeMystify:**
 
     ```bash
-    $ go run main.go <converted_files_directory_path>
+    $ go run . "/path/to/Myst Files"
     ```
 
-    *   Replace `<converted_files_directory_path>` with the path to the directory where you saved the converted stack files (*e.g.*, `/Users/Atrus/Myst_decompiled_cards`).
+    *   Use the directory containing the six original stacks. Previously converted XML stack directories remain supported and are detected automatically. If both input formats are present, select a directory containing only the format you want to use.
 3.  **Wait:** The graph generation process takes several minutes.
 4.  **The Myst Graph is generated:** The generated DOT and PDF files will be saved in the `generated` subdirectory.
+
+For programmatic use, `hypercard.ReadFile(path)` returns a decoded stack and `parser.NewParser(path)` accepts either a single native stack or a directory. `parser.LoadInput(path)` exposes the complete input model, including source offsets and diagnostics; `parser.NewParserFromCorpus(corpus)` analyzes an in-memory model without reopening its source files. The command above expects the complete six-stack Myst dataset.
 
 ### Add the publication border, header and footer
 

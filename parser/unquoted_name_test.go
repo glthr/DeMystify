@@ -77,12 +77,18 @@ func TestUnquotedNamesCheckOtherScriptsAndBackgrounds(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		write("stack_-1.xml", `<stack><background id="7" file="background_7.xml"/></stack>`)
+		write("stack_-1.xml", `<stack><name>Example</name><background id="7" file="background_7.xml"/><card id="1"/><card id="2" name="Black"/></stack>`)
 		write("background_7.xml", tc.text)
 		for _, card := range p.cards {
 			card.Filepath = filepath.Join(dir, fmt.Sprintf("card_%d.xml", card.ID))
-			write(filepath.Base(card.Filepath), `<card><owner>7</owner></card>`)
+			write(filepath.Base(card.Filepath), fmt.Sprintf(`<card><id>%d</id><owner>7</owner></card>`, card.ID))
 		}
+		var err error
+		p, err = NewParser(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		source, target = p.cards[0], p.cards[1]
 		link, err := p.parseCardCommand(source, "go card Black")
 		if err != nil || (link != nil) != tc.want || tc.want && link.Target != target {
 			t.Fatalf("background scope: link=%+v err=%v want=%v", link, err, tc.want)
