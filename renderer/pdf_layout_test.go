@@ -3,6 +3,7 @@ package pdf
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,43 @@ import (
 
 	pdflayout "github.com/glthr/DeMystify/renderer/layout"
 )
+
+func TestPinnedPDFAndBrowserPreserveTheSamePreparedArrangement(t *testing.T) {
+	if _, err := exec.LookPath("neato"); err != nil {
+		t.Skip("Neato is not installed")
+	}
+	t.Chdir(t.TempDir())
+	const source = `digraph G {
+ graph[splines=true]; node[shape=box];
+ "1"[pos="40,-80!"]; "2"[pos="540,-280!"];
+ "1"->"2"[dir=both,arrowtail=odot];
+ }`
+	if err := os.WriteFile("placed.dot", []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	data, err := RenderPinnedPDFAndLayout("placed.dot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := pdflayout.FromJSON(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	standalone, err := pdflayout.RunPinned(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(shared, standalone) {
+		t.Fatal("PDF and HTML have different pinned drawing geometry")
+	}
+	first, second := shared.Nodes[0], shared.Nodes[1]
+	if math.Abs(second.X-first.X-500) > .01 || math.Abs(second.Y-first.Y-200) > .01 {
+		t.Fatalf("prepared relative positions changed: %+v %+v", first, second)
+	}
+	if len(shared.Edges) != 1 || len(shared.Edges[0].Head) == 0 || len(shared.Edges[0].Tail) == 0 {
+		t.Fatal("pinned routing lost an edge or arrow")
+	}
+}
 
 func TestRenderPDFAndLayoutShareOneNeatoInvocation(t *testing.T) {
 	if _, err := exec.LookPath("neato"); err != nil {

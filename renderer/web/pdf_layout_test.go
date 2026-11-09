@@ -163,3 +163,47 @@ func TestNormalizedGraphvizCoordinatesSurviveHTMLExport(t *testing.T) {
 		t.Fatal("Bezier route or Graphviz endpoint identity changed")
 	}
 }
+
+func TestLargeGraphvizRoundingDoesNotRejectValidNodeBoxes(t *testing.T) {
+	// The five-significant-digit pos/bb fields are coarser than the draw paths
+	// once coordinates exceed 10,000 points. Both center and bounds can round in
+	// opposite directions; width/height are independently rounded in inches.
+	raw := []byte(`{"bb":"0,0,13643,13935","objects":[
+ {"_gvid":0,"name":"0","pos":"60,200","width":"1.25","height":"0.55555556"},
+ {"_gvid":1,"name":"1","pos":"13593,10350","width":"1.3979","height":"0.43333"},
+ {"_gvid":2,"name":"2","pos":"420,200","width":"1.25","height":"0.55555556"}]}`)
+	drawing, err := pdflayout.FromJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := collectData(syntheticGraph(3), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := attachPDFLayout(&data, &drawing); err != nil {
+		t.Fatalf("valid large-coordinate rounding rejected: %v", err)
+	}
+	// Exercise independent rounding on the other axis as well.
+	drawing.Nodes[1].Y = 15
+	if err := attachPDFLayout(&data, &drawing); err != nil {
+		t.Fatalf("valid top-bound rounding rejected: %v", err)
+	}
+	drawing.Nodes[1].X += 2
+	if err := attachPDFLayout(&data, &drawing); err == nil {
+		t.Fatal("real out-of-bounds node accepted under rounding tolerance")
+	}
+}
+
+func TestPDFNodeCornerOverflowCannotBeHiddenByRoundingTolerance(t *testing.T) {
+	data, err := collectData(syntheticGraph(3), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drawing := syntheticPDFDrawing()
+	drawing.Bounds.MaxX = math.MaxFloat64
+	drawing.Nodes[1].X = math.MaxFloat64
+	drawing.Nodes[1].Width = math.MaxFloat64
+	if err := attachPDFLayout(&data, &drawing); err == nil {
+		t.Fatal("overflowing node corners accepted")
+	}
+}

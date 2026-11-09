@@ -11,6 +11,11 @@ import (
 
 // writeNodes writes all nodes with their styles to the DOT output
 func (g *Generator) writeNodes(buf *bytes.Buffer) {
+	g.writeNodesWithPositions(buf, nil)
+}
+
+// Positions are already validated and encoded as DOT coordinate pairs.
+func (g *Generator) writeNodesWithPositions(buf *bytes.Buffer, positions map[int64]string) {
 	customPathNodes := make(map[int64]bool)
 	for _, id := range g.customPath {
 		customPathNodes[id] = true
@@ -28,6 +33,7 @@ func (g *Generator) writeNodes(buf *bytes.Buffer) {
 		return nodeIDs[i] < nodeIDs[j]
 	})
 
+	written := make(map[int64]bool)
 	// process nodes in sorted order
 	for _, id := range nodeIDs {
 		nodeObj, nodeExists := g.nodeByID(id)
@@ -49,7 +55,27 @@ func (g *Generator) writeNodes(buf *bytes.Buffer) {
 				style.label = fmt.Sprintf("%d", id)
 			}
 		}
-		buf.WriteString(fmt.Sprintf("  \"%d\" [%s];\n", id, g.buildNodeStyleString(style)))
+		attributes := g.buildNodeStyleString(style)
+		if position, exists := positions[id]; exists {
+			if attributes != "" {
+				attributes += ", "
+			}
+			attributes += "pos=\"" + position + "!\""
+		}
+		buf.WriteString(fmt.Sprintf("  \"%d\" [%s];\n", id, attributes))
+		written[id] = true
+	}
+	// Generate permits implied path endpoints outside the canonical inventory.
+	// Explicit pos-only declarations retain their inherited default node style.
+	var implicit []int64
+	for id := range positions {
+		if !written[id] {
+			implicit = append(implicit, id)
+		}
+	}
+	sort.Slice(implicit, func(i, j int) bool { return implicit[i] < implicit[j] })
+	for _, id := range implicit {
+		buf.WriteString(fmt.Sprintf("  \"%d\" [pos=\"%s!\"];\n", id, positions[id]))
 	}
 }
 

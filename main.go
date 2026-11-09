@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -27,13 +28,14 @@ Options:
   --assets directory         Decoded view images and optional images.json mappings
   --web-output directory     Browser export directory (default generated/web)
   --web-layout auto|pdf|atlas Browser placement (default auto: PDF when Neato is available)
+  --layout ages|original     Shared PDF graph arrangement (default ages)
 
 HTML exports open offline. The PDF layout requires Neato during generation;
 --web-layout atlas uses the built-in layout without Neato.
 `
 
 type outputOptions struct {
-	format, assetsDir, webDir, webLayout, input string
+	format, assetsDir, webDir, webLayout, arrangement, input string
 }
 
 func parseOutputOptions(args []string) (outputOptions, error) {
@@ -44,6 +46,7 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
 	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
 	flags.StringVar(&options.webLayout, "web-layout", "auto", "browser placement")
+	flags.StringVar(&options.arrangement, "layout", "ages", "shared PDF graph arrangement")
 	if err := flags.Parse(args); err != nil {
 		return options, fmt.Errorf("%s\n%w", usage, err)
 	}
@@ -62,6 +65,11 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	case "auto", "pdf", "atlas":
 	default:
 		return options, fmt.Errorf("%s\nunknown web layout %q", usage, options.webLayout)
+	}
+	switch options.arrangement {
+	case "ages", "original":
+	default:
+		return options, fmt.Errorf("%s\nunknown graph arrangement %q", usage, options.arrangement)
 	}
 	options.input = flags.Arg(0)
 	return options, nil
@@ -163,6 +171,39 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error generating the graph rendering: %w", err)
 	}
+	pinned := options.arrangement == "ages" && (usePDFLayout || options.format == "all" || options.format == "pdf")
+	if pinned {
+		fmt.Println("Arranging Ages and reducing within-Age crossings...")
+		flatDOT, err := dotGenerator.GenerateFlat(nil)
+		if err != nil {
+			return fmt.Errorf("preparing Age layout: %w", err)
+		}
+		ctx := context.Background()
+		original, err := pdflayout.PositionOnly(ctx, dotContent)
+		if err != nil {
+			return fmt.Errorf("preparing original placement: %w", err)
+		}
+		flat, err := pdflayout.PositionOnly(ctx, flatDOT)
+		if err != nil {
+			return fmt.Errorf("preparing alternative placement: %w", err)
+		}
+		groups := make(map[int64]string, len(original.Nodes))
+		for _, node := range metadata.Nodes {
+			group := node.StackName
+			if group == "" && node.IsOfType(common.IsStack) {
+				group = node.Name
+			}
+			groups[node.GraphID] = group
+		}
+		arranged, err := pdflayout.ArrangeAges(ctx, original, flat, groups)
+		if err != nil {
+			return fmt.Errorf("arranging Ages: %w", err)
+		}
+		dotContent, err = dotGenerator.GeneratePositioned(nil, arranged.Positions)
+		if err != nil {
+			return fmt.Errorf("saving Age placement: %w", err)
+		}
+	}
 
 	if err := os.MkdirAll(filepath.Dir(graphFilePath), 0755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
@@ -178,13 +219,21 @@ func run(args []string) error {
 		var value pdflayout.Drawing
 		if options.format == "all" {
 			var encoded []byte
-			encoded, err = pdf.RenderPDFAndLayout(graphFilePath)
+			if pinned {
+				encoded, err = pdf.RenderPinnedPDFAndLayout(graphFilePath)
+			} else {
+				encoded, err = pdf.RenderPDFAndLayout(graphFilePath)
+			}
 			if err == nil {
 				value, err = pdflayout.FromJSON(encoded)
 			}
 			pdfRendered = err == nil
 		} else {
-			value, err = pdflayout.Run(dotContent)
+			if pinned {
+				value, err = pdflayout.RunPinned(dotContent)
+			} else {
+				value, err = pdflayout.Run(dotContent)
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("preparing PDF-style browser layout (use --web-layout atlas for the built-in layout): %w", err)
@@ -209,6 +258,9 @@ func run(args []string) error {
 	}
 	if (options.format == "all" || options.format == "pdf") && !pdfRendered {
 		fmt.Println("Generating the PDF file...")
+		if pinned {
+			return pdf.RenderPinnedPDF(graphFilePath)
+		}
 		return pdf.RenderPDF(graphFilePath)
 	}
 	return nil

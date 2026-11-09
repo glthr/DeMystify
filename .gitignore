@@ -28,3 +28,4 @@ generated/graph.pdf
 # Local browser exports can contain original game imagery and scripts.
 /generated/web/
 /generated/.web-*/
+/generated/.demystify-web-*/

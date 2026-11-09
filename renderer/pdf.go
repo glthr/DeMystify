@@ -13,17 +13,28 @@ const pdfFilePath = "generated/graph.pdf"
 // RenderPDF generates a PDF visualization using Neato
 // NOTE: it would be great to replace this system call with a function call (library)
 func RenderPDF(dotFilePath string) error {
-	_, err := renderPDF(dotFilePath, false)
+	_, err := renderPDF(dotFilePath, false, false)
 	return err
 }
 
 // RenderPDFAndLayout emits PDF and Graphviz drawing JSON from one layout pass.
 // The browser can replay the same positions, splines and arrows as the PDF.
 func RenderPDFAndLayout(dotFilePath string) ([]byte, error) {
-	return renderPDF(dotFilePath, true)
+	return renderPDF(dotFilePath, true, false)
 }
 
-func renderPDF(dotFilePath string, withLayout bool) ([]byte, error) {
+// RenderPinnedPDF preserves the prepared node arrangement while routing edges.
+func RenderPinnedPDF(dotFilePath string) error {
+	_, err := renderPDF(dotFilePath, false, true)
+	return err
+}
+
+// RenderPinnedPDFAndLayout shares one pinned layout pass between PDF and HTML.
+func RenderPinnedPDFAndLayout(dotFilePath string) ([]byte, error) {
+	return renderPDF(dotFilePath, true, true)
+}
+
+func renderPDF(dotFilePath string, withLayout, pinned bool) ([]byte, error) {
 	// Graphviz does not accept "--"; absolute paths keep leading dashes literal.
 	dotInputPath, err := filepath.Abs(dotFilePath)
 	if err != nil {
@@ -45,6 +56,9 @@ func renderPDF(dotFilePath string, withLayout bool) ([]byte, error) {
 		"-Goverlap=false",
 		"-Gdpi=600",
 		dotInputPath, "-o", output.Name()}
+	if pinned {
+		args = append([]string{"-n2"}, args...)
+	}
 	var layoutPath string
 	if withLayout {
 		layout, err := os.CreateTemp(filepath.Dir(pdfFilePath), ".graph-*.json")

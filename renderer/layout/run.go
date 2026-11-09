@@ -25,6 +25,16 @@ func Run(dot string) (Drawing, error) {
 // RunContext bounds execution by both the caller and DefaultTimeout. It passes
 // DOT through stdin and never invokes a shell or treats a filename as an option.
 func RunContext(ctx context.Context, dot string) (Drawing, error) {
+	return runContext(ctx, dot, false)
+}
+
+// RunPinned routes connections around node positions already expressed in
+// points. Neato may translate the whole drawing, but does not rearrange nodes.
+func RunPinned(dot string) (Drawing, error) {
+	return runContext(context.Background(), dot, true)
+}
+
+func runContext(ctx context.Context, dot string, pinned bool) (Drawing, error) {
 	if ctx == nil {
 		return Drawing{}, fmt.Errorf("layout context is nil")
 	}
@@ -33,7 +43,11 @@ func RunContext(ctx context.Context, dot string) (Drawing, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "neato", "-Tjson", "-Goverlap=false", "-Gdpi=600")
+	args := []string{"-Tjson", "-Goverlap=false", "-Gdpi=600"}
+	if pinned {
+		args = append(args, "-n2")
+	}
+	cmd := exec.CommandContext(ctx, "neato", args...)
 	cmd.Stdin = strings.NewReader(dot)
 	output := cappedOutput{maximum: maxJSONBytes}
 	diagnostic := cappedOutput{maximum: maxErrorBytes, discard: true}

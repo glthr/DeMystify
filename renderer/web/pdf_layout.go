@@ -31,7 +31,6 @@ func attachPDFLayout(data *graphData, drawing *pdflayout.Drawing) error {
 		expected[node.ID] = true
 	}
 	seen := make(map[int64]bool, len(drawing.Nodes))
-	const tolerance = 0.1 // Graphviz JSON geometry is rounded in points.
 	for _, node := range drawing.Nodes {
 		if !expected[node.ID] || seen[node.ID] {
 			return fmt.Errorf("PDF graph drawing has an unknown or duplicate node ID %d", node.ID)
@@ -40,7 +39,14 @@ func attachPDFLayout(data *graphData, drawing *pdflayout.Drawing) error {
 		if !finiteValues(node.X, node.Y, node.Width, node.Height) || node.Width <= 0 || node.Height <= 0 {
 			return fmt.Errorf("PDF graph drawing node %d has invalid geometry", node.ID)
 		}
-		if node.X-node.Width/2 < box.MinX-tolerance || node.X+node.Width/2 > box.MaxX+tolerance || node.Y-node.Height/2 < box.MinY-tolerance || node.Y+node.Height/2 > box.MaxY+tolerance {
+		left, right := node.X-node.Width/2, node.X+node.Width/2
+		top, bottom := node.Y-node.Height/2, node.Y+node.Height/2
+		if !finiteValues(left, right, top, bottom) {
+			return fmt.Errorf("PDF graph drawing node %d has overflowing geometry", node.ID)
+		}
+		toleranceX := pdfCoordinateTolerance(box.MinX, box.MaxX, node.X, node.Width)
+		toleranceY := pdfCoordinateTolerance(box.MinY, box.MaxY, node.Y, node.Height)
+		if box.MinX-left > toleranceX || right-box.MaxX > toleranceX || box.MinY-top > toleranceY || bottom-box.MaxY > toleranceY {
 			return fmt.Errorf("PDF graph drawing node %d lies outside its bounds", node.ID)
 		}
 	}
@@ -54,6 +60,22 @@ func attachPDFLayout(data *graphData, drawing *pdflayout.Drawing) error {
 	data.PDFLayout = drawing
 	data.Meta.DefaultLayout = "pdf"
 	return nil
+}
+
+// Graphviz's pos/bb strings use five significant digits. At 10,000 points the
+// final digit is a whole point, so independently rounded centers and bounds can
+// differ by up to one point. Width/height strings use inches; include the half-
+// size conversion's rounding too. Keep the ordinary small-drawing floor while
+// scaling only to the coordinate precision, not to a percentage of a node box.
+func pdfCoordinateTolerance(lower, upper, center, size float64) float64 {
+	quantum := func(value float64) float64 {
+		if value == 0 {
+			return 0
+		}
+		return math.Pow10(int(math.Floor(math.Log10(math.Abs(value)))) - 4)
+	}
+	magnitude := math.Max(math.Abs(lower), math.Max(math.Abs(upper), math.Abs(center)))
+	return math.Max(0.1, quantum(magnitude)+18*quantum(size/72)+1e-8)
 }
 
 func finiteValues(values ...float64) bool {

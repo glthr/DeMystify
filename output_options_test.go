@@ -12,7 +12,7 @@ func TestOutputOptionsKeepPDFAndAddBrowserExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.format != "all" || options.webDir != "generated/web" || options.webLayout != "auto" || options.input != "stacks" {
+	if options.format != "all" || options.webDir != "generated/web" || options.webLayout != "auto" || options.arrangement != "ages" || options.input != "stacks" {
 		t.Fatalf("default output: %+v", options)
 	}
 	options, err = parseOutputOptions([]string{"--format", "html", "--assets", "views", "--web-output", "viewer", "stacks"})
@@ -22,7 +22,11 @@ func TestOutputOptionsKeepPDFAndAddBrowserExport(t *testing.T) {
 	if options.format != "html" || options.assetsDir != "views" || options.webDir != "viewer" {
 		t.Fatalf("HTML options: %+v", options)
 	}
-	for _, args := range [][]string{{"--format", "unknown", "stacks"}, {"--web-output", "", "stacks"}, {"--web-layout", "unknown", "stacks"}, {"--missing", "stacks"}} {
+	options, err = parseOutputOptions([]string{"--layout", "original", "stacks"})
+	if err != nil || options.arrangement != "original" {
+		t.Fatalf("original arrangement: %+v, %v", options, err)
+	}
+	for _, args := range [][]string{{"--format", "unknown", "stacks"}, {"--web-output", "", "stacks"}, {"--web-layout", "unknown", "stacks"}, {"--layout", "unknown", "stacks"}, {"--missing", "stacks"}} {
 		if _, err := parseOutputOptions(args); err == nil {
 			t.Errorf("accepted %v", args)
 		}

@@ -6,7 +6,9 @@ DeMystify is an unofficial open-source project graph-based analysis of the class
 
 ## The Myst Graph
 
-The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,232 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
+The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,225 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
+
+Supported straight-line navigation sequences are represented step by step. For example, two successive literal `go` commands through an intermediate view become `start → intermediate → destination`, rather than two departures from the script's starting card. These continuations are distinct from saved push/pop returns. Branches, dynamic navigation and opaque calls limit which sequences can be resolved statically. Shared intermediate cards can combine continuations from different callers; path search does not retain that caller context. A graph step counts a card change, including automatic transitions, rather than a player click.
 
 The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled and backtracking edges. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
 
@@ -51,6 +53,8 @@ Open `generated/web/index.html` directly in your browser. The viewer works offli
 
 When Neato is installed, the browser starts with the PDF graph's organic placement, routed connections, arrow shapes and colors. Switch between **PDF graph** and **Image atlas** in the viewer. In the PDF view, the **Images** control switches between compact thumbnails and the original graph labels, retaining the same node boxes and positions. Card pictures and interaction zones remain available in the side panel in both views.
 
+Saved-return entries use the PDF's inverted arrowheads at both ends, including in the image atlas. They mark extracted push/pop navigation, such as entering a close-up with a saved return; they do not add an unconditional reverse connection to the graph.
+
 Use **Highlight nodes** to emphasize sources, sinks, isolated nodes, active self-references, page cards, absent targets or stacks. Multiple categories combine with OR. Other nodes stay in place and turn gray, along with their unrelated connections; they remain selectable and searchable. Clearing the highlights restores the normal colors. Age visibility controls remain independent.
 
 `--web-layout auto` is the default: use the PDF drawing when Neato is available, otherwise the built-in image atlas. Choose `--web-layout pdf` to require the PDF-style graph or `--web-layout atlas` to generate HTML without Neato. For example:
@@ -59,7 +63,9 @@ Use **Highlight nodes** to emphasize sources, sinks, isolated nodes, active self
 go run . --format html --web-layout pdf --assets "/path/to/views" "/path/to/Myst Files"
 ```
 
-When HTML and PDF are generated together, both use the same Graphviz layout pass. The browser stores its drawing locally and needs no Graphviz installation when opened.
+The default `--layout ages` arrangement groups cards by Age and chooses between two organic placements to reduce crossings within each Age. Small disconnected components stay near their own Age. Use `--layout original` to retain the original placement. This option controls the PDF and the browser's **PDF graph** together; the built-in **Image atlas** keeps its separate placement. DOT-only generation skips placement.
+
+When HTML and PDF are generated together, both use the same Graphviz layout pass, including node boxes, curved connections and arrowheads. The PDF contains labels; the browser can display pictures inside those same boxes. The browser stores its drawing locally and needs no Graphviz installation when opened.
 
 Enable **Interactive zones** on the selected view to inspect card and background buttons and fields. Select a zone to read its stored name, visibility/enabled flags and HyperTalk script. These are the geometry and flags saved in the stack; scripts can change them at runtime. The viewer inspects the static graph and does not execute the game.
 
