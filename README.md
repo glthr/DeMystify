@@ -16,7 +16,7 @@ The analysis extracts links from supported HyperTalk commands without executing 
 
 *   A 1993 Myst CD-ROM (Macintosh)
 *   [Go](https://go.dev/doc/install)
-*   [Neato](https://graphviz.org/docs/layouts/neato/)
+*   [Neato](https://graphviz.org/docs/layouts/neato/) for PDF output; HTML and DOT output work without it
 
 Copy the six HyperCard stacks from the CD-ROM's `Myst Files` directory: `Channelwood Age`, `Dunny Age`, `Mechanical Age`, `Myst`, `Selenitic Age` and `Stoneship Age`. DeMystify reads these files directly into Go objects; no conversion tool or intermediate XML is required.
 
@@ -35,9 +35,47 @@ It does not decode artwork, audio or movies, execute scripts, decrypt encrypted 
 
     *   Use the directory containing the six original stacks. Previously converted XML stack directories remain supported and are detected automatically. If both input formats are present, select a directory containing only the format you want to use.
 3.  **Wait:** The graph generation process takes several minutes.
-4.  **The Myst Graph is generated:** The generated DOT and PDF files will be saved in the `generated` subdirectory.
+4.  **The Myst Graph is generated:** DOT and PDF are saved in `generated`; open `generated/web/index.html` for the browser viewer.
 
 For programmatic use, `hypercard.ReadFile(path)` returns a decoded stack and `parser.NewParser(path)` accepts either a single native stack or a directory. `parser.LoadInput(path)` exposes the complete input model, including source offsets and diagnostics; `parser.NewParserFromCorpus(corpus)` analyzes an in-memory model without reopening its source files. The command above expects the complete six-stack Myst dataset.
+
+### Explore in a browser
+
+Generate the browser output with your decoded view images:
+
+```bash
+go run . --format html --assets "/path/to/views" "/path/to/Myst Files"
+```
+
+Open `generated/web/index.html` directly in your browser. The viewer works offline, with no server, CDN or JavaScript package installation. Scroll or pinch to zoom, drag to pan, use the zoom/fit controls, filter by Age, or search for a card ID, name or picture name. Zooming into the graph reveals view thumbnails inside its nodes. Selecting a card opens its larger view and incoming/outgoing connections.
+
+Enable **Interactive zones** on the selected view to inspect card and background buttons and fields. Select a zone to read its stored name, visibility/enabled flags and HyperTalk script. These are the geometry and flags saved in the stack; scripts can change them at runtime. The viewer inspects the static graph and does not execute the game.
+
+`--format all` (the default) produces HTML, PDF and DOT. `--format pdf` produces PDF and DOT; `--format dot` produces DOT alone. Use `--web-output /path/to/viewer` to choose the browser export directory. Without `--assets`, the viewer still provides the graph and interactive geometry, with missing views explicitly identified.
+
+The default `generated/web` export is ignored by Git because it contains local game imagery and scripts. Original assets are not included in the repository. Keep custom export/image directories outside Git or in an ignored local directory.
+
+The image directory can contain PNG, JPEG or GIF files. Stack subdirectories scope picture filenames and `card_<id>` filenames. For exact mappings, add an `images.json` file; its paths are relative to that directory:
+
+```json
+{"images":[
+  {"node":"Example Age:1","path":"views/start.png"},
+  {"stack":"Example Age","picture":"Courtyard-N","path":"views/courtyard.png"}
+]}
+```
+
+When a manifest is present, it defines the mappings. Ambiguous images stay unmapped and are reported. Matching pictures are copied and deduplicated into the browser export, with smaller thumbnails loaded as they enter the viewport. The originals remain unchanged.
+
+### Extract original view images
+
+The optional image extractor uses Python's standard library and [FFmpeg](https://ffmpeg.org/). Point it at the original `Myst Graphics` resource banks with their resource forks preserved, or at extracted `.rsrc`, MacBinary or AppleDouble bank files:
+
+```bash
+python3 scripts/extract_myst_images.py "/path/to/Myst Graphics" --output "/path/to/decoded views"
+go run . --format html --assets "/path/to/decoded views" "/path/to/Myst Files"
+```
+
+It decodes named PICT resources containing a single QuickTime SMC image and writes PNGs, an `images.json` catalogue and an extraction report. Source banks remain unchanged. Unsupported picture formats are reported. These images are stored base views; QuickDraw compositing, movies and runtime puzzle changes are not reconstructed. FFmpeg is needed only for this extraction step, not for graph import or the browser viewer.
 
 ### Add the publication border, header and footer
 

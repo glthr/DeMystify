@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -12,9 +14,49 @@ import (
 	"github.com/glthr/DeMystify/parser"
 	pdf "github.com/glthr/DeMystify/renderer"
 	"github.com/glthr/DeMystify/renderer/dot"
+	web "github.com/glthr/DeMystify/renderer/web"
 )
 
 const graphFilePath = "generated/graph.dot"
+
+const usage = `usage: go run . [options] <hypercard_stacks_directory_path>
+
+Options:
+  --format all|html|pdf|dot   Output formats (default all; DOT is always saved)
+  --assets directory         Decoded view images and optional images.json mappings
+  --web-output directory     Browser export directory (default generated/web)
+
+HTML exports open directly in a browser and do not require Neato.
+`
+
+type outputOptions struct {
+	format, assetsDir, webDir, input string
+}
+
+func parseOutputOptions(args []string) (outputOptions, error) {
+	var options outputOptions
+	flags := flag.NewFlagSet("demystify", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	flags.StringVar(&options.format, "format", "all", "output formats")
+	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
+	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
+	if err := flags.Parse(args); err != nil {
+		return options, fmt.Errorf("%s\n%w", usage, err)
+	}
+	if flags.NArg() != 1 {
+		return options, fmt.Errorf("%s", usage)
+	}
+	switch options.format {
+	case "all", "html", "pdf", "dot":
+	default:
+		return options, fmt.Errorf("%s\nunknown output format %q", usage, options.format)
+	}
+	if options.webDir == "" {
+		return options, fmt.Errorf("%s\nweb output directory is empty", usage)
+	}
+	options.input = flags.Arg(0)
+	return options, nil
+}
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -23,26 +65,30 @@ func main() {
 }
 
 func run(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: go run . <hypercard_stacks_directory_path>")
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		fmt.Print(usage)
+		return nil
 	}
-
-	// ensure that Neato is installed (to generate the PDF file)
-	// NOTE: should be refactored by using a library to create the PDF file,
-	// or render the graph in a different format
-	err := CheckNeatoInstalled()
+	options, err := parseOutputOptions(args)
 	if err != nil {
 		return err
 	}
-
-	stacksDir := args[0]
+	if options.format == "all" || options.format == "pdf" {
+		if err := CheckNeatoInstalled(); err != nil {
+			return err
+		}
+	}
 
 	// parser: extract information from the stacks and cards
 	fmt.Println("Parsing stacks and cards...")
 
-	p, err := parser.NewParser(stacksDir)
+	corpus, err := parser.LoadInput(options.input)
 	if err != nil {
 		return fmt.Errorf("unable to parse stacks and cards: %w", err)
+	}
+	p, err := parser.NewParserFromCorpus(corpus)
+	if err != nil {
+		return fmt.Errorf("unable to analyze stacks and cards: %w", err)
 	}
 
 	metadata, err := p.Process()
@@ -102,9 +148,26 @@ func run(args []string) error {
 		return fmt.Errorf("saving DOT file: %w", err)
 	}
 
-	fmt.Println("Generating the PDF file...")
-
-	return pdf.RenderPDF(graphFilePath)
+	if options.format == "all" || options.format == "html" {
+		fmt.Println("Generating the browser viewer...")
+		report, err := web.Write(options.webDir, metadata, web.Options{AssetsDir: options.assetsDir, InputDir: options.input, Corpus: &corpus})
+		if err != nil {
+			return fmt.Errorf("generating browser viewer: %w", err)
+		}
+		fmt.Printf("Browser viewer: %s\nCards with images: %d/%d\n", report.IndexPath, report.Images, metadata.TotalCards)
+		for i, warning := range report.Warnings {
+			if i == 3 {
+				fmt.Printf("%d additional image warnings\n", len(report.Warnings)-i)
+				break
+			}
+			fmt.Printf("Image note: %s\n", warning)
+		}
+	}
+	if options.format == "all" || options.format == "pdf" {
+		fmt.Println("Generating the PDF file...")
+		return pdf.RenderPDF(graphFilePath)
+	}
+	return nil
 }
 
 func ComputeShortestPath(

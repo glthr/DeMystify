@@ -34,6 +34,10 @@ To compare native import with XML produced from the same originals, set both `DE
 
 Format changed Go files with `gofmt`. The tests use synthetic stack and card data, so they do not require a Myst CD-ROM. When Graphviz is installed, the integration tests also validate generated DOT with `neato`; those checks are skipped when it is unavailable.
 
+When Node.js 18 or newer is available, the Go web exporter tests also run the viewer's synthetic DOM/canvas interaction tests. They can be run directly with `node --test renderer/web/viewer_test.cjs`. These exercise interaction logic; they do not replace a visual browser check.
+
+Run the optional media extractor's synthetic resource-fork and output-safety tests with `python3 -m unittest discover -s scripts -p test_extract_myst_images.py`. Original game images, banks, decoded catalogues and browser exports must stay outside Git; `generated/web` is ignored by default.
+
 ## License
 
 By submitting code changes, you agree that your contributions will be licensed under the same MIT license as the rest of the project.
