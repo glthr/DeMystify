@@ -6,11 +6,11 @@ DeMystify is an unofficial open-source project graph-based analysis of the class
 
 ## The Myst Graph
 
-The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,225 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
+The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,249 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
 
-Supported straight-line navigation sequences are represented step by step. For example, two successive literal `go` commands through an intermediate view become `start → intermediate → destination`, rather than two departures from the script's starting card. These continuations are distinct from saved push/pop returns. Branches, dynamic navigation and opaque calls limit which sequences can be resolved statically. Shared intermediate cards can combine continuations from different callers; path search does not retain that caller context. A graph step counts a card change, including automatic transitions, rather than a player click.
+A handler that requests several cards in a row keeps one connection from its own card to each of them. For two successive literal `go` commands through an intermediate view, that is `start → intermediate` and `start → destination`. The step `intermediate → destination` is recorded as well, as an automatic next step. It is drawn with a hollow arrowhead, and it keeps a view that the player only passes through from looking like a dead end. Path search does not follow these steps, so one click is never counted as several, and a view shared by several callers does not connect one caller to another's destination. They are distinct from saved push/pop returns. A sequence continues through the display, sound and wait commands of the shared Myst player; branches, dynamic navigation and other calls end it.
 
-The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled and backtracking edges. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
+The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled edges, backtracking edges and automatic next steps. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
 
 ## Generate the Myst Graph
 
@@ -53,7 +53,7 @@ Open `generated/web/index.html` directly in your browser. The viewer works offli
 
 When Neato is installed, the browser starts with the PDF graph's organic placement, routed connections, arrow shapes and colors. Switch between **PDF graph** and **Image atlas** in the viewer. In the PDF view, the **Images** control switches between compact thumbnails and the original graph labels, retaining the same node boxes and positions. Card pictures and interaction zones remain available in the side panel in both views.
 
-Saved-return entries use the PDF's inverted arrowheads at both ends, including in the image atlas. They mark extracted push/pop navigation, such as entering a close-up with a saved return; they do not add an unconditional reverse connection to the graph.
+Saved-return entries use the PDF's inverted arrowheads at both ends, including in the image atlas. They mark extracted push/pop navigation, such as entering a close-up with a saved return; they do not add an unconditional reverse connection to the graph. Automatic next steps end in a hollow arrowhead in both views.
 
 Use **Highlight nodes** to emphasize sources, sinks, isolated nodes, active self-references, page cards, absent targets or stacks. Multiple categories combine with OR. Other nodes stay in place and turn gray, along with their unrelated connections; they remain selectable and searchable. Clearing the highlights restores the normal colors. Age visibility controls remain independent.
 
