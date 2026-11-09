@@ -43,5 +43,9 @@ jobs:
       # without it.
       - name: Test
         run: go test -race ./...
-      - name: Test the image extractor
-        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      # The framing tests need the pinned PDF libraries; install them privately.
+      - name: Test the optional Python scripts
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pdf"
+          "$RUNNER_TEMP/pdf/bin/python" -m pip install --quiet -r scripts/requirements-pdf.txt
+          "$RUNNER_TEMP/pdf/bin/python" -m unittest discover -s scripts -p 'test_*.py'

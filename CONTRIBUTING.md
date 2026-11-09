@@ -38,7 +38,7 @@ Format changed Go files with `gofmt`. The tests use synthetic stack and card dat
 
 When Node.js 18 or newer is available, the Go web exporter tests also run the viewer's synthetic DOM/canvas interaction tests. They can be run directly with `node --test renderer/web/viewer_test.cjs`. These exercise interaction logic; they do not replace a visual browser check.
 
-Run the optional media extractor's synthetic resource-fork and output-safety tests with `python3 -m unittest discover -s scripts -p test_extract_myst_images.py`. Original game images, banks, decoded catalogues and browser exports must stay outside Git; `generated/web` is ignored by default.
+Run the optional scripts' tests with `python3 -m unittest discover -s scripts -p 'test_*.py'`. They cover the media extractor's synthetic resource forks and output safety, and the publication framing; the framing tests are skipped unless the libraries in `scripts/requirements-pdf.txt` are installed. Original game images, banks, decoded catalogues and browser exports must stay outside Git; `generated/web` is ignored by default.
 
 ## License
 

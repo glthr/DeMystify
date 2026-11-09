@@ -5,6 +5,7 @@ from datetime import date
 from io import BytesIO
 import os
 from pathlib import Path
+import stat
 from tempfile import NamedTemporaryFile
 
 from pypdf import PdfReader, PdfWriter
@@ -52,6 +53,9 @@ def frame_graph(source, destination, updated, subtitle):
         with NamedTemporaryFile(dir=destination.parent, suffix=".pdf", delete=False) as output:
             temporary = Path(output.name)
             writer.write(output)
+        # The temporary file is owner-only; publish the framed PDF as readable as
+        # the graph it frames. The owner keeps write access.
+        temporary.chmod(stat.S_IMODE(source.stat().st_mode) | stat.S_IWUSR)
         os.replace(temporary, destination)
     finally:
         if temporary is not None:
