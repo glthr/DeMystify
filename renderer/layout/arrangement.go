@@ -42,7 +42,7 @@ func PositionOnly(ctx context.Context, dot string) (Drawing, error) {
 	if len(dot) > maxDOTBytes {
 		return Drawing{}, fmt.Errorf("DOT exceeds layout input size limit")
 	}
-	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, seedTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "neato", "-Tjson", "-Gdpi=600", "-Gsplines=line")
 	cmd.Stdin = strings.NewReader(dot)
@@ -112,7 +112,7 @@ func ArrangeAges(ctx context.Context, original, flat Drawing, groupByID map[int6
 	if ctx == nil {
 		return Arrangement{}, fmt.Errorf("layout context is nil")
 	}
-	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, seedTimeout)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return Arrangement{}, err

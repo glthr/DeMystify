@@ -10,11 +10,18 @@ import (
 )
 
 const (
-	maxJSONBytes   = 64 << 20
-	maxDOTBytes    = 16 << 20
-	maxErrorBytes  = 64 << 10
+	maxJSONBytes  = 64 << 20
+	maxDOTBytes   = 16 << 20
+	maxErrorBytes = 64 << 10
+	// DefaultTimeout bounds the short seed layouts and the placement search of
+	// the Age arrangement. Routing the complete graph takes minutes, and more
+	// on a slow or busy machine, so it has no fixed limit: like the PDF render,
+	// it ends when Neato does or when the caller cancels its context.
 	DefaultTimeout = 5 * time.Minute
 )
+
+// seedTimeout is DefaultTimeout; tests shorten it.
+var seedTimeout = DefaultTimeout
 
 // Run uses the same Neato layout flags as PDF rendering. The JSON output uses
 // points regardless of the raster DPI, so the browser must not multiply by 600.
@@ -22,8 +29,8 @@ func Run(dot string) (Drawing, error) {
 	return RunContext(context.Background(), dot)
 }
 
-// RunContext bounds execution by both the caller and DefaultTimeout. It passes
-// DOT through stdin and never invokes a shell or treats a filename as an option.
+// RunContext runs until Neato ends or the caller cancels ctx. It passes DOT
+// through stdin and never invokes a shell or treats a filename as an option.
 func RunContext(ctx context.Context, dot string) (Drawing, error) {
 	return runContext(ctx, dot, false)
 }
@@ -41,8 +48,6 @@ func runContext(ctx context.Context, dot string, pinned bool) (Drawing, error) {
 	if len(dot) > maxDOTBytes {
 		return Drawing{}, fmt.Errorf("DOT exceeds layout input size limit")
 	}
-	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
-	defer cancel()
 	args := []string{"-Tjson", "-Goverlap=false", "-Gdpi=600"}
 	if pinned {
 		args = append(args, "-n2")
