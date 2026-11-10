@@ -71,6 +71,9 @@ func TestOriginalMystImport(t *testing.T) {
 		{"Mechanical Age:32201", "Mechanical Age:31976"},
 		{"Myst:87741", "Myst:56926"},
 		{"Myst:49781", "Myst:56926"},
+		// The fireplace button redisplays its own card before it shows the
+		// closed door and the lit panel; that redraw hides neither request.
+		{"Myst:61587", "Myst:63906"},
 	} {
 		if !g.HasEdge(pair[0], pair[1]) {
 			t.Errorf("missing sequence reference %s -> %s", pair[0], pair[1])
@@ -133,9 +136,9 @@ func mystInputProfile(t *testing.T, p *parser.Parser) (uint, int, bool) {
 		}
 		switch strings.ToLower(strings.Join(strings.Fields(part.Script), " ")) {
 		case "on mouseup 5119 end mouseup":
-			return 3248, 3274, false
+			return 3249, 3275, false
 		case "on mouseup go to card id 5119 end mouseup":
-			return 3249, 3275, true
+			return 3250, 3276, true
 		}
 	}
 	t.Fatal("unrecognized Dunny:5200 part-2 script; verify the original-data profile")

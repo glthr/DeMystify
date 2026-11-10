@@ -150,6 +150,37 @@ func TestLiteralSequenceRejectsControlFlowAndUnresolvedContexts(t *testing.T) {
 	}
 }
 
+// A handler may redisplay its own card before it moves on, as the Myst
+// fireplace button does. That request names no destination: it ends a run and
+// hides nothing else. Any other request that is not a literal card still hides
+// the handler, because it may leave the stack.
+func TestLiteralSequenceRedrawEndsARunWithoutHidingTheHandler(t *testing.T) {
+	step := func(from, to string) [][2]string { return [][2]string{{"Example:" + from, "Example:" + to}} }
+	for name, tc := range map[string]struct {
+		body string
+		want [][2]string
+	}{
+		"redraw first":       {"play \"SW kachunk\"\ngo card\nplay stop\ngo card id 2\ngo card id 3", step("2", "3")},
+		"this card first":    {"go this card\ngo card id 2\ngo card id 3", step("2", "3")},
+		"to this card first": {"go to this card\ngo card id 2\ngo card id 3", step("2", "3")},
+		"redraw last":        {"go card id 2\ngo card id 3\ngo card", step("2", "3")},
+		"redraw between":     {"go card id 2\ngo card\ngo card id 3", nil},
+		"redraw then a pair": {"go card id 2\ngo card\ngo card id 3\ngo card id 4", step("3", "4")},
+		"stack first":        {"go card id 4 of stack \"Example\"\ngo card id 2\ngo card id 3", nil},
+		"ordinal first":      {"go next\ngo card id 2\ngo card id 3", nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var got [][2]string
+			for _, edge := range sequenceEdges(sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+tc.body+"\nend mouseUp"))) {
+				got = append(got, [2]string{edge.Source.Name, edge.Target.Name})
+			}
+			if len(got) != len(tc.want) || len(got) == 1 && got[0] != tc.want[0] {
+				t.Fatalf("got continuations %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
 	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "vs direction", `vs "direction"`, `vs "left" & suffix`, `vs "left", 2`, "put navigator() into state",
 		// A parenthesized call could run a function of the imported stacks.

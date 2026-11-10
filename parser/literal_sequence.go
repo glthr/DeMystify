@@ -9,6 +9,8 @@ import (
 
 var (
 	sequenceLiteralGo = regexp.MustCompile(`(?i)^go(?:\s+to)?\s+card\s+(?:id\s+[0-9]+|"[^"]+"|[a-z][a-z0-9_]*)$`)
+	// A go that names no destination redisplays the card already showing.
+	sequenceRedrawGo = regexp.MustCompile(`(?i)^go(?:\s+to)?(?:\s+this)?\s+card$`)
 	// The direction is one literal word; scripts spell it with or without quotes.
 	sequenceVS     = regexp.MustCompile(`(?i)^vs\s+(?:left|right|up|down|"(?:left|right|up|down)")$`)
 	sequenceVisual = regexp.MustCompile(`(?i)^visual\s+effect\s+(?:cut|plain|dissolve|(?:scroll|wipe)\s+(?:left|right|up|down))(?:\s+(?:very\s+)?(?:fast|slow))?$`)
@@ -90,6 +92,11 @@ func linearSequenceHandler(handler handlerDefinition) bool {
 		case "if", "else", "repeat", "end", "exit", "next", "return", "pass", "push", "pop", "on", "function":
 			return false
 		case "go":
+			// A redraw changes neither the card nor the stack. It ends a run
+			// in observe, like any other command, and hides nothing else.
+			if sequenceRedrawGo.MatchString(command) {
+				continue
+			}
 			if !sequenceLiteralGo.MatchString(command) {
 				return false
 			}
