@@ -160,7 +160,7 @@ func TestLiteralSequenceRedrawEndsARunWithoutHidingTheHandler(t *testing.T) {
 		body string
 		want [][2]string
 	}{
-		"redraw first":       {"play \"SW kachunk\"\ngo card\nplay stop\ngo card id 2\ngo card id 3", step("2", "3")},
+		"redraw first":       {"play \"click\"\ngo card\nplay stop\ngo card id 2\ngo card id 3", step("2", "3")},
 		"this card first":    {"go this card\ngo card id 2\ngo card id 3", step("2", "3")},
 		"to this card first": {"go to this card\ngo card id 2\ngo card id 3", step("2", "3")},
 		"redraw last":        {"go card id 2\ngo card id 3\ngo card", step("2", "3")},
@@ -198,12 +198,12 @@ func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
 }
 
 func TestLiteralSequenceCrossesPlayerDisplaySoundAndWaitCommands(t *testing.T) {
-	for _, command := range []string{`play "SW kachunk"`, "play stop", "wait 20", `wait until the sound is "done"`, "wait until ready", "set cursor to none",
-		"vd", `dplay "DR SafeLatch"`, `playQT "MR Elev Room Loud MoV",,loop,50`, `playQT "",,"loop",volume * 2,,,,,true`, "soundidle", "SoundIdle",
-		`HTVisual "wipe up",,,1,32`, `htvisual "scroll down",,the rect of card button panel,1,4`, "htlock true", "htlock forcefalse",
+	for _, command := range []string{`play "click"`, "play stop", "wait 20", `wait until the sound is "done"`, "wait until ready", "set cursor to none",
+		"vd", `dplay "latch"`, `playQT "room tone",,loop,40`, `playQT "",,"loop",volume * 2,,,,,true`, "soundidle", "SoundIdle",
+		`HTVisual "wipe up",,,2,16`, `htvisual "scroll down",,the rect of card button "panel",2,8`, "htlock true", "htlock forcefalse",
 		// Parentheses inside a quoted name are text, not a call.
-		`htaddpict "vault controlpanel (sunk)",the rect of card button marker,"srccopy"`,
-		"play \"EL sharphum\"\nplay \"SW kachunk\"\nvs \"left\"\nset cursor to none -- trailing note"} {
+		`htaddpict "panel (lit)",the rect of card button "panel","srccopy"`,
+		"play \"hum\"\nplay \"click\"\nvs \"left\"\nset cursor to none -- trailing note"} {
 		t.Run(command, func(t *testing.T) {
 			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\nend mouseUp"))
 			edges := sequenceEdges(metadata)
