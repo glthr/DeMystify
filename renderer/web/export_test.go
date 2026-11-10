@@ -416,3 +416,113 @@ func TestWriteCopiesVersionedImagesAndKeepsEarlierViewsUsable(t *testing.T) {
 		t.Fatal("failed artwork refresh changed prior index")
 	}
 }
+
+// A directory made beforehand (mkdir, mktemp -d) is a normal place to export
+// to. Renaming the staging directory onto it fails on every platform.
+func TestWriteFillsAnExistingEmptyDirectory(t *testing.T) {
+	for _, withPictures := range []bool{false, true} {
+		base := t.TempDir()
+		target := filepath.Join(base, "atlas")
+		if err := os.Mkdir(target, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.Stat(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		options := Options{}
+		if withPictures {
+			options.AssetsDir = pictureSource(t, base, syntheticGraph(2))
+		}
+		report, err := Write(target, syntheticGraph(2), options)
+		if err != nil {
+			t.Fatalf("pictures=%v: %v", withPictures, err)
+		}
+		data, _ := readExport(t, report.IndexPath)
+		if len(data.Nodes) != 2 || withPictures != (data.Nodes[0].Image != "") {
+			t.Fatalf("pictures=%v: incomplete export: %+v", withPictures, data.Nodes)
+		}
+		if after, err := os.Stat(target); err != nil || !os.SameFile(before, after) || after.Mode() != before.Mode() {
+			t.Fatalf("pictures=%v: the caller's directory was replaced: %v", withPictures, err)
+		}
+		leftovers, _ := filepath.Glob(filepath.Join(base, ".demystify-web-*"))
+		if len(leftovers) != 0 {
+			t.Fatalf("pictures=%v: staging directory left behind: %v", withPictures, leftovers)
+		}
+	}
+}
+
+// Opening the pictures folder in a file manager adds a file of its own. That
+// must not block the next export, while a changed picture still must.
+func TestRefreshIgnoresForeignFilesBesideInstalledPictures(t *testing.T) {
+	base := t.TempDir()
+	metadata := syntheticGraph(2)
+	target, source := filepath.Join(base, "atlas"), pictureSource(t, base, metadata)
+	report, err := Write(target, metadata, Options{AssetsDir: source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, first := readExport(t, report.IndexPath)
+	picture, err := url.PathUnescape(data.Nodes[0].Image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed := filepath.Join(target, filepath.FromSlash(picture))
+	stray := filepath.Join(filepath.Dir(installed), ".DS_Store")
+	if err := os.WriteFile(stray, []byte("Bud1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Write(target, metadata, Options{AssetsDir: source}); err != nil {
+		t.Fatalf("a foreign file beside the pictures blocked the export: %v", err)
+	}
+	if second, _ := os.ReadFile(report.IndexPath); !bytes.Equal(first, second) {
+		t.Fatal("the same pictures produced another page")
+	}
+	if _, err := os.Stat(stray); err != nil {
+		t.Fatalf("the foreign file was removed: %v", err)
+	}
+	if err := os.WriteFile(installed, []byte("changed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = Write(target, metadata, Options{AssetsDir: source})
+	if err == nil || !strings.Contains(err.Error(), filepath.Base(installed)) {
+		t.Fatalf("a changed installed picture was accepted, or the error does not name it: %v", err)
+	}
+	if err := os.Remove(installed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Write(target, metadata, Options{AssetsDir: source}); err == nil {
+		t.Fatal("a missing installed picture was accepted")
+	}
+}
+
+func pictureSource(t *testing.T, base string, metadata *common.Metadata) string {
+	t.Helper()
+	source := filepath.Join(base, "original-pictures")
+	if err := os.Mkdir(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var entries []map[string]string
+	for _, node := range metadata.Nodes {
+		entries = append(entries, map[string]string{"path": "view.png", "node": node.Name})
+	}
+	encoded, err := json.Marshal(map[string]any{"images": entries})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "images.json"), encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	picture := image.NewRGBA(image.Rect(0, 0, 64, 40))
+	for i := range picture.Pix {
+		picture.Pix[i] = 200
+	}
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, picture); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "view.png"), buffer.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return source
+}
