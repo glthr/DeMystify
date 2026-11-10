@@ -6,11 +6,13 @@ DeMystify is an unofficial open-source project graph-based analysis of the class
 
 ## The Myst Graph
 
-The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,249 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
+The Myst Graph represents the game's cards as a network showing how they are connected. The generated full graph contains 1,364 nodes and 3,250 non-disabled directed connections, before reverse pairs are combined for display. Counts can vary with the input files.
 
-A handler that requests several cards in a row keeps one connection from its own card to each of them. For two successive literal `go` commands through an intermediate view, that is `start → intermediate` and `start → destination`. The step `intermediate → destination` is recorded as well, as an automatic next step. It is drawn with a hollow arrowhead, and it keeps a view that the player only passes through from looking like a dead end. Path search does not follow these steps, so one click is never counted as several, and a view shared by several callers does not connect one caller to another's destination. They are distinct from saved push/pop returns. A sequence continues through the display, sound and wait commands of the shared Myst player; branches, dynamic navigation and other calls end it.
+A handler that requests several cards in a row keeps one connection from its own card to each of them. For two successive literal `go` commands through an intermediate view, that is `start → intermediate` and `start → destination`. The step `intermediate → destination` is recorded as well, as an automatic next step. It is drawn with a hollow arrowhead, and it keeps a view that the player only passes through from looking like a dead end. Where an ordinary connection joins the same two cards in the same direction, both share one line: the filled arrowhead comes first and the hollow one follows it. Path search does not follow these steps, so one click is never counted as several, and a view shared by several callers does not connect one caller to another's destination. They are distinct from saved push/pop returns. A sequence continues through the display, sound and wait commands of the shared Myst player. A `go` that only redisplays the current card, dynamic navigation and any other call end it. A handler that contains a condition, a loop, an exit or a saved return is not read as a sequence at all.
 
 The analysis extracts links from supported HyperTalk commands without executing the scripts. Shortest paths describe the static card graph and exclude disabled edges, backtracking edges and automatic next steps. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
+
+In the same way, a sink flag means that no outgoing connection was extracted, not that the player is stuck. A close-up that is left through a saved return carries it, and so does a view that a script shows and leaves inside a condition, through a helper handler or on the way to another stack.
 
 ## Generate the Myst Graph
 
@@ -37,7 +39,7 @@ It does not decode artwork, audio or movies, execute scripts, decrypt encrypted 
 
     *   Use the directory containing the six original stacks. Previously converted XML stack directories remain supported and are detected automatically. If both input formats are present, select a directory containing only the format you want to use.
 3.  **Wait:** The graph generation process takes several minutes.
-4.  **The Myst Graph is generated:** DOT and PDF are saved in `generated`; open `generated/web/index.html` for the browser viewer.
+4.  **The Myst Graph is generated:** DOT and PDF are saved in `generated`; open `generated/web/index.html` for the browser viewer. The run also prints the number of records, the source, sink and isolated flags, and the largest shortest distance with its two cards.
 
 For programmatic use, `hypercard.ReadFile(path)` returns a decoded stack and `parser.NewParser(path)` accepts either a single native stack or a directory. `parser.LoadInput(path)` exposes the complete input model, including source offsets and diagnostics; `parser.NewParserFromCorpus(corpus)` analyzes an in-memory model without reopening its source files. The command above expects the complete six-stack Myst dataset.
 
@@ -53,7 +55,7 @@ Open `generated/web/index.html` directly in your browser. The viewer works offli
 
 When Neato is installed, the browser starts with the PDF graph's organic placement, routed connections, arrow shapes and colors. Switch between **PDF graph** and **Image atlas** in the viewer. In the PDF view, the **Images** control switches between compact thumbnails and the original graph labels, retaining the same node boxes and positions. Card pictures and interaction zones remain available in the side panel in both views.
 
-Saved-return entries use the PDF's inverted arrowheads at both ends, including in the image atlas. They mark extracted push/pop navigation, such as entering a close-up with a saved return; they do not add an unconditional reverse connection to the graph. Automatic next steps end in a hollow arrowhead in both views.
+Saved-return entries use the PDF's inverted arrowheads at both ends, including in the image atlas. They mark extracted push/pop navigation, such as entering a close-up with a saved return; they do not add an unconditional reverse connection to the graph. Automatic next steps end in a hollow arrowhead in both views; in the PDF view, a step that shares its line with an ordinary connection shows the hollow arrowhead behind the filled one.
 
 Use **Highlight nodes** to emphasize sources, sinks, isolated nodes, active self-references, page cards, absent targets or stacks. Multiple categories combine with OR. Other nodes stay in place and turn gray, along with their unrelated connections; they remain selectable and searchable. Clearing the highlights restores the normal colors. Age visibility controls remain independent.
 
