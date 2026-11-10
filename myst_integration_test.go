@@ -35,7 +35,7 @@ func TestOriginalMystImport(t *testing.T) {
 	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
-	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 51 || isolated != 19 {
+	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 50 || isolated != 19 {
 		t.Fatalf("unexpected source/sink/isolated counts: %d/%d/%d", sources, sinks, isolated)
 	}
 	for _, pair := range [][2]string{
@@ -74,6 +74,11 @@ func TestOriginalMystImport(t *testing.T) {
 		// The fireplace button redisplays its own card before it shows the
 		// closed door and the lit panel; that redraw hides neither request.
 		{"Myst:61587", "Myst:63906"},
+		// A run inside one branch of a condition, and one that leaves a branch
+		// by its end: the tunnel exit is shown inside a condition, and the handler
+		// goes on below it.
+		{"Selenitic Age:7689", "Selenitic Age:42081"},
+		{"Stoneship Age:38754", "Stoneship Age:34007"},
 	} {
 		if !g.HasEdge(pair[0], pair[1]) {
 			t.Errorf("missing sequence reference %s -> %s", pair[0], pair[1])
@@ -105,14 +110,16 @@ func TestOriginalMystImport(t *testing.T) {
 			}
 		}
 	}
-	if classes[common.Backtracking] != 47 || classes[common.Disabled] != 9 || classes[common.NotImplemented] != 3 || classes[common.CrossAge] != 21 ||
+	if classes[common.Backtracking] != 47 || classes[common.Disabled] != 26 || classes[common.NotImplemented] != 3 || classes[common.CrossAge] != 21 ||
 		classes[common.RestrictiveTransitivityTail] != 5 || classes[common.RestrictiveTransitivityHead] != 5 {
 		t.Errorf("unexpected record classes: saved returns=%d disabled=%d absent targets=%d between Ages=%d paired tails=%d paired heads=%d",
 			classes[common.Backtracking], classes[common.Disabled], classes[common.NotImplemented], classes[common.CrossAge],
 			classes[common.RestrictiveTransitivityTail], classes[common.RestrictiveTransitivityHead])
 	}
-	if self := len(g.FindNodesWithSelfLoops()); self != 20 {
-		t.Errorf("got %d nodes with an active reference to themselves, want 20", self)
+	// Eleven marker buttons and six lever buttons hold a body whose handler
+	// declaration was commented out: 17 of the 26 disabled records.
+	if self := len(g.FindNodesWithSelfLoops()); self != 9 {
+		t.Errorf("got %d nodes with an active reference to themselves, want 9", self)
 	}
 	verifySharedStackHandlerEntries(t, g)
 	localDistance := float64(3)
@@ -145,7 +152,7 @@ func TestOriginalMystImport(t *testing.T) {
 	}
 }
 
-// The 31 automatic next steps of the six stacks, sorted.
+// The 37 automatic next steps of the six stacks, sorted.
 var automaticNextSteps = []string{
 	"Channelwood Age:45661 -> Channelwood Age:44320",
 	"Channelwood Age:45661 -> Channelwood Age:85222",
@@ -170,6 +177,7 @@ var automaticNextSteps = []string{
 	"Myst:37752 -> Myst:37618",
 	"Myst:57929 -> Myst:45039",
 	"Myst:60085 -> Myst:60372",
+	"Myst:61587 -> Myst:56926",
 	"Myst:61587 -> Myst:63906",
 	"Myst:85634 -> Myst:52926",
 	"Myst:85634 -> Myst:64906",
@@ -177,7 +185,12 @@ var automaticNextSteps = []string{
 	"Myst:90595 -> Myst:88671",
 	"Myst:90595 -> Myst:89742",
 	"Myst:90595 -> Myst:90877",
+	"Selenitic Age:7689 -> Selenitic Age:42081",
 	"Selenitic Age:7689 -> Selenitic Age:7990",
+	"Stoneship Age:38754 -> Stoneship Age:29287",
+	"Stoneship Age:38754 -> Stoneship Age:30263",
+	"Stoneship Age:38754 -> Stoneship Age:34007",
+	"Stoneship Age:38754 -> Stoneship Age:34998",
 }
 
 // Identify the two verified input snapshots from the loaded stacks themselves,
@@ -203,9 +216,9 @@ func mystInputProfile(t *testing.T, dir string) (uint, int, bool) {
 				}
 				switch strings.ToLower(strings.Join(strings.Fields(part.Script.Text), " ")) {
 				case "on mouseup 5119 end mouseup":
-					return 3249, 3275, false
+					return 3243, 3287, false
 				case "on mouseup go to card id 5119 end mouseup":
-					return 3250, 3276, true
+					return 3244, 3288, true
 				}
 			}
 		}

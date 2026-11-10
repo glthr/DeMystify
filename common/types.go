@@ -42,11 +42,13 @@ const (
 	Backtracking
 	RestrictiveTransitivityTail
 	RestrictiveTransitivityHead
-	// SequenceContinuation is the step from a view that a linear handler has
-	// just requested to the next one it requests. The handler's own card keeps
-	// its reference to both. The continuation is displayed and counts as an
-	// outgoing reference, but path search does not follow it: one action is not
-	// several steps, and a view shared by callers does not join their routes.
+	// SequenceContinuation is the step from a view that a handler has just
+	// requested to the next one it requests, with nothing but display, sound
+	// and wait commands or the end of a branch between the two requests. The
+	// handler's own card keeps its reference to both. The continuation is
+	// displayed and counts as an outgoing reference, but path search does not
+	// follow it: one action is not several steps, and a view shared by callers
+	// does not join their routes.
 	SequenceContinuation
 )
 

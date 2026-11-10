@@ -158,6 +158,58 @@ func (p *Parser) identifyLinks() error {
 	return nil
 }
 
+var removedDeclaration = regexp.MustCompile(`(?i)^--+\s*(?:on|function)\s+([a-z][a-z0-9_]*)`)
+
+// removedBodies marks the lines left behind by a handler whose declaration was
+// commented out while its body and its end line were not:
+//
+//	--on mouseUp
+//	go this card
+//	end mouseUp
+//
+// Such a body belongs to no handler, so HyperCard never runs it. The matching
+// end line is required: a comment that merely begins with "on" removes nothing.
+func removedBodies(script HyperTalk) []bool {
+	removed := make([]bool, len(script.lines))
+	live := ""
+	for i := 0; i < len(script.lines); i++ {
+		command := activeCommand(script.lines[i])
+		if m := handlerDeclaration.FindStringSubmatch(command); m != nil {
+			live = m[2]
+			continue
+		}
+		if live != "" {
+			if endsHandler(command, live) {
+				live = ""
+			}
+			continue
+		}
+		m := removedDeclaration.FindStringSubmatch(strings.TrimSpace(script.lines[i].Line))
+		if m == nil {
+			continue
+		}
+		for j := i + 1; j < len(script.lines); j++ {
+			next := activeCommand(script.lines[j])
+			if handlerDeclaration.MatchString(next) {
+				break
+			}
+			if endsHandler(next, m[1]) {
+				for k := i + 1; k < j; k++ {
+					removed[k] = true
+				}
+				i = j
+				break
+			}
+		}
+	}
+	return removed
+}
+
+func endsHandler(command, name string) bool {
+	fields := strings.Fields(command)
+	return len(fields) == 2 && strings.EqualFold(fields[0], "end") && strings.EqualFold(fields[1], name)
+}
+
 func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityID *int64) ([]*HyperCardLink, error) {
 	if p.pushedLinks == nil {
 		p.pushedLinks = make(map[*HyperCardLink]bool)
@@ -165,10 +217,20 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 	var links []*HyperCardLink
 	var handlers []int
 	sequence := p.newLiteralSequence(source, script)
+	removed := removedBodies(script)
 	handlerID := 0
 	handlerName := ""
 	pushed := false
 	for lineIndex, line := range script.lines {
+		// A removed body is read as commented lines, and as a sequence of its
+		// own: its references are disabled, and it sets no card state.
+		if removed[lineIndex] != (lineIndex > 0 && removed[lineIndex-1]) {
+			handlerID++
+			pushed = false
+		}
+		if removed[lineIndex] && !strings.HasPrefix(strings.TrimSpace(line.Line), "--") {
+			line = ScriptLine{Line: "--" + line.Line, IsDisabled: true}
+		}
 		// Handler declarations delimit independent sequences of commands.
 		// Nested `end if`/`end repeat` statements do not end a handler.
 		fields := strings.Fields(line.Line)
