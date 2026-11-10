@@ -19,13 +19,23 @@ func enrichTransitiveEdgeIDTooltip(tooltip *string, edge *common.Edge) {
 func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := g.applyNavigationStyle(edge, isOnCustomPath)
 	if edge.IsOfType(common.SequenceContinuation) {
-		if style.tooltip != "" {
-			style.tooltip += "; "
+		style.tooltip = joinTooltip(style.tooltip, continuationTooltip)
+		// A hollow head marks the automatic step. The calling card keeps its own
+		// reference to the same view, drawn with an ordinary arrow.
+		if style.arrowhead == "" {
+			style.arrowhead = continuationArrow
 		}
-		style.tooltip += "Ordered literal continuation (static script order; lifecycle handlers not evaluated)"
 	}
 	return style
 }
+
+const (
+	continuationTooltip = "Automatic next step (static script order; not followed by path search)"
+	continuationArrow   = "onormal"
+	// On a stroke shared with an ordinary reference, the filled head comes
+	// first and the hollow head follows it.
+	sharedContinuationArrow = "normalonormal"
+)
 
 func (g *Generator) applyNavigationStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := edgeStyle{}

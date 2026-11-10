@@ -302,26 +302,65 @@ func directoryDigest(root string) (string, error) {
 		if err != nil {
 			return err
 		}
-		file, err := os.Open(name)
+		digest, err := fileDigest(name)
 		if err != nil {
 			return err
 		}
-		fileHash := sha256.New()
-		_, copyErr := io.Copy(fileHash, file)
-		closeErr := file.Close()
-		if copyErr != nil {
-			return copyErr
-		}
-		if closeErr != nil {
-			return closeErr
-		}
-		fmt.Fprintf(hash, "%s\x00%x\n", filepath.ToSlash(rel), fileHash.Sum(nil))
+		fmt.Fprintf(hash, "%s\x00%x\n", filepath.ToSlash(rel), digest)
 		return nil
 	})
 	if err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func fileDigest(name string) ([]byte, error) {
+	file, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	hash := sha256.New()
+	_, copyErr := io.Copy(hash, file)
+	if closeErr := file.Close(); copyErr == nil {
+		copyErr = closeErr
+	}
+	if copyErr != nil {
+		return nil, copyErr
+	}
+	return hash.Sum(nil), nil
+}
+
+// verifyInstalledArtwork checks that an artwork version already in the output
+// holds every staged file with the same bytes. Anything else in that directory
+// is not part of the export and is left alone: a file manager's .DS_Store or
+// Thumbs.db must not make every later export fail.
+func verifyInstalledArtwork(staged, installed string) error {
+	return filepath.WalkDir(staged, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(staged, name)
+		if err != nil {
+			return err
+		}
+		existing := filepath.Join(installed, rel)
+		mismatch := fmt.Errorf("existing HTML artwork %s does not match this export: %s", installed, filepath.ToSlash(rel))
+		if info, err := os.Lstat(existing); err != nil || !info.Mode().IsRegular() {
+			return mismatch
+		}
+		want, err := fileDigest(name)
+		if err != nil {
+			return err
+		}
+		if got, err := fileDigest(existing); err != nil || !bytes.Equal(got, want) {
+			return mismatch
+		}
+		return nil
+	})
 }
 
 func writeSynced(name string, data []byte) error {
@@ -352,19 +391,8 @@ func publish(stage, target, version string) error {
 	} else if err != nil {
 		return err
 	}
-	entries, err := os.ReadDir(target)
-	if err != nil {
-		return err
-	}
-	if len(entries) == 0 {
-		// POSIX rename can also atomically replace an empty destination dir.
-		// On platforms that refuse this form, the unchanged empty directory
-		// remains safe and the error is returned before installing any files.
-		if err := os.Rename(stage, target); err != nil {
-			return fmt.Errorf("publishing HTML into empty directory: %w", err)
-		}
-		return nil
-	}
+	// An existing directory, empty or already holding an export, is filled in
+	// place: os.Rename does not replace a directory, even an empty one.
 	if version != "" {
 		destination := filepath.Join(target, version)
 		if _, err := os.Lstat(destination); os.IsNotExist(err) {
@@ -373,11 +401,8 @@ func publish(stage, target, version string) error {
 			}
 		} else if err != nil {
 			return err
-		} else {
-			actual, err := directoryDigest(destination)
-			if err != nil || "images-"+actual != version {
-				return fmt.Errorf("existing HTML artwork version failed verification")
-			}
+		} else if err := verifyInstalledArtwork(filepath.Join(stage, version), destination); err != nil {
+			return err
 		}
 	}
 	if err := os.Rename(filepath.Join(stage, "index.html"), filepath.Join(target, "index.html")); err != nil {

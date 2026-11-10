@@ -10,6 +10,12 @@ import (
 	"gonum.org/v1/gonum/graph/multi"
 )
 
+// notTraversed reports whether a displayed edge is excluded from path search:
+// a saved return, or the automatic step that continues a caller's handler.
+func notTraversed(edge *common.Edge) bool {
+	return edge.IsOfType(common.Backtracking) || edge.IsOfType(common.SequenceContinuation)
+}
+
 func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 	if err := g.validateEdge(edge); err != nil {
 		return err
@@ -65,7 +71,7 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 			}
 		}
 	} else {
-		if edge.IsOfType(common.Backtracking) {
+		if notTraversed(edge) {
 			weight = math.Inf(1)
 		}
 		g.Graph.SetWeightedLine(multi.WeightedLine{
@@ -126,7 +132,7 @@ func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.
 			changed = true
 		}
 	}
-	if changed && (attribute == common.Disabled || attribute == common.Backtracking) {
+	if changed && (attribute == common.Disabled || attribute == common.Backtracking || attribute == common.SequenceContinuation) {
 		lines := g.Graph.WeightedLines(sourceID, targetID)
 		for lines.Next() {
 			line := lines.WeightedLine()

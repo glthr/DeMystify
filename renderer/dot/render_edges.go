@@ -27,14 +27,6 @@ func (g *Generator) renderEdge(buf *bytes.Buffer, fromID, toID int64, edge *comm
 	buf.WriteString(fmt.Sprintf("  \"%d\" -> \"%d\" [%s];\n", fromID, toID, styleStr))
 }
 
-// renderBidirectionalEdge renders a bidirectional edge to the buffer
-func (g *Generator) renderBidirectionalEdge(buf *bytes.Buffer, fromID, toID int64, edge *common.Edge) {
-	style := g.applyEdgeStyle(edge, false)
-	style.bidirectional = true
-	styleStr := g.buildEdgeStyleString(style)
-	buf.WriteString(fmt.Sprintf("  \"%d\" -> \"%d\" [%s];\n", fromID, toID, styleStr))
-}
-
 // renderSelfLoopEdge renders a self-loop edge to the buffer
 func (g *Generator) renderSelfLoopEdge(buf *bytes.Buffer, nodeID int64, edge *common.Edge, isOnPath bool) {
 	style := g.applyEdgeStyle(edge, isOnPath)
@@ -134,19 +126,25 @@ func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
 			}
 
 			// Keep both directions explicit when either is highlighted.
+			style := g.applyEdgeStyle(edge, false)
 			matched := false
 			if !pathPairs[pair] && !pathPairs[reversePair] {
 				for _, reverse := range groups[reversePair] {
 					if !reverse.used && g.edgeAttributesMatch(edge, reverse.edge) {
 						reverse.used = true
-						g.renderBidirectionalEdge(&bidirectional, pair.from, pair.to, edge)
+						style.bidirectional = true
+						g.shareStroke(&style, edge, groups[pair], groups[reversePair])
+						fmt.Fprintf(&bidirectional, "  \"%d\" -> \"%d\" [%s];\n", pair.from, pair.to, g.buildEdgeStyleString(style))
 						matched = true
 						break
 					}
 				}
 			}
 			if !matched {
-				g.renderEdge(&regular, pair.from, pair.to, edge, false)
+				if !pathPairs[pair] {
+					g.shareStroke(&style, edge, groups[pair], nil)
+				}
+				fmt.Fprintf(&regular, "  \"%d\" -> \"%d\" [%s];\n", pair.from, pair.to, g.buildEdgeStyleString(style))
 			}
 		}
 	}
@@ -179,4 +177,45 @@ func (g *Generator) renderMetadataEdges(buf *bytes.Buffer) {
 		highlighted[pair] = true
 	}
 	buf.WriteString("\n")
+}
+
+// shareStroke draws an automatic next step on the stroke of an ordinary
+// reference that joins the same two cards in the same direction: the hollow
+// head follows the filled one. Neato can route two strokes between the same
+// cards along one line, which would hide a hollow head under a filled one.
+func (g *Generator) shareStroke(style *edgeStyle, edge *common.Edge, forward, backward []*pendingEdge) {
+	if style.arrowhead != "" || style.arrowtail != "" || edge.IsOfType(common.SequenceContinuation) {
+		return
+	}
+	if g.takeHollowStep(forward) {
+		style.arrowhead = sharedContinuationArrow
+		style.tooltip = joinTooltip(style.tooltip, continuationTooltip)
+	}
+	if style.bidirectional && g.takeHollowStep(backward) {
+		style.arrowtail = sharedContinuationArrow
+		style.tooltip = joinTooltip(style.tooltip, continuationTooltip)
+	}
+}
+
+// takeHollowStep consumes one pending automatic next step that would otherwise
+// be a plain stroke with a hollow head.
+func (g *Generator) takeHollowStep(records []*pendingEdge) bool {
+	for _, record := range records {
+		if record.used || !record.edge.IsOfType(common.SequenceContinuation) {
+			continue
+		}
+		if own := g.applyEdgeStyle(record.edge, false); own != (edgeStyle{arrowhead: continuationArrow, tooltip: continuationTooltip}) {
+			continue
+		}
+		record.used = true
+		return true
+	}
+	return false
+}
+
+func joinTooltip(existing, addition string) string {
+	if existing == "" {
+		return addition
+	}
+	return existing + "; " + addition
 }

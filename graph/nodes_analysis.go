@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"slices"
+
 	"github.com/glthr/DeMystify/common"
 )
 
@@ -125,14 +127,28 @@ func (na *nodesAnalyzer) findIsolatedNodes() []common.NodeInfo {
 	return result
 }
 
-// findNodesWithSelfLoops identifies all nodes that have edges to themselves
+// findNodesWithSelfLoops lists the nodes with an active reference to
+// themselves. Every record from a node to itself is marked as a
+// self-reference, disabled or not: marking a disabled one only when an active
+// record sat beside it described the same kind of record in two ways.
 func (na *nodesAnalyzer) findNodesWithSelfLoops() []common.NodeInfo {
 	var result []common.NodeInfo
 
+	mark := func(edge *common.Edge) {
+		if edge.Source.GraphID == edge.Target.GraphID && !edge.IsOfType(common.SelfReference) {
+			edge.Attributes = append(slices.Clone(edge.Attributes), common.SelfReference)
+		}
+	}
+	for _, edge := range na.g.Metadata.Edges {
+		mark(edge)
+	}
+	for id, targets := range na.g.EdgeMap {
+		for i := range targets[id] {
+			mark(&targets[id][i])
+		}
+	}
 	for _, id := range na.g.traverser.getAllNodeIDs() {
-		// check if the node has an edge to itself
 		if na.g.HasEdgeFromTo(id, id) {
-			na.g.AddEdgeAttribute(id, id, common.SelfReference)
 			result = append(result, common.NodeInfo{
 				ID:   id,
 				Name: na.g.GetNameForID(id),

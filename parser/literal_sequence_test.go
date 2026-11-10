@@ -45,9 +45,10 @@ func sequenceEdges(metadata *common.Metadata) []*common.Edge {
 	return edges
 }
 
-func TestLiteralSequenceReplacesOwnerReferenceWithOrderedContinuation(t *testing.T) {
+func TestLiteralSequenceKeepsOwnerReferencesBesideOrderedContinuation(t *testing.T) {
 	// Like a doorway preview followed by the actual interior, both literal go
-	// commands belong to the original button handler, not the preview card.
+	// commands belong to the original button handler: its card refers to both
+	// views, and the preview continues to the interior.
 	corpus := sequenceCorpus("on mouseUp\ngo to card id 2\nvs left\ngo to card id 3\nhc\nsoundidle\nopenElevator\nend mouseUp")
 	corpus.Stacks[0].Script.Text = "on openElevator\nput \"Elevator Window.MooV\" into movieName\nMovie movieName\nend openElevator"
 	before, err := json.Marshal(corpus)
@@ -55,24 +56,50 @@ func TestLiteralSequenceReplacesOwnerReferenceWithOrderedContinuation(t *testing
 		t.Fatal(err)
 	}
 	metadata := sequenceMetadata(t, corpus)
-	if len(metadata.Edges) != 2 {
-		t.Fatalf("got %d edges, want the entry plus continuation", len(metadata.Edges))
+	if len(metadata.Edges) != 3 {
+		t.Fatalf("got %d edges, want the two owner references plus one continuation", len(metadata.Edges))
 	}
-	entry, continuation := metadata.Edges[0], metadata.Edges[1]
+	entry, direct, continuation := metadata.Edges[0], metadata.Edges[1], metadata.Edges[2]
 	if entry.Source.Name != "Example:1" || entry.Target.Name != "Example:2" || entry.IsOfType(common.SequenceContinuation) {
 		t.Fatalf("incorrect entry: %+v", entry)
+	}
+	if direct.Source.Name != "Example:1" || direct.Target.Name != "Example:3" || direct.IsOfType(common.SequenceContinuation) {
+		t.Fatalf("the owner lost its own reference to the second view: %+v", direct)
 	}
 	if continuation.Source.Name != "Example:2" || continuation.Target.Name != "Example:3" || !continuation.IsOfType(common.SequenceContinuation) || continuation.IsOfType(common.Backtracking) {
 		t.Fatalf("incorrect static continuation: %+v", continuation)
 	}
 	for _, edge := range metadata.Edges {
-		if edge.Target.Name == "Example:1" || edge.Source.Name == "Example:1" && edge.Target.Name == "Example:3" {
-			t.Fatalf("invented a reverse or retained the owner's second-step reference: %+v", edge)
+		if edge.Target.Name == "Example:1" {
+			t.Fatalf("invented a return to the calling card: %+v", edge)
 		}
 	}
 	after, err := json.Marshal(corpus)
 	if err != nil || string(after) != string(before) {
 		t.Fatalf("analysis changed original script evidence: %v", err)
+	}
+}
+
+func TestLiteralSequenceIgnoresRequestsThatAreNotSteps(t *testing.T) {
+	for name, tc := range map[string]struct {
+		script string
+		want   [][2]string
+	}{
+		// The owner's own references already record these requests.
+		"owner first":   {"go card id 1\nvs left\ngo card id 2", nil},
+		"same view":     {"go card id 2\ngo card id 2", nil},
+		"owner between": {"go card id 2\ngo card id 1\ngo card id 3", [][2]string{{"Example:2", "Example:1"}}},
+		"later step":    {"go card id 1\ngo card id 2\ngo card id 3", [][2]string{{"Example:2", "Example:3"}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var got [][2]string
+			for _, edge := range sequenceEdges(sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+tc.script+"\nend mouseUp"))) {
+				got = append(got, [2]string{edge.Source.Name, edge.Target.Name})
+			}
+			if len(got) != len(tc.want) || len(got) == 1 && got[0] != tc.want[0] {
+				t.Fatalf("got continuations %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -82,6 +109,9 @@ func TestLiteralSequenceSupportsResolvedNamesCommentsAndVisualEffects(t *testing
 		"quoted names":  "go card \"Transit\"\n-- ordinary explanation\n\nvisual effect dissolve fast\ngo card \"Destination\"",
 		"static names":  "go card Transit\nvs right\ngo card Destination",
 		"trailing note": "go card id 2 -- entered here\nvs left -- visual-only convention\ngo to card id 3",
+		// Both spellings pass the same literal direction to the same command.
+		"quoted direction": "go card id 2\nvs \"left\"\ngo to card id 3",
+		"quoted and cased": "go card id 2\nVS \"Right\" -- visual-only convention\ngo to card id 3",
 	} {
 		t.Run(name, func(t *testing.T) {
 			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+script+"\nend mouseUp"))
@@ -120,8 +150,43 @@ func TestLiteralSequenceRejectsControlFlowAndUnresolvedContexts(t *testing.T) {
 	}
 }
 
+// A handler may redisplay its own card before it moves on, as the Myst
+// fireplace button does. That request names no destination: it ends a run and
+// hides nothing else. Any other request that is not a literal card still hides
+// the handler, because it may leave the stack.
+func TestLiteralSequenceRedrawEndsARunWithoutHidingTheHandler(t *testing.T) {
+	step := func(from, to string) [][2]string { return [][2]string{{"Example:" + from, "Example:" + to}} }
+	for name, tc := range map[string]struct {
+		body string
+		want [][2]string
+	}{
+		"redraw first":       {"play \"click\"\ngo card\nplay stop\ngo card id 2\ngo card id 3", step("2", "3")},
+		"this card first":    {"go this card\ngo card id 2\ngo card id 3", step("2", "3")},
+		"to this card first": {"go to this card\ngo card id 2\ngo card id 3", step("2", "3")},
+		"redraw last":        {"go card id 2\ngo card id 3\ngo card", step("2", "3")},
+		"redraw between":     {"go card id 2\ngo card\ngo card id 3", nil},
+		"redraw then a pair": {"go card id 2\ngo card\ngo card id 3\ngo card id 4", step("3", "4")},
+		"stack first":        {"go card id 4 of stack \"Example\"\ngo card id 2\ngo card id 3", nil},
+		"ordinal first":      {"go next\ngo card id 2\ngo card id 3", nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var got [][2]string
+			for _, edge := range sequenceEdges(sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+tc.body+"\nend mouseUp"))) {
+				got = append(got, [2]string{edge.Source.Name, edge.Target.Name})
+			}
+			if len(got) != len(tc.want) || len(got) == 1 && got[0] != tc.want[0] {
+				t.Fatalf("got continuations %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
-	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "wait until ready", "vs direction", "put navigator() into state"} {
+	for _, command := range []string{"navigateSomewhere", `do "go card id 4"`, `send "navigate" to this card`, "vs direction", `vs "direction"`, `vs "left" & suffix`, `vs "left", 2`, "put navigator() into state",
+		// A parenthesized call could run a function of the imported stacks.
+		"wait until ready()", "play chooser()", "set cursor to pick(1)", `HTVisual effect("wipe"),,,1`, `playQT "" & loop()`,
+		// Not among the player's display, sound and wait commands.
+		"hc", "ww", "xCIcon3 it,4001", "openCard", "put 1 into state", "get the mouse", "lock screen", `answer "ready"`} {
 		t.Run(command, func(t *testing.T) {
 			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\ngo card id 4\nend mouseUp"))
 			edges := sequenceEdges(metadata)
@@ -129,6 +194,48 @@ func TestLiteralSequenceUnknownCommandsBreakRuns(t *testing.T) {
 				t.Fatalf("opaque call was crossed, or the following explicit run was lost: %+v", edges)
 			}
 		})
+	}
+}
+
+func TestLiteralSequenceCrossesPlayerDisplaySoundAndWaitCommands(t *testing.T) {
+	for _, command := range []string{`play "click"`, "play stop", "wait 20", `wait until the sound is "done"`, "wait until ready", "set cursor to none",
+		"vd", `dplay "latch"`, `playQT "room tone",,loop,40`, `playQT "",,"loop",volume * 2,,,,,true`, "soundidle", "SoundIdle",
+		`HTVisual "wipe up",,,2,16`, `htvisual "scroll down",,the rect of card button "panel",2,8`, "htlock true", "htlock forcefalse",
+		// Parentheses inside a quoted name are text, not a call.
+		`htaddpict "panel (lit)",the rect of card button "panel","srccopy"`,
+		"play \"hum\"\nplay \"click\"\nvs \"left\"\nset cursor to none -- trailing note"} {
+		t.Run(command, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus("on mouseUp\ngo card id 2\n"+command+"\ngo card id 3\nend mouseUp"))
+			edges := sequenceEdges(metadata)
+			if len(edges) != 1 || edges[0].Source.Name != "Example:2" || edges[0].Target.Name != "Example:3" {
+				t.Fatalf("a display, sound or wait command ended the run: %+v", edges)
+			}
+			if len(metadata.Edges) != 3 {
+				t.Fatalf("got %d records, want both owner references and the continuation", len(metadata.Edges))
+			}
+		})
+	}
+}
+
+func TestLiteralSequenceImportedHandlersOverrideTransparentCommands(t *testing.T) {
+	for name := range sequenceTransparent {
+		for _, scope := range []string{"stack", "source-card", "target-card"} {
+			t.Run(name+"/"+scope, func(t *testing.T) {
+				corpus := sequenceCorpus("on mouseUp\ngo card id 2\n" + name + " something\ngo card id 3\nend mouseUp")
+				script := hypercard.Script{Text: "on " + name + " value\ngo card id 4\nend " + name}
+				switch scope {
+				case "stack":
+					corpus.Stacks[0].Script = script
+				case "source-card":
+					corpus.Stacks[0].Cards[0].Script = script
+				case "target-card":
+					corpus.Stacks[0].Cards[1].Script = script
+				}
+				if len(sequenceEdges(sequenceMetadata(t, corpus))) != 0 {
+					t.Fatal("an imported handler of the same name was ignored")
+				}
+			})
+		}
 	}
 }
 
@@ -223,7 +330,9 @@ func TestLiteralSequenceDoesNotDeduplicateOrdinaryAndOrderedReferences(t *testin
 	corpus := sequenceCorpus("on mouseUp\ngo card id 2\ngo card id 3\nend mouseUp")
 	corpus.Stacks[0].Cards[1].Script.Text = "on mouseUp\ngo card id 3\nend mouseUp"
 	metadata := sequenceMetadata(t, corpus)
-	if len(metadata.Edges) != 3 || len(sequenceEdges(metadata)) != 1 {
+	// 1 -> 2 and 1 -> 3 from the owner, then 2 -> 3 twice: the continuation
+	// and the intermediate card's own reference.
+	if len(metadata.Edges) != 4 || len(sequenceEdges(metadata)) != 1 {
 		t.Fatal("ordinary and ordered references with the same endpoints were conflated")
 	}
 }

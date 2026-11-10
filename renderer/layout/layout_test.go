@@ -3,11 +3,16 @@ package layout
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 const drawingFixture = `{
@@ -154,5 +159,47 @@ func TestRunContextCancellationAndBoundedOutput(t *testing.T) {
 	output := cappedOutput{maximum: 4}
 	if _, err := output.Write([]byte("12345")); err == nil || output.buffer.Len() != 4 {
 		t.Fatal("layout output was not bounded")
+	}
+}
+
+// Routing the complete Myst graph takes minutes. The browser export used to
+// stop Neato after DefaultTimeout while the PDF render had no limit, so the
+// same layout succeeded for one output and failed for the other.
+func TestRoutedLayoutIsNotCutShortByTheSeedLimit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stand-in neato is a shell script")
+	}
+	directory := t.TempDir()
+	fixture := filepath.Join(directory, "layout.json")
+	if err := os.WriteFile(fixture, []byte(drawingFixture), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Slower than the shortened seed limit below, then a valid drawing.
+	script := "#!/bin/sh\ncat >/dev/null\nsleep 0.4\ncat '" + fixture + "'\n"
+	if err := os.WriteFile(filepath.Join(directory, "neato"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+	previous := seedTimeout
+	seedTimeout = 50 * time.Millisecond
+	defer func() { seedTimeout = previous }()
+
+	for name, run := range map[string]func(string) (Drawing, error){"routed": Run, "pinned": RunPinned} {
+		drawing, err := run("digraph {0}")
+		if err != nil {
+			t.Fatalf("%s layout was cut short: %v", name, err)
+		}
+		if len(drawing.Nodes) != 2 || len(drawing.Edges) != 1 {
+			t.Fatalf("%s layout lost its drawing: %+v", name, drawing)
+		}
+	}
+	// The caller's own deadline still applies, and seed layouts stay bounded.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := RunContext(ctx, "digraph {0}"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("the caller's deadline was ignored: %v", err)
+	}
+	if _, err := PositionOnly(context.Background(), "digraph {0}"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("a seed layout outlived its limit: %v", err)
 	}
 }

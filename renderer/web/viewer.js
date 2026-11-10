@@ -2,7 +2,8 @@
   "use strict";
 
   const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79"];
-  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Scripted sequence · next step", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
+  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Automatic next step · hollow arrow", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
+  const ATTRIBUTE_HELP = {backtracking: "Saved return: the script saves the starting card before this move and the destination returns to it (push card / pop card). It is not an ordinary two-way connection.", sequencecontinuation: "Automatic next step: one handler requests both cards in a row, so the script moves from the first to the second without another click. Path search does not follow it."};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
   const HIGHLIGHTS = [
     {id: "source", label: "Sources", flag: "source", description: "Uses the exported source flag. Source, sink and isolate flags may overlap."},
@@ -21,6 +22,8 @@
   const has = (object, name) => object.flags.has(name);
   const formatNumber = value => finite(value).toLocaleString("en-US");
   const safeImagePath = value => typeof value === "string" && value && !/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(value) && !value.includes("\0") ? value : null;
+  // Text entry owns printable keys, arrows and Escape. A focused checkbox or button does not.
+  const typingTarget = element => !!element && (element.isContentEditable === true || element.tagName === "TEXTAREA" || element.tagName === "SELECT" || element.tagName === "INPUT" && !/^(?:checkbox|radio|button|submit|reset)$/i.test(element.type || ""));
 
   function normalizeGraph(raw = {}) {
     const nodes = [], byID = new Map();
@@ -33,7 +36,7 @@
       node.thumbnail = safeImagePath(input.thumbnail) || node.image;
       node.originalName = String(input.originalName || "");
       node.assetName = String(input.assetName || "");
-      node.searchText = [node.id, node.name, node.stack, node.originalName, node.assetName].join(" ").toLowerCase();
+      node.searchText = [node.name, node.stack, node.originalName, node.assetName].join(" ").toLowerCase();
       node.zones = (Array.isArray(input.zones) ? input.zones : []).map((zone, index) => ({...zone, key: index, id: zone.id == null ? index + 1 : zone.id, type: String(zone.type || "part"), name: String(zone.name || ""), layer: zone.layer === "background" ? "background" : "card", x: finite(zone.x), y: finite(zone.y), width: Math.max(0, finite(zone.width)), height: Math.max(0, finite(zone.height)), hidden: zone.hidden === true, enabled: zone.enabled !== false, script: typeof zone.script === "string" ? zone.script : ""}));
       node.atlas = {x: node.x, y: node.y, width: node.width, height: node.height};
       nodes.push(node); byID.set(node.id, node);
@@ -51,7 +54,7 @@
       if (!parallel.has(key)) parallel.set(key, []);
       parallel.get(key).push(edge); edges.push(edge); incoming.get(target.id).push(edge); outgoing.get(source.id).push(edge);
     }
-    for (const group of parallel.values()) group.forEach((edge, index) => { edge.parallel = index - (group.length - 1) / 2; });
+    for (const group of parallel.values()) group.forEach((edge, index) => { edge.parallel = index - (group.length - 1) / 2; edge.slot = index; });
     for (const node of nodes) { node.highlightKinds = new Set(HIGHLIGHTS.filter(kind => kind.flag && has(node, kind.flag)).map(kind => kind.id)); node.highlightMatch = true; }
     for (const edge of edges) if (edge.source === edge.target && !has(edge, "disabled")) edge.from.highlightKinds.add("selfReference");
     const graph = {nodes, byID, edges, stacks, colors, atlasColors: colors, incoming, outgoing, meta: raw.meta || {}};
@@ -86,7 +89,14 @@
     return [inverted ? [x - along.x, y - along.y] : [x, y], [base.x + across.x, base.y + across.y], [base.x - across.x, base.y - across.y]];
   }
 
+  const grayMemo = new Map();
   function grayColor(value, role = "stroke", mode = "pdf") {
+    const key = mode + "|" + role + "|" + value;
+    let result = grayMemo.get(key);
+    if (result === undefined) { result = computeGray(value, role, mode); if (grayMemo.size < 4096) grayMemo.set(key, result); }
+    return result;
+  }
+  function computeGray(value, role, mode) {
     const text = String(value || "").toLowerCase();
     if (text === "transparent" || text === "none") return "#00000000";
     const names = {black: "#000000", white: "#ffffff", gray: "#808080", grey: "#808080", red: "#ff0000", blue: "#0000ff", green: "#008000"};
@@ -272,6 +282,7 @@
     const pointers = new Map(), ageInputs = new Map(), highlightInputs = new Map(), highlightLabels = new Map(), cache = new Map(), grayCache = new Map(), imageQueue = [], zoneRectangles = new Map(), pdfTextMetrics = new Map();
     const MAX_GRAY_BUFFERS = 128, MAX_GRAY_PIXELS = 2000000, MAX_GRAY_EDGE = 192;
     let animation = null, activeImages = 0, gesture = null, drag = null, multiTouch = false, frameID = 0, grayPixels = 0, neededGrayImages = new Set();
+    const hasPictures = graph.nodes.some(node => node.thumbnail);
     const requestFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : callback => window.setTimeout(callback, 16);
     const visible = node => state.ages.has(node.stack);
     const muted = node => state.highlights.size > 0 && !node.highlightMatch;
@@ -287,7 +298,14 @@
       state.width = Math.max(1, rect.width); state.height = Math.max(1, rect.height);
       const dpr = Math.min(2.5, window.devicePixelRatio || 1);
       canvas.width = Math.round(state.width * dpr); canvas.height = Math.round(state.height * dpr);
-      if (initial) fit(); else { state.camera.x += (state.width - oldWidth) / 2; state.camera.y += (state.height - oldHeight) / 2; schedule(); }
+      // Resizing the backing store clears it, and this runs after the frame's animation
+      // callbacks: draw now, or the browser paints an empty canvas for this frame.
+      if (initial) fit(); else { state.camera.x += (state.width - oldWidth) / 2; state.camera.y += (state.height - oldHeight) / 2; draw(); }
+    }
+    function sheetHeight() {
+      const sheet = $("selection-panel").parentNode;
+      if (typeof window.getComputedStyle !== "function" || window.getComputedStyle(sheet).position !== "absolute") return 0;
+      return clamp(canvas.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top + 44, 0, state.height * .7);
     }
     function fit() {
       const nodes = graph.nodes.filter(visible);
@@ -296,7 +314,7 @@
         const source = graph.pdfLayout.bounds;
         if (source && [source.minX, source.minY, source.maxX, source.maxY].every(Number.isFinite) && source.maxX > source.minX && source.maxY > source.minY) bounds = source;
       }
-      state.camera = fitCamera(bounds, state.width, state.height, state.width > 520 ? 190 : 110);
+      state.camera = fitCamera(bounds, state.width, state.height - sheetHeight(), state.width > 520 ? 190 : 110);
       state.minScale = Math.min(.02, state.camera.scale * .25); schedule();
     }
     function zoom(factor, anchor = {x: state.width / 2, y: state.height / 2}) {
@@ -305,7 +323,7 @@
     function focusNode(node) {
       state.camera.scale = state.mode === "pdf" ? clamp(Math.max(state.camera.scale, 220 / node.width), state.minScale, 8) : clamp(Math.max(state.camera.scale, 1), state.minScale, 2.5);
       state.camera.x = (state.width + (state.width > 520 ? 170 : 0)) / 2 - node.x * state.camera.scale;
-      state.camera.y = state.height / 2 - node.y * state.camera.scale; schedule();
+      state.camera.y = (state.height - sheetHeight()) / 2 - node.y * state.camera.scale; schedule();
     }
     function setLayout(mode, refit = true) {
       if (mode !== "pdf" || !graph.pdfLayout) mode = "atlas";
@@ -317,7 +335,7 @@
       graph.colors = mode === "pdf" ? graph.pdfColors : graph.atlasColors;
       for (const node of graph.nodes) node.color = graph.colors.get(node.stack);
       $("map-surface").classList.toggle("is-pdf", mode === "pdf"); $("map-surface").classList.toggle("has-layouts", !!graph.pdfLayout);
-      $("layout-tools").hidden = !graph.pdfLayout; $("pdf-images-control").hidden = mode !== "pdf";
+      $("layout-tools").hidden = !graph.pdfLayout; $("pdf-images-control").hidden = mode !== "pdf" || !hasPictures;
       $("pdf-layout").setAttribute("aria-pressed", String(mode === "pdf")); $("atlas-layout").setAttribute("aria-pressed", String(mode === "atlas"));
       $("atlas-legend").hidden = mode === "pdf"; $("pdf-legend").hidden = mode !== "pdf";
       canvas.setAttribute("aria-label", (mode === "pdf" ? "Shared PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
@@ -400,7 +418,7 @@
       if (has(edge, "conditional") || has(edge, "zip")) { color = "#7aada3"; dash = [7, 5]; }
       if (has(edge, "disabled")) { color = "#8d8875"; dash = [5, 5]; alpha *= .7; }
       if (state.highlights.size) {
-        if (edgeMuted(edge)) { color = grayColor(color, "edge", "atlas"); alpha = 1; }
+        if (edgeMuted(edge)) { color = grayColor(color, "edge", "atlas"); alpha = .3; }
         else alpha = has(edge, "disabled") ? .65 : .9;
       }
       return {color, dash, alpha, related};
@@ -412,7 +430,10 @@
         ctx.moveTo(x + Math.sin(angle) * size * .6, y - Math.cos(angle) * size * .6); ctx.lineTo(x - Math.sin(angle) * size * .6, y + Math.cos(angle) * size * .6); ctx.stroke();
       } else {
         const points = arrowPolygon(x, y, angle, size, has(edge, "backtracking"));
-        ctx.moveTo(...points[0]); ctx.lineTo(...points[1]); ctx.lineTo(...points[2]); ctx.closePath(); ctx.fill();
+        ctx.moveTo(...points[0]); ctx.lineTo(...points[1]); ctx.lineTo(...points[2]); ctx.closePath();
+        // An automatic next step ends in a hollow head, as in the PDF graph: clear the head, then outline it.
+        if (has(edge, "sequencecontinuation") && !has(edge, "backtracking")) { ctx.save(); ctx.globalCompositeOperation = "destination-out"; ctx.globalAlpha = 1; ctx.fill(); ctx.restore(); ctx.setLineDash([]); ctx.stroke(); }
+        else ctx.fill();
       }
     }
     function drawEdge(edge, viewport) {
@@ -423,7 +444,8 @@
       const appearance = edgeAppearance(edge, state.selected), scale = state.camera.scale;
       ctx.strokeStyle = ctx.fillStyle = appearance.color; ctx.globalAlpha = appearance.alpha; ctx.lineWidth = (appearance.related ? 1.5 : .7) / Math.max(.4, scale); ctx.setLineDash(appearance.dash.map(value => value / Math.max(.6, scale)));
       if (a.id === b.id) {
-        const radius = 24 + Math.abs(edge.parallel) * 9, x = a.x + a.width * .28, y = a.y - a.height / 2;
+        // One loop per record: symmetric offsets would give two records the same radius.
+        const radius = 24 + edge.slot * 9, x = a.x + a.width * .28, y = a.y - a.height / 2;
         ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.bezierCurveTo(x - radius, y - radius * 2, x + radius * 2, y - radius * 2, x + 16, y); ctx.stroke();
         if (scale > .24 || appearance.related) {
           const size = 6 / Math.max(.6, scale);
@@ -508,10 +530,15 @@
           ctx.drawImage(image, x + 4 + (thumbWidth - width) / 2, y + 3 + (thumbHeight - height) / 2, width, height);
           const textOperations = (drawing.labels || []).filter(operation => operation.op === "T");
           const lines = textOperations.length ? textOperations.map(operation => String(operation.text || "")) : [node.name, node.assetName || node.originalName].filter(Boolean);
-          const font = (drawing.labels || []).find(operation => operation.op === "F"), size = Math.min(finite(font && font.size, 10), (node.height - 5) / Math.max(1, lines.length) / 1.15);
-          ctx.font = size + "px " + pdfFont(font && font.face); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = isMuted ? grayColor(drawing.fontColor || "#000000") : drawing.fontColor || "#000000";
-          const textX = x + thumbWidth + 9, textWidth = node.width - thumbWidth - 13, lineHeight = size * 1.15;
-          lines.forEach((line, index) => ctx.fillText(fitText(line, textWidth), textX, node.y + (index - (lines.length - 1) / 2) * lineHeight));
+          const font = (drawing.labels || []).find(operation => operation.op === "F"), base = Math.min(finite(font && font.size, 10), (node.height - 5) / Math.max(1, lines.length) / 1.15), family = pdfFont(font && font.face);
+          const textX = x + thumbWidth + 9, textWidth = node.width - thumbWidth - 13;
+          // The box was sized for its label alone. Beside a thumbnail, shrink the label
+          // before cutting it, so that card IDs stay readable; truncate only below 55%.
+          ctx.font = base + "px " + family;
+          const shrink = clamp(textWidth / Math.max(1, ...lines.map(line => ctx.measureText(line).width)), .55, 1), fitted = lines.map(line => fitText(line, textWidth / shrink));
+          const size = base * shrink, lineHeight = size * 1.15;
+          ctx.font = size + "px " + family; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = isMuted ? grayColor(drawing.fontColor || "#000000") : drawing.fontColor || "#000000";
+          fitted.forEach((line, index) => ctx.fillText(line, textX, node.y + (index - (lines.length - 1) / 2) * lineHeight));
           ctx.restore(); compact = true;
         }
       }
@@ -527,6 +554,8 @@
     }
     function draw() {
       if (!ctx) return;
+      // A window moved to a display of another density keeps its size: follow the density here.
+      if (Math.abs(canvas.width - Math.round(state.width * Math.min(2.5, window.devicePixelRatio || 1))) > 1) { resize(); return; }
       frameID++;
       const dpr = canvas.width / state.width, camera = state.camera;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, state.width, state.height);
@@ -560,7 +589,7 @@
       for (const entry of grayCache.values()) if (!neededGrayImages.has(entry.url)) releaseGray(entry);
       ctx.globalAlpha = 1; ctx.setLineDash([]);
       $("zoom-level").textContent = Math.round(camera.scale * 100) + "%";
-      $("view-status").textContent = (state.highlights.size ? formatNumber(state.highlightCount.matched) + " / " + formatNumber(state.highlightCount.visible) + " highlighted" : formatNumber(state.highlightCount.visible) + " nodes") + " · " + (state.mode === "pdf" ? state.pdfImages ? "PDF layout · zoom for pictures" : "PDF layout · original labels" : "zoom in to reveal pictures");
+      $("view-status").textContent = (state.highlights.size ? formatNumber(state.highlightCount.matched) + " / " + formatNumber(state.highlightCount.visible) + " highlighted" : formatNumber(state.highlightCount.visible) + " nodes") + " · " + (state.mode === "pdf" ? state.pdfImages && hasPictures ? "PDF layout · zoom for pictures" : "PDF layout · original labels" : hasPictures ? "zoom in to reveal pictures" : "zoom in to read the names");
       $("map-empty").hidden = state.ages.size !== 0 || !graph.nodes.length;
     }
 
@@ -612,10 +641,12 @@
       schedule();
     }
     function renderSearch() {
-      state.search = searchNodes(graph.nodes, $("graph-search").value); state.searchIndex = -1;
-      const host = $("search-results"); host.replaceChildren();
+      const matches = searchNodes(graph.nodes, $("graph-search").value, Infinity);
+      state.search = matches.slice(0, 20); state.searchIndex = -1;
+      const host = $("search-results"); host.replaceChildren(); $("graph-search").removeAttribute("aria-activedescendant");
       const query = $("graph-search").value.trim(); host.hidden = !query; $("graph-search").setAttribute("aria-expanded", query ? "true" : "false");
       if (!query) return;
+      announce(matches.length ? formatNumber(matches.length) + (matches.length === 1 ? " card matches." : " cards match.") + (matches.length > state.search.length ? " The first " + state.search.length + " are listed." : "") : "No cards match.");
       if (!state.search.length) { host.append(element("p", "search-empty", "No cards match. Try a card ID, original name, or picture name.")); return; }
       state.search.forEach((node, index) => {
         const button = element("button", "search-result"), dot = element("span", "result-dot"), copy = element("span", "result-copy");
@@ -623,14 +654,18 @@
         copy.append(element("strong", "", node.name), element("small", "", node.assetName || node.originalName || "Card view")); button.append(dot, copy, element("span", "result-age", node.stack.replace(/ Age$/, "")));
         button.addEventListener("click", () => { selectNode(node.id, true); closeSearch(); }); host.append(button);
       });
+      if (matches.length > state.search.length) host.append(element("p", "search-empty", "Showing " + state.search.length + " of " + formatNumber(matches.length) + " matches. Type more to narrow the list."));
     }
     function closeSearch() { $("search-results").hidden = true; $("graph-search").setAttribute("aria-expanded", "false"); $("graph-search").removeAttribute("aria-activedescendant"); }
     function searchKey(event) {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeSearch(); canvas.focus(); return; }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault(); if (!state.search.length) return;
-        state.searchIndex = (state.searchIndex + (event.key === "ArrowDown" ? 1 : -1) + state.search.length) % state.search.length;
-        [...$("search-results").children].forEach((child, index) => { child.classList.toggle("is-active", index === state.searchIndex); child.setAttribute("aria-selected", String(index === state.searchIndex)); });
+        const count = state.search.length, step = event.key === "ArrowDown" ? 1 : -1;
+        state.searchIndex = state.searchIndex < 0 ? (step > 0 ? 0 : count - 1) : (state.searchIndex + step + count) % count;
+        [...$("search-results").children].filter(child => child.tagName === "BUTTON").forEach((child, index) => { child.classList.toggle("is-active", index === state.searchIndex); child.setAttribute("aria-selected", String(index === state.searchIndex)); });
+        const active = $("search-results").children[state.searchIndex];
+        if (active && typeof active.scrollIntoView === "function") active.scrollIntoView({block: "nearest"});
         $("graph-search").setAttribute("aria-activedescendant", "search-result-" + state.searchIndex);
       } else if (event.key === "Enter" && state.search.length) {
         event.preventDefault(); selectNode(state.search[Math.max(0, state.searchIndex)].id, true); closeSearch(); canvas.focus();
@@ -646,6 +681,8 @@
         const inverseHead = has(edge, "restrictivetransitivitytail") ? "" : has(edge, "disabled") ? "⊣" : "◀";
         const marker = element("span", "ref-arrow" + (has(edge, "backtracking") ? " inverted" : ""), has(edge, "backtracking") ? "▶—" + inverseHead : direction === "incoming" ? "↙" : "↗");
         marker.setAttribute("aria-hidden", "true"); button.append(marker, copy, dot);
+        const help = [...edge.flags].map(flag => ATTRIBUTE_HELP[flag]).filter(Boolean).join(" ");
+        if (help) { button.title = help; button.setAttribute("aria-description", help); }
         button.setAttribute("aria-label", other.name + ", " + edgeLabel(edge)); button.addEventListener("click", () => selectNode(other.id, true)); host.append(button);
       }
     }
@@ -698,7 +735,7 @@
       state.zones = $("show-zones").checked; state.hiddenZones = $("show-hidden-zones").checked;
       $("hidden-zones-label").hidden = !state.zones; $("zones-note").hidden = !state.zones;
       $("dialog-show-zones").checked = state.zones; $("dialog-show-hidden-zones").checked = state.hiddenZones; $("dialog-hidden-zones-label").hidden = !state.zones;
-      if (!state.zones) { state.zone = null; $("zone-detail").hidden = true; }
+      if (!state.zones) clearZone();
       if (state.selected) { renderPicture($("selected-picture"), state.selected); if (state.dialog) renderPicture($("dialog-picture"), state.selected); }
     }
     function renderSelectedTags(node) {
@@ -708,6 +745,7 @@
     }
     function selectNode(id, focus = false) {
       const node = graph.byID.get(Number(id)); if (!node) return;
+      const inspector = state.selected !== node && $("selection-panel").parentNode;
       state.selected = node; state.zone = null;
       if (!visible(node)) { state.ages.add(node.stack); const input = ageInputs.get(node.stack); if (input) input.checked = true; }
       $("welcome-panel").hidden = true; $("selection-panel").hidden = false; $("zone-detail").hidden = true;
@@ -727,6 +765,7 @@
       fact("Zones", node.zones.length ? String(node.zones.length) + " stored parts" : "None exported");
       if (has(node, "virtual")) fact("Status", "Referenced target absent from the imported data.");
       renderReferences(node, "incoming"); renderReferences(node, "outgoing");
+      if (inspector) inspector.scrollTop = 0;
       announce("Selected " + node.name + ", " + graph.incoming.get(node.id).length + " incoming and " + graph.outgoing.get(node.id).length + " outgoing reference records.");
       if (focus) focusNode(node); else schedule();
       if (state.dialog) openPicture();
@@ -776,7 +815,7 @@
         state.camera = {scale, x: mid.x - gesture.world.x * scale, y: mid.y - gesture.world.y * scale};
       } else if (drag) {
         const dx = position.x - drag.start.x, dy = position.y - drag.start.y;
-        if (Math.hypot(dx, dy) > 4) drag.moved = true;
+        if (Math.hypot(dx, dy) > (event.pointerType === "touch" || event.pointerType === "pen" ? 12 : 4)) drag.moved = true;
         state.camera.x = drag.camera.x + dx; state.camera.y = drag.camera.y + dy;
       }
       schedule();
@@ -793,9 +832,13 @@
     $("graph-search").addEventListener("input", renderSearch); $("graph-search").addEventListener("keydown", searchKey);
     $("graph-search").addEventListener("focus", () => { if ($("graph-search").value.trim()) renderSearch(); });
     document.addEventListener("pointerdown", event => { if (!$("graph-search").parentNode.contains(event.target)) closeSearch(); });
+    // The result buttons are part of the search control: Escape on one closes the list, and tabbing out of the control closes it too.
+    $("search-results").addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeSearch(); canvas.focus(); } });
+    $("graph-search").parentNode.addEventListener("focusout", event => { if (event.relatedTarget && !$("graph-search").parentNode.contains(event.relatedTarget)) closeSearch(); });
     document.addEventListener("keydown", event => {
-      const tag = document.activeElement && document.activeElement.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement && document.activeElement.isContentEditable) return;
+      if (typingTarget(document.activeElement)) return;
+      // Command, Control and Alt chords belong to the browser: find, page zoom, history.
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "/") { event.preventDefault(); $("graph-search").focus(); return; }
       if (event.key === "Escape") { if (state.dialog) { closeDialog($("picture-dialog")); state.dialog = false; } else if ($("help-dialog").open) closeDialog($("help-dialog")); else clearSelection(); return; }
       if ($("picture-dialog").open || $("help-dialog").open) return;
@@ -833,7 +876,7 @@
     return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setHighlights, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache, grayCache, grayBudget: {buffers: MAX_GRAY_BUFFERS, pixels: MAX_GRAY_PIXELS, edge: MAX_GRAY_EDGE}};
   }
 
-  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, matchesHighlights, highlightCounts, grayColor, arrowPolygon, HIGHLIGHTS, createApp};
+  const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, typingTarget, matchesHighlights, highlightCounts, grayColor, arrowPolygon, HIGHLIGHTS, createApp};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (global.document && global.document.getElementById("graph-canvas")) {
     global.DeMystifyAtlas = api;

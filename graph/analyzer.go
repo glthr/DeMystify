@@ -14,6 +14,7 @@ func (g *MystGraph) Process() {
 	g.Metadata.Stats.ConnectedComponents = g.FindConnectedComponents()
 
 	// paths
-	g.Metadata.Stats.ShortestPaths = g.ComputeAllShortestPaths()
+	// Nothing reads the complete all-pairs table, which holds about 1.7 million
+	// routes for the full Myst graph. ComputeAllShortestPaths builds it on demand.
 	g.Metadata.Stats.MostSeparatedNodes = g.FindMostSeparatedNodes()
 }

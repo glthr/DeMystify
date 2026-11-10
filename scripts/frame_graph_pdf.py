@@ -5,6 +5,7 @@ from datetime import date
 from io import BytesIO
 import os
 from pathlib import Path
+import stat
 from tempfile import NamedTemporaryFile
 
 from pypdf import PdfReader, PdfWriter
@@ -13,7 +14,9 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 
 def frame_graph(source, destination, updated, subtitle):
-    if source.resolve() == destination.resolve():
+    # Compare the files, not their spellings: on a case-insensitive volume
+    # "Graph.pdf" and "graph.PDF" are one file.
+    if source.resolve() == destination.resolve() or destination.exists() and os.path.samefile(source, destination):
         raise ValueError("Use a separate output file to preserve the raw graph")
     reader = PdfReader(source)
     if len(reader.pages) != 1:
@@ -52,6 +55,9 @@ def frame_graph(source, destination, updated, subtitle):
         with NamedTemporaryFile(dir=destination.parent, suffix=".pdf", delete=False) as output:
             temporary = Path(output.name)
             writer.write(output)
+        # The temporary file is owner-only; publish the framed PDF as readable as
+        # the graph it frames. The owner keeps write access.
+        temporary.chmod(stat.S_IMODE(source.stat().st_mode) | stat.S_IWUSR)
         os.replace(temporary, destination)
     finally:
         if temporary is not None:

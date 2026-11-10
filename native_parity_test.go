@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
 	"github.com/glthr/DeMystify/hypercard"
 	"github.com/glthr/DeMystify/parser"
@@ -43,6 +44,7 @@ func TestNativeMystParity(t *testing.T) {
 	}
 	var generated [2]string
 	var metadata [2]any
+	var stats common.GraphStats
 	for i, corpus := range []hypercard.Corpus{native, xml} {
 		p, err := parser.NewParserFromCorpus(corpus)
 		if err != nil {
@@ -56,11 +58,11 @@ func TestNativeMystParity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if m.TotalNodes != 1364 || m.TotalEdges != 3225 || len(m.Edges) != 3244 {
+		if m.TotalNodes != 1364 || m.TotalEdges != 3250 || len(m.Edges) != 3276 {
 			t.Fatalf("input %d: got %d nodes, %d active pairs, %d edge records", i, m.TotalNodes, m.TotalEdges, len(m.Edges))
 		}
 		g.Process()
-		metadata[i] = m
+		metadata[i], stats = m, m.Stats
 		generated[i], err = dot.NewGenerator(g, m).Generate(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -71,6 +73,21 @@ func TestNativeMystParity(t *testing.T) {
 	}
 	if generated[0] != generated[1] {
 		t.Fatal("native and XML imports produce different DOT output")
+	}
+	// The published graph is what this code generates, and the search itself
+	// reports the pair the project quotes, not only its distance.
+	tracked, err := os.ReadFile("generated/graph.dot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if generated[0] != strings.ReplaceAll(string(tracked), "\r\n", "\n") {
+		t.Error("generated/graph.dot is not what this code generates from the original stacks")
+	}
+	if farthest := stats.MostSeparatedNodes; farthest.Distance != 130 || farthest.Source.Name != "Selenitic Age:26154" || farthest.Target.Name != "Channelwood Age:88814" || len(farthest.Path) != 131 {
+		t.Errorf("most separated nodes: %s -> %s at %v", farthest.Source.Name, farthest.Target.Name, farthest.Distance)
+	}
+	if len(stats.ConnectedComponents) != 21 || len(stats.ConnectedComponents[0]) != 1342 {
+		t.Errorf("got %d components, want 21 with 1,342 nodes in the largest", len(stats.ConnectedComponents))
 	}
 }
 

@@ -42,8 +42,11 @@ const (
 	Backtracking
 	RestrictiveTransitivityTail
 	RestrictiveTransitivityHead
-	// SequenceContinuation follows an earlier literal go in one linear handler.
-	// It records static command order, not lifecycle or runtime reachability.
+	// SequenceContinuation is the step from a view that a linear handler has
+	// just requested to the next one it requests. The handler's own card keeps
+	// its reference to both. The continuation is displayed and counts as an
+	// outgoing reference, but path search does not follow it: one action is not
+	// several steps, and a view shared by callers does not join their routes.
 	SequenceContinuation
 )
 
@@ -74,6 +77,8 @@ type Metadata struct {
 // GraphStats contains analysis results for a graph
 type GraphStats struct {
 	// path and connectivity analysis
+	// ShortestPaths is left nil by MystGraph.Process; callers that need every
+	// route assign the result of MystGraph.ComputeAllShortestPaths themselves.
 	ShortestPaths          map[int64]map[int64]ShortestPathInfo
 	MostSeparatedNodes     NodePairInfo
 	ConnectedComponents    [][]int64

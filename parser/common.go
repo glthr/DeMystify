@@ -192,15 +192,24 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 		}
 		link, err := p.parseCardCommand(source, line.Line)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse command %q: %w", line.Line, err)
+			// A comment is not a command. Text that only resembles one, such
+			// as a note quoting an old go line, records nothing.
+			if !disabled && !line.IsDisabled {
+				return nil, fmt.Errorf("cannot parse command %q: %w", line.Line, err)
+			}
+			link = nil
 		}
-		sequence.observe(lineIndex, line, link)
+		continuation := sequence.observe(lineIndex, line, link)
 		if link != nil {
 			link.IsDisabled = line.IsDisabled
 			if pushed && !link.IsDisabled {
 				p.pushedLinks[link] = true
 			}
 			links = append(links, link)
+			handlers = append(handlers, handlerID)
+		}
+		if continuation != nil {
+			links = append(links, continuation)
 			handlers = append(handlers, handlerID)
 		}
 	}
@@ -230,6 +239,11 @@ func (p *Parser) identifyScriptLinks(source any, script HyperTalk, transitivityI
 			}
 		}
 		if goLink == nil {
+			// A commented-out push with no commented-out go after it is a
+			// leftover or a note, not an incomplete command.
+			if link.IsDisabled {
+				continue
+			}
 			return nil, fmt.Errorf("push card command has no following go card command")
 		}
 

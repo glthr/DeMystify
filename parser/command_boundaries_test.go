@@ -1,6 +1,11 @@
 package parser
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/glthr/DeMystify/common"
+)
 
 func TestCommandsDoNotInventLiteralTargetsFromExpressions(t *testing.T) {
 	stack, other := &HyperCardStack{Name: "Example"}, &HyperCardStack{Name: "Other"}
@@ -34,6 +39,48 @@ func TestCommandsRejectZeroCardIDs(t *testing.T) {
 	for _, command := range []string{"go card id 0", `go card id 0 of stack "Example"`, `push card id 0 of stack "Example"`} {
 		if _, err := p.parseCardCommand(source, command); err == nil {
 			t.Errorf("accepted nonpositive card ID in %q", command)
+		}
+	}
+}
+
+// Commented text cannot stop the analysis, whatever it looks like. An active
+// command of the same shape is still an error.
+func TestCommentsThatResembleCommandsDoNotAbortTheAnalysis(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body string
+		want []string
+	}{
+		"commented push, active go":  {"--push card id 4 of stack \"Example\"\ngo card id 2", []string{"Example:1 -> Example:2"}},
+		"note quoting a push":        {"-- was: push card id 4 of stack \"Example\"\ngo card id 2", []string{"Example:1 -> Example:2"}},
+		"note quoting an invalid go": {"-- used to be: go to card id 0\ngo card id 3", []string{"Example:1 -> Example:3"}},
+		"commented invalid go":       {"--go to card id 0", nil},
+		"commented push and its go":  {"--push card id 4 of stack \"Example\"\n--go card id 2", []string{"Example:1 -> Example:2 disabled", "Example:2 -> Example:4 disabled"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p, err := NewParserFromCorpus(sequenceCorpus("on mouseUp\n" + tc.body + "\nend mouseUp"))
+			if err != nil {
+				t.Fatalf("a comment stopped the analysis: %v", err)
+			}
+			metadata, err := p.Process()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, edge := range metadata.Edges {
+				record := edge.Source.Name + " -> " + edge.Target.Name
+				if edge.IsOfType(common.Disabled) {
+					record += " disabled"
+				}
+				got = append(got, record)
+			}
+			if strings.Join(got, "; ") != strings.Join(tc.want, "; ") {
+				t.Fatalf("records %v, want %v", got, tc.want)
+			}
+		})
+	}
+	for name, body := range map[string]string{"active push without a go": "push card id 4 of stack \"Example\"", "active invalid go": "go to card id 0"} {
+		if _, err := NewParserFromCorpus(sequenceCorpus("on mouseUp\n" + body + "\nend mouseUp")); err == nil {
+			t.Errorf("%s: accepted", name)
 		}
 	}
 }

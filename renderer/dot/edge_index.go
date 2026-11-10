@@ -42,6 +42,9 @@ func indexEdges(edges []*common.Edge) ([]nodePair, map[nodePair][]*pendingEdge) 
 			if a.IsOfType(common.Backtracking) != b.IsOfType(common.Backtracking) {
 				return !a.IsOfType(common.Backtracking)
 			}
+			if a.IsOfType(common.SequenceContinuation) != b.IsOfType(common.SequenceContinuation) {
+				return !a.IsOfType(common.SequenceContinuation)
+			}
 			return a.TransitivityID < b.TransitivityID
 		})
 	}

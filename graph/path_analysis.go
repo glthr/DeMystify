@@ -172,24 +172,30 @@ func (pa *pathAnalyzer) computeShortestPath(from, to int64, mandatoryNodes []com
 // findMostSeparatedNodes identifies the pair of connected nodes with the longest shortest path
 // prioritizing peripheral nodes (nodes with fewer connections) at the ends of the path
 func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
-	result := common.NodePairInfo{}
-	maxFiniteDistance := -1.0
-
 	nodeIDs := pa.g.traverser.getAllNodeIDs()
 
 	// If we have less than 2 nodes, we cannot compute separation
 	if len(nodeIDs) < 2 {
-		return result
+		return common.NodePairInfo{}
 	}
 
-	type pathCandidate struct {
-		source   int64
-		target   int64
-		distance float64
-		path     []int64
+	// equal distances favor peripheral nodes (fewer connections)
+	nodeDegrees := make(map[int64]int, len(nodeIDs))
+	for _, id := range nodeIDs {
+		degree := 0
+		for to := pa.g.To(id); to.Next(); {
+			degree++
+		}
+		for from := pa.g.From(id); from.Next(); {
+			degree++
+		}
+		nodeDegrees[id] = degree
 	}
 
-	var candidates []pathCandidate
+	found := false
+	var source, target int64
+	var distance float64
+	var peripheralScore int
 
 	// check all pairs of nodes
 	for _, src := range nodeIDs {
@@ -201,106 +207,40 @@ func (pa *pathAnalyzer) findMostSeparatedNodes() common.NodePairInfo {
 				continue // skip self
 			}
 
-			pathNodes, weight := p.To(dst)
-
-			// skip unreachable nodes or paths using backtracking edges
-			if len(pathNodes) == 0 || weight == math.Inf(1) {
+			// Distances rank every pair; only the selected route is materialized
+			// below. Unreachable nodes and backtracking-only paths are infinite.
+			weight := p.WeightTo(dst)
+			if math.IsInf(weight, 1) {
 				continue
 			}
 
-			// for reachable nodes with valid paths, track if this is a candidate
-			if weight >= maxFiniteDistance {
-				var pathIDs []int64
-				for _, node := range pathNodes {
-					pathIDs = append(pathIDs, node.ID())
-				}
-
-				if weight > maxFiniteDistance {
-					maxFiniteDistance = weight
-					candidates = []pathCandidate{}
-				}
-
-				candidates = append(candidates, pathCandidate{
-					source:   src,
-					target:   dst,
-					distance: weight,
-					path:     pathIDs,
-				})
+			// lower score means more peripheral; the first pair wins a complete tie
+			score := nodeDegrees[src] + nodeDegrees[dst]
+			if !found || weight > distance || weight == distance && score < peripheralScore {
+				found = true
+				source, target, distance, peripheralScore = src, dst, weight, score
 			}
 		}
 	}
 
-	if len(candidates) == 0 {
-		return result
+	if !found {
+		return common.NodePairInfo{}
 	}
 
-	if len(candidates) == 1 {
-		candidate := candidates[0]
-		if shortest, err := pa.computeShortestPath(candidate.source, candidate.target, nil); err == nil {
-			candidate.path = shortest.Path
-		}
-		return common.NodePairInfo{
-			Source: common.NodeInfo{
-				ID:   candidate.source,
-				Name: pa.g.GetNameForID(candidate.source),
-			},
-			Target: common.NodeInfo{
-				ID:   candidate.target,
-				Name: pa.g.GetNameForID(candidate.target),
-			},
-			Distance: candidate.distance,
-			Path:     candidate.path,
+	var route []int64
+	if shortest, err := pa.computeShortestPath(source, target, nil); err == nil {
+		route = shortest.Path
+	} else {
+		nodes, _ := path.DijkstraFrom(pa.g.Node(source), orderedPathGraph{pa.g}).To(target)
+		for _, node := range nodes {
+			route = append(route, node.ID())
 		}
 	}
 
-	// multiple candidates with the same distance: favor peripheral nodes
-	nodeDegrees := make(map[int64]int)
-	for _, id := range nodeIDs {
-		inDegree := 0
-		to := pa.g.To(id)
-		for to.Next() {
-			inDegree++
-		}
-
-		outDegree := 0
-		from := pa.g.From(id)
-		for from.Next() {
-			outDegree++
-		}
-
-		nodeDegrees[id] = inDegree + outDegree
+	return common.NodePairInfo{
+		Source:   common.NodeInfo{ID: source, Name: pa.g.GetNameForID(source)},
+		Target:   common.NodeInfo{ID: target, Name: pa.g.GetNameForID(target)},
+		Distance: distance,
+		Path:     route,
 	}
-
-	// find the candidate with the most peripheral end nodes
-	bestCandidate := candidates[0]
-	bestPeripheralScore := nodeDegrees[bestCandidate.source] + nodeDegrees[bestCandidate.target]
-
-	for _, candidate := range candidates[1:] {
-		currentScore := nodeDegrees[candidate.source] + nodeDegrees[candidate.target]
-
-		// lower score means more peripheral (fewer connections)
-		if currentScore < bestPeripheralScore {
-			bestPeripheralScore = currentScore
-			bestCandidate = candidate
-		}
-	}
-
-	if shortest, err := pa.computeShortestPath(bestCandidate.source, bestCandidate.target, nil); err == nil {
-		bestCandidate.path = shortest.Path
-	}
-
-	result = common.NodePairInfo{
-		Source: common.NodeInfo{
-			ID:   bestCandidate.source,
-			Name: pa.g.GetNameForID(bestCandidate.source),
-		},
-		Target: common.NodeInfo{
-			ID:   bestCandidate.target,
-			Name: pa.g.GetNameForID(bestCandidate.target),
-		},
-		Distance: bestCandidate.distance,
-		Path:     bestCandidate.path,
-	}
-
-	return result
 }

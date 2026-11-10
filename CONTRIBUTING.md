@@ -28,15 +28,17 @@ go test -race ./...
 go vet ./...
 ```
 
-To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the converted stack directory. The test selects expected counts from the input script rather than the graph output. The game data is optional and must not be added to the repository.
+Pull requests run the same formatting, vet and test checks automatically, with the oldest supported Go version (`.github/workflows/ci.yml`). Graphviz is not installed there, so the checks that need `neato` only run locally.
 
-To compare native import with XML produced from the same originals, set both `DEMYSTIFY_NATIVE_TEST_DATA` (the directory of original stack data forks) and `DEMYSTIFY_TEST_DATA` (the corresponding XML directory), then run `go test -run TestNativeMystParity .`. This checks the decoded objects, graph records and generated DOT. Native parser fixtures and fuzz seeds in the repository are synthetic.
+To verify the original six-stack dataset locally, run `DEMYSTIFY_TEST_DATA="$MYST_DATA" go test -run TestOriginalMystImport .`, where `MYST_DATA` points to the directory of the six original stacks or to an XML conversion of them. The test selects expected counts from the input script rather than the graph output, and checks the complete list of automatic next steps. The game data is optional and must not be added to the repository.
+
+To compare native import with XML produced from the same originals, set both `DEMYSTIFY_NATIVE_TEST_DATA` (the directory of original stack data forks) and `DEMYSTIFY_TEST_DATA` (the corresponding XML directory), then run `go test -run TestNativeMystParity .`. This checks the decoded objects, graph records and generated DOT, and that `generated/graph.dot` is what the code generates from the original stacks. Native parser fixtures and fuzz seeds in the repository are synthetic.
 
 Format changed Go files with `gofmt`. The tests use synthetic stack and card data, so they do not require a Myst CD-ROM. When Graphviz is installed, the integration tests also validate generated DOT with `neato`; those checks are skipped when it is unavailable.
 
 When Node.js 18 or newer is available, the Go web exporter tests also run the viewer's synthetic DOM/canvas interaction tests. They can be run directly with `node --test renderer/web/viewer_test.cjs`. These exercise interaction logic; they do not replace a visual browser check.
 
-Run the optional media extractor's synthetic resource-fork and output-safety tests with `python3 -m unittest discover -s scripts -p test_extract_myst_images.py`. Original game images, banks, decoded catalogues and browser exports must stay outside Git; `generated/web` is ignored by default.
+Run the optional scripts' tests with `python3 -m unittest discover -s scripts -p 'test_*.py'`. They cover the media extractor's synthetic resource forks and output safety, and the publication framing; the framing tests are skipped unless the libraries in `scripts/requirements-pdf.txt` are installed. Original game images, banks, decoded catalogues and browser exports must stay outside Git; `generated/web` is ignored by default.
 
 ## License
 

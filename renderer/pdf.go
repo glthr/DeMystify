@@ -94,6 +94,13 @@ func renderPDF(dotFilePath string, withLayout, pinned bool) ([]byte, error) {
 			return nil, fmt.Errorf("neato produced invalid drawing JSON")
 		}
 	}
+	// The temporary file is owner-only. Publish the PDF as readable as the DOT
+	// it was rendered from, as when Neato created the output file itself.
+	if source, err := os.Stat(dotInputPath); err == nil {
+		if err := os.Chmod(output.Name(), source.Mode().Perm()|0200); err != nil {
+			return nil, fmt.Errorf("setting rendered PDF permissions: %w", err)
+		}
+	}
 	if err := os.Rename(output.Name(), pdfFilePath); err != nil {
 		return nil, fmt.Errorf("saving rendered PDF: %w", err)
 	}
