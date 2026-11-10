@@ -12,7 +12,7 @@ A handler that requests several cards in a row keeps one connection from its own
 
 The analysis extracts links from supported HyperTalk commands without executing the scripts. A commented-out command is kept as a disabled connection. So is the body of a handler whose declaration line was commented out while the rest was left in place: it belongs to no handler, and HyperCard never runs it. Shortest paths describe the static card graph and exclude disabled edges, backtracking edges and automatic next steps. They do not simulate puzzle conditions, variables, or the HyperCard return stack; restrictive-transitivity IDs associate edges visually rather than enforce stateful navigation. A graph path therefore does not guarantee a playable route through the game.
 
-In the same way, a sink flag means that no outgoing connection was extracted, not that the player is stuck. A close-up that is left through a saved return carries it, and so does a view that a script shows and leaves inside a condition, through a helper handler or on the way to another stack.
+In the same way, a sink flag means that no outgoing connection was extracted, not that the player is stuck. A close-up that is left through a saved return carries it, and so does a view that a script shows and then leaves through a helper handler, after other commands, or on the way to another stack.
 
 ## Generate the Myst Graph
 
