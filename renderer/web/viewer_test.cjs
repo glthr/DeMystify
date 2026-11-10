@@ -507,3 +507,48 @@ test("PDF grayscale mapper also desaturates gradient stops and retains transpare
   assert.ok(fill.stops.every(stop => neutralHex(stop.color))); assert.match(fill.stops[1].color, /80$/);
   assert.equal(h.api.grayColor("transparent"), "#00000000"); assert.equal(h.api.grayColor("#fffffe00"), "#c9c9c900");
 });
+
+// Found by driving a real export in Chrome; each of these failed before its fix.
+const api = harness(fixture()).api;
+
+
+test("Command/Control/Alt chords are left to the browser", () => {
+  const h = harness(fixture()); h.get("graph-canvas").focus();
+  const scale = h.app.state.camera.scale, x = h.app.state.camera.x;
+  for (const [key, modifier] of [["f", "metaKey"], ["f", "ctrlKey"], ["=", "metaKey"], ["-", "ctrlKey"], ["ArrowLeft", "metaKey"], ["ArrowLeft", "altKey"], ["/", "metaKey"]])
+    assert.notEqual(h.document.dispatch("keydown", {key, [modifier]: true}).defaultPrevented, true, modifier + "+" + key + " must reach the browser");
+  near(h.app.state.camera.scale, scale); near(h.app.state.camera.x, x);
+});
+
+
+test("ArrowUp from the search box starts at the last result and a new query drops the stale active option", () => {
+  const h = harness(fixture()), search = h.get("graph-search");
+  search.value = "myst"; search.dispatch("input"); assert.equal(h.app.state.search.length, 2);
+  search.dispatch("keydown", {key: "ArrowUp"}); assert.equal(h.app.state.searchIndex, 1, "first ArrowUp selects the last result");
+  assert.equal(search.getAttribute("aria-activedescendant"), "search-result-1");
+  search.value = "dock"; search.dispatch("input");
+  assert.equal(search.getAttribute("aria-activedescendant"), null, "no option is active after the list was rebuilt");
+});
+
+
+test("search does not match the export's internal node index", () => {
+  const data = fixture(); data.nodes[1].id = 777; data.edges = [];
+  const graph = api.normalizeGraph(data);
+  assert.equal(api.searchNodes(graph.nodes, "777").map(node => node.name).join(), "", "777 appears in no card ID, name or picture name");
+});
+
+
+test("Escape on a focused result closes the list and keeps the selected card", () => {
+  const h = harness(fixture()), search = h.get("graph-search"), list = h.get("search-results");
+  search.value = "myst"; search.dispatch("input"); const option = list.children[0]; option.focus();
+  option.dispatch("keydown", {key: "Escape"});
+  assert.equal(list.hidden, true, "the list closes"); assert.equal(h.app.state.selected && h.app.state.selected.id, 1, "the card stays selected");
+});
+
+
+test("tabbing out of the search control closes its list", () => {
+  const h = harness(fixture()), search = h.get("graph-search"), list = h.get("search-results");
+  search.value = "myst"; search.dispatch("input"); assert.equal(list.hidden, false);
+  list.children[1].dispatch("focusout", {relatedTarget: h.get("help-button")});
+  assert.equal(list.hidden, true);
+});

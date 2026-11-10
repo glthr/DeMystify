@@ -35,7 +35,7 @@
       node.thumbnail = safeImagePath(input.thumbnail) || node.image;
       node.originalName = String(input.originalName || "");
       node.assetName = String(input.assetName || "");
-      node.searchText = [node.id, node.name, node.stack, node.originalName, node.assetName].join(" ").toLowerCase();
+      node.searchText = [node.name, node.stack, node.originalName, node.assetName].join(" ").toLowerCase();
       node.zones = (Array.isArray(input.zones) ? input.zones : []).map((zone, index) => ({...zone, key: index, id: zone.id == null ? index + 1 : zone.id, type: String(zone.type || "part"), name: String(zone.name || ""), layer: zone.layer === "background" ? "background" : "card", x: finite(zone.x), y: finite(zone.y), width: Math.max(0, finite(zone.width)), height: Math.max(0, finite(zone.height)), hidden: zone.hidden === true, enabled: zone.enabled !== false, script: typeof zone.script === "string" ? zone.script : ""}));
       node.atlas = {x: node.x, y: node.y, width: node.width, height: node.height};
       nodes.push(node); byID.set(node.id, node);
@@ -622,10 +622,12 @@
       schedule();
     }
     function renderSearch() {
-      state.search = searchNodes(graph.nodes, $("graph-search").value); state.searchIndex = -1;
-      const host = $("search-results"); host.replaceChildren();
+      const matches = searchNodes(graph.nodes, $("graph-search").value, Infinity);
+      state.search = matches.slice(0, 20); state.searchIndex = -1;
+      const host = $("search-results"); host.replaceChildren(); $("graph-search").removeAttribute("aria-activedescendant");
       const query = $("graph-search").value.trim(); host.hidden = !query; $("graph-search").setAttribute("aria-expanded", query ? "true" : "false");
       if (!query) return;
+      announce(matches.length ? formatNumber(matches.length) + (matches.length === 1 ? " card matches." : " cards match.") + (matches.length > state.search.length ? " The first " + state.search.length + " are listed." : "") : "No cards match.");
       if (!state.search.length) { host.append(element("p", "search-empty", "No cards match. Try a card ID, original name, or picture name.")); return; }
       state.search.forEach((node, index) => {
         const button = element("button", "search-result"), dot = element("span", "result-dot"), copy = element("span", "result-copy");
@@ -633,14 +635,18 @@
         copy.append(element("strong", "", node.name), element("small", "", node.assetName || node.originalName || "Card view")); button.append(dot, copy, element("span", "result-age", node.stack.replace(/ Age$/, "")));
         button.addEventListener("click", () => { selectNode(node.id, true); closeSearch(); }); host.append(button);
       });
+      if (matches.length > state.search.length) host.append(element("p", "search-empty", "Showing " + state.search.length + " of " + formatNumber(matches.length) + " matches. Type more to narrow the list."));
     }
     function closeSearch() { $("search-results").hidden = true; $("graph-search").setAttribute("aria-expanded", "false"); $("graph-search").removeAttribute("aria-activedescendant"); }
     function searchKey(event) {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeSearch(); canvas.focus(); return; }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault(); if (!state.search.length) return;
-        state.searchIndex = (state.searchIndex + (event.key === "ArrowDown" ? 1 : -1) + state.search.length) % state.search.length;
-        [...$("search-results").children].forEach((child, index) => { child.classList.toggle("is-active", index === state.searchIndex); child.setAttribute("aria-selected", String(index === state.searchIndex)); });
+        const count = state.search.length, step = event.key === "ArrowDown" ? 1 : -1;
+        state.searchIndex = state.searchIndex < 0 ? (step > 0 ? 0 : count - 1) : (state.searchIndex + step + count) % count;
+        [...$("search-results").children].filter(child => child.tagName === "BUTTON").forEach((child, index) => { child.classList.toggle("is-active", index === state.searchIndex); child.setAttribute("aria-selected", String(index === state.searchIndex)); });
+        const active = $("search-results").children[state.searchIndex];
+        if (active && typeof active.scrollIntoView === "function") active.scrollIntoView({block: "nearest"});
         $("graph-search").setAttribute("aria-activedescendant", "search-result-" + state.searchIndex);
       } else if (event.key === "Enter" && state.search.length) {
         event.preventDefault(); selectNode(state.search[Math.max(0, state.searchIndex)].id, true); closeSearch(); canvas.focus();
@@ -803,8 +809,13 @@
     $("graph-search").addEventListener("input", renderSearch); $("graph-search").addEventListener("keydown", searchKey);
     $("graph-search").addEventListener("focus", () => { if ($("graph-search").value.trim()) renderSearch(); });
     document.addEventListener("pointerdown", event => { if (!$("graph-search").parentNode.contains(event.target)) closeSearch(); });
+    // The result buttons are part of the search control: Escape on one closes the list, and tabbing out of the control closes it too.
+    $("search-results").addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeSearch(); canvas.focus(); } });
+    $("graph-search").parentNode.addEventListener("focusout", event => { if (event.relatedTarget && !$("graph-search").parentNode.contains(event.relatedTarget)) closeSearch(); });
     document.addEventListener("keydown", event => {
       if (typingTarget(document.activeElement)) return;
+      // Command, Control and Alt chords belong to the browser: find, page zoom, history.
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "/") { event.preventDefault(); $("graph-search").focus(); return; }
       if (event.key === "Escape") { if (state.dialog) { closeDialog($("picture-dialog")); state.dialog = false; } else if ($("help-dialog").open) closeDialog($("help-dialog")); else clearSelection(); return; }
       if ($("picture-dialog").open || $("help-dialog").open) return;
