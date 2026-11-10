@@ -49,16 +49,16 @@
             <div id="atlas-legend" class="legend-rows">
               <div><i class="legend-line"></i><span>Ordinary reference</span></div>
               <div><i class="legend-line cross"></i><span>Between Ages</span></div>
-              <div><i class="legend-line backtracking"></i><span>Saved return · inverted arrows</span></div>
+              <div title="The script saves the starting card before this move and the destination returns to it (push card / pop card)."><i class="legend-line backtracking"></i><span>Saved return · inverted arrows</span></div>
               <div><i class="legend-line restrictive"></i><span>Paired return reference</span></div>
-              <div><svg class="legend-arrow" viewBox="0 0 24 9" aria-hidden="true"><path d="M0 4.5h17M17 1.2l6 3.3-6 3.3z"/></svg><span>Automatic next step · hollow arrow</span></div>
+              <div title="One handler requests both cards in a row: the script moves on without another click. Path search does not follow it."><svg class="legend-arrow" viewBox="0 0 24 9" aria-hidden="true"><path d="M0 4.5h17M17 1.2l6 3.3-6 3.3z"/></svg><span>Automatic next step · hollow arrow</span></div>
               <div><i class="legend-line disabled"></i><span>Commented / disabled</span></div>
               <div id="conditional-legend" hidden><i class="legend-line conditional"></i><span>Conditional / Zip reference</span></div>
             </div>
             <div id="pdf-legend" class="legend-rows" hidden>
               <div><span class="pdf-line-sample"><i class="legend-line pdf-ordinary"></i></span><span>Ordinary reference</span></div>
-              <div><span class="pdf-line-sample"><i class="legend-line pdf-return"></i></span><span>Saved return · inverted arrows</span></div>
-              <div><span class="pdf-line-sample"><svg class="legend-arrow" viewBox="0 0 24 9" aria-hidden="true"><path d="M0 4.5h17M17 1.2l6 3.3-6 3.3z"/></svg></span><span>Automatic next step · hollow arrow</span></div>
+              <div title="The script saves the starting card before this move and the destination returns to it (push card / pop card)."><span class="pdf-line-sample"><i class="legend-line pdf-return"></i></span><span>Saved return · inverted arrows</span></div>
+              <div title="One handler requests both cards in a row: the script moves on without another click. Path search does not follow it. Where an ordinary reference joins the same two cards, the hollow arrow follows the filled one on the same line."><span class="pdf-line-sample"><svg class="legend-arrow" viewBox="0 0 24 9" aria-hidden="true"><path d="M0 4.5h17M17 1.2l6 3.3-6 3.3z"/></svg></span><span>Automatic next step · hollow arrow</span></div>
               <div><span class="pdf-line-sample"><i class="legend-line pdf-disabled"></i></span><span>Disabled: tee / dashed</span></div>
               <p class="pdf-legend-note">Original PDF colors, arrowheads, source/sink fills and page borders are retained. Age and paired-reference colors vary.</p>
             </div>

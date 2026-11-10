@@ -80,7 +80,9 @@ function harness(data) {
     set src(value) { this.url = value; }
     finish() { if (this.finished) return; this.finished = true; if (this.onload) this.onload(); }
   }
-  const window = {document, DEMYSTIFY_GRAPH: data, Image: LocalImage, devicePixelRatio: 2, requestAnimationFrame: callback => { frames.push(callback); return frames.length; }, addEventListener() {}, setTimeout};
+  // The harness has no layout: a test calls an observer to stand for a change of canvas size.
+  const resizeObservers = []; class RecordingResizeObserver { constructor(callback) { resizeObservers.push(callback); } observe() {} }
+  const window = {document, DEMYSTIFY_GRAPH: data, Image: LocalImage, ResizeObserver: RecordingResizeObserver, resizeObservers, devicePixelRatio: 2, requestAnimationFrame: callback => { frames.push(callback); return frames.length; }, addEventListener() {}, setTimeout};
   const context = vm.createContext({window, console, setTimeout}); vm.runInContext(source, context, {filename: "viewer.js"});
   const app = window.DeMystifyAtlas.app;
   const flush = () => { for (let n = 0; frames.length && n < 30; n++) frames.shift()(); assert.ok(frames.length < 30, "render loop must settle without image loads"); };
@@ -511,7 +513,6 @@ test("PDF grayscale mapper also desaturates gradient stops and retains transpare
 // Found by driving a real export in Chrome; each of these failed before its fix.
 const api = harness(fixture()).api;
 
-
 test("Command/Control/Alt chords are left to the browser", () => {
   const h = harness(fixture()); h.get("graph-canvas").focus();
   const scale = h.app.state.camera.scale, x = h.app.state.camera.x;
@@ -519,7 +520,6 @@ test("Command/Control/Alt chords are left to the browser", () => {
     assert.notEqual(h.document.dispatch("keydown", {key, [modifier]: true}).defaultPrevented, true, modifier + "+" + key + " must reach the browser");
   near(h.app.state.camera.scale, scale); near(h.app.state.camera.x, x);
 });
-
 
 test("ArrowUp from the search box starts at the last result and a new query drops the stale active option", () => {
   const h = harness(fixture()), search = h.get("graph-search");
@@ -530,13 +530,60 @@ test("ArrowUp from the search box starts at the last result and a new query drop
   assert.equal(search.getAttribute("aria-activedescendant"), null, "no option is active after the list was rebuilt");
 });
 
-
 test("search does not match the export's internal node index", () => {
   const data = fixture(); data.nodes[1].id = 777; data.edges = [];
   const graph = api.normalizeGraph(data);
   assert.equal(api.searchNodes(graph.nodes, "777").map(node => node.name).join(), "", "777 appears in no card ID, name or picture name");
 });
 
+test("two self-reference records of one card are drawn as two loops", () => {
+  const data = fixture(); data.nodes = data.nodes.slice(0, 1); data.edges = [{source: 1, target: 1, attributes: ["selfReference"]}, {source: 1, target: 1, attributes: ["disabled", "selfReference"]}];
+  const h = harness(data); h.app.state.camera = {x: 300, y: 300, scale: 1}; h.canvasCalls.length = 0; h.app.draw();
+  const loops = h.canvasCalls.filter(call => call[0] === "bezierCurveTo").map(call => call.slice(1).join(","));
+  assert.equal(loops.length, 2); assert.notEqual(loops[0], loops[1], "the two records must not share one curve");
+});
+
+test("under a highlight, unrelated atlas connections are not drawn stronger than ordinary ones", () => {
+  const data = fixture(); data.nodes[2].attributes.push("source"); data.edges = [{source: 1, target: 2, attributes: ["intraAge"]}];
+  const h = harness(data); h.app.clearSelection(); h.app.state.camera = {x: 200, y: 200, scale: 1};
+  const edgeAlpha = () => { h.canvasPaints.length = 0; h.app.draw(); return h.canvasPaints.find(paint => paint.method === "stroke" && paint.args.length === 0 && (paint.stroke === "#728268" || paint.stroke === api.grayColor("#728268", "edge", "atlas"))).alpha; };
+  const ordinary = edgeAlpha(); h.app.setHighlights(["source"]); const muted = edgeAlpha();
+  assert.ok(muted <= ordinary, "muted " + muted + " must not exceed ordinary " + ordinary);
+});
+
+test("a resize repaints in the same turn instead of leaving a cleared canvas for a frame", () => {
+  const h = harness(fixture());
+  const observers = h.window.resizeObservers; assert.ok(observers.length, "the viewer observes its canvas");
+  h.canvasPaints.length = 0; observers[0]();
+  assert.ok(h.canvasPaints.length > 0, "nothing was painted before the browser would present the cleared canvas");
+});
+
+test("switching zones off also empties the zone panel of the enlarged view", () => {
+  const h = harness(fixture()); h.app.showZone(h.app.state.selected.zones[0], true);
+  assert.match(h.get("dialog-zone-name").textContent, /Forward/);
+  h.get("show-zones").checked = false; h.app.updateZones();
+  assert.equal(h.get("dialog-zone-name").textContent, "Select a zone"); assert.equal(h.get("dialog-zone-script").textContent, "");
+});
+
+test("an export without pictures does not promise pictures", () => {
+  const data = fixture(); for (const node of data.nodes) { delete node.image; delete node.thumbnail; }
+  const h = harness(data); h.app.draw();
+  assert.doesNotMatch(h.get("view-status").textContent, /picture/i);
+});
+
+test("a finger tap that drifts a few pixels still selects", () => {
+  const h = harness(fixture()), canvas = h.get("graph-canvas"); h.app.clearSelection(); h.app.state.camera = {x: 200, y: 200, scale: 1};
+  canvas.dispatch("pointerdown", {clientX: 200, clientY: 200, pointerType: "touch"}); canvas.dispatch("pointermove", {clientX: 207, clientY: 203, pointerType: "touch"}); canvas.dispatch("pointerup", {clientX: 207, clientY: 203, pointerType: "touch"});
+  assert.equal(h.app.state.selected && h.app.state.selected.id, 1);
+  h.app.clearSelection(); h.app.state.camera = {x: 200, y: 200, scale: 1};
+  canvas.dispatch("pointerdown", {clientX: 200, clientY: 200, pointerType: "mouse"}); canvas.dispatch("pointermove", {clientX: 207, clientY: 203, pointerType: "mouse"}); canvas.dispatch("pointerup", {clientX: 207, clientY: 203, pointerType: "mouse"});
+  assert.equal(h.app.state.selected, null, "a mouse drag of the same length still pans");
+});
+
+test("selecting another card shows its panel from the top", () => {
+  const h = harness(fixture()), inspector = h.get("selection-panel").parentNode; inspector.scrollTop = 400;
+  h.app.selectNode(2); assert.equal(inspector.scrollTop, 0);
+});
 
 test("Escape on a focused result closes the list and keeps the selected card", () => {
   const h = harness(fixture()), search = h.get("graph-search"), list = h.get("search-results");
@@ -544,7 +591,6 @@ test("Escape on a focused result closes the list and keeps the selected card", (
   option.dispatch("keydown", {key: "Escape"});
   assert.equal(list.hidden, true, "the list closes"); assert.equal(h.app.state.selected && h.app.state.selected.id, 1, "the card stays selected");
 });
-
 
 test("tabbing out of the search control closes its list", () => {
   const h = harness(fixture()), search = h.get("graph-search"), list = h.get("search-results");
