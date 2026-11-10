@@ -131,7 +131,21 @@ func TestLiteralSequenceRejectsControlFlowAndUnresolvedContexts(t *testing.T) {
 	for name, body := range map[string]string{
 		"branches":     "if ready then\ngo card id 2\nelse\ngo card id 3\nend if",
 		"inline":       "if ready then go card id 2\ngo card id 3",
-		"loop":         "repeat with x = 1 to 2\ngo card id 2\ngo card id 3\nend repeat",
+		"alternatives": "if ready then go card id 2\nif waiting then go card id 3",
+		"else between": "if ready then\ngo card id 2\nelse\nplay \"click\"\nend if\ngo card id 3",
+		"inline else":  "if ready then\ngo card id 2\nelse go card id 4\ngo card id 3",
+		"conditional":  "go card id 2\nif ready then\ngo card id 3\nend if",
+		"branch exit":  "if ready then\ngo card id 2\nexit mouseUp\nend if\ngo card id 3",
+		"loop exit":    "repeat with x = 1 to 2\ngo card id 2\nend repeat\ngo card id 3",
+		"loop entry":   "go card id 2\nrepeat with x = 1 to 2\ngo card id 3\nend repeat",
+		"next turn":    "repeat with x = 1 to 2\ngo card id 3\nplay \"click\"\nend repeat\ngo card id 2",
+		"saved return": "if ready then push card\ngo card id 2\ngo card id 3",
+		"inline pop":   "go card id 2\ngo card id 3\nif ready then pop card",
+		"stack named":  "go card id 4 of stack \"Example\"\ngo card id 2\ngo card id 3",
+		"stack inline": "if ready then go card id 4 of stack \"Example\"\ngo card id 2\ngo card id 3",
+		"ordinal else": "if ready then play \"click\" else go next\ngo card id 2\ngo card id 3",
+		"then alone":   "if ready\nthen go next\ngo card id 2\ngo card id 3",
+		"comment line": "go card id 2\n-- a note ¬\ngo card id 3",
 		"join":         "go card id 2\nif ready then\nput 1 into state\nend if\ngo card id 3",
 		"dynamic go":   "global destination\ngo card id 2\ngo card destination\ngo card id 3",
 		"computed go":  "go card id 2\ngo card id offset + 2\ngo card id 3",
@@ -176,6 +190,30 @@ func TestLiteralSequenceRedrawEndsARunWithoutHidingTheHandler(t *testing.T) {
 			}
 			if len(got) != len(tc.want) || len(got) == 1 && got[0] != tc.want[0] {
 				t.Fatalf("got continuations %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A run lives inside one branch or one loop body, and can leave a branch by
+// its end. It never enters a condition or a loop, never passes an else and
+// never leaves a loop.
+func TestLiteralSequenceFollowsOneBranchAndItsEnd(t *testing.T) {
+	for name, body := range map[string]string{
+		"then branch":     "if ready then\ngo card id 2\nvs left\ngo card id 3\nelse\ngo card id 4\nend if",
+		"else branch":     "if ready then\ngo card id 4\nelse\ngo card id 2\nvs left\ngo card id 3\nend if",
+		"loop body":       "repeat with x = 1 to 2\ngo card id 2\ngo card id 3\nend repeat",
+		"branch end":      "if ready then\nvd\ngo card id 2\nvs \"left\"\nend if\ngo card id 3",
+		"two branch ends": "if ready then\nif lit then\ngo card id 2\nend if\nend if -- both\nplay \"click\"\ngo card id 3",
+		"else branch end": "if ready then\ngo card id 4\nelse\ngo card id 2\nend if\ngo card id 3",
+		"condition first": "if ready then play \"click\"\ngo card id 2\ngo card id 3\nexit mouseUp",
+		"inline literals": "if ready then go card id 4 else go card id 4\ngo card id 2\ngo card id 3",
+		"quoted keywords": "play \"go home\"\ngo card id 2\nplay \"then go back else push\"\ngo card id 3",
+	} {
+		t.Run(name, func(t *testing.T) {
+			edges := sequenceEdges(sequenceMetadata(t, sequenceCorpus("on mouseUp\n"+body+"\nend mouseUp")))
+			if len(edges) != 1 || edges[0].Source.Name != "Example:2" || edges[0].Target.Name != "Example:3" {
+				t.Fatalf("got %d continuation(s), want the single step 2 -> 3", len(edges))
 			}
 		})
 	}

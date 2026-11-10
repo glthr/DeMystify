@@ -14,6 +14,13 @@ var (
 	// The direction is one literal word; scripts spell it with or without quotes.
 	sequenceVS     = regexp.MustCompile(`(?i)^vs\s+(?:left|right|up|down|"(?:left|right|up|down)")$`)
 	sequenceVisual = regexp.MustCompile(`(?i)^visual\s+effect\s+(?:cut|plain|dissolve|(?:scroll|wipe)\s+(?:left|right|up|down))(?:\s+(?:very\s+)?(?:fast|slow))?$`)
+	// Leaving a branch by its end continues with the line that follows it.
+	sequenceEndIf = regexp.MustCompile(`(?i)^end\s+if$`)
+	// A saved return anywhere in the handler: push or pop, even after "then".
+	sequenceSavedReturn = regexp.MustCompile(`(?i)\b(?:push|pop)\b`)
+	// A go command starts a line or follows then or else.
+	sequenceGoStart = regexp.MustCompile(`(?i)(?:^|\b(?:then|else)\s+)go\b`)
+	sequenceElse    = regexp.MustCompile(`(?i)\s+else\b`)
 )
 
 // Between two requests, these commands of the shared Myst player display, play
@@ -50,7 +57,7 @@ func (p *Parser) newLiteralSequence(source any, script HyperTalk) *literalSequen
 	}
 	eligible := make(map[int]int)
 	for _, handler := range scriptHandlers(script) {
-		if handler.kind != "on" || !linearSequenceHandler(handler) {
+		if handler.kind != "on" || !sequenceHandler(handler) {
 			continue
 		}
 		for i := handler.start + 1; i < handler.end; i++ {
@@ -75,35 +82,64 @@ func (p *Parser) newLiteralSequence(source any, script HyperTalk) *literalSequen
 	return &literalSequence{owner: card, eligible: eligible, shared: shared, local: local, declared: make(map[*HyperCardCard]map[string]int)}
 }
 
-// Reject the whole handler rather than approximating joins, loop iterations or
-// saved-return state. Unrecognized ordinary calls still break individual runs.
-func linearSequenceHandler(handler handlerDefinition) bool {
-	goCount := 0
+// sequenceHandler reports whether a handler's lines can be read as runs. A
+// run is a stretch of lines inside one branch or one loop body: a condition,
+// an else, a loop boundary, an exit or any other command ends it at its own
+// line, in observe, so joins and loop iterations are never approximated.
+//
+// Only what a run cannot localize hides the whole handler: a continued line, a
+// saved return, and a go that is neither a literal card nor a redraw. Such a
+// go may leave the stack, after which a later card id means another card.
+func sequenceHandler(handler handlerDefinition) bool {
+	requests := 0
 	for _, line := range handler.body {
+		// A continued line takes the next one with it, comment or not.
+		if strings.Contains(line.Line, "¬") {
+			return false
+		}
 		command := activeCommand(line)
 		fields := strings.Fields(command)
 		if len(fields) == 0 {
 			continue
 		}
-		if strings.Contains(command, "¬") {
+		switch strings.ToLower(fields[0]) {
+		case "on", "function":
 			return false
 		}
-		switch strings.ToLower(fields[0]) {
-		case "if", "else", "repeat", "end", "exit", "next", "return", "pass", "push", "pop", "on", "function":
+		if sequenceSavedReturn.MatchString(unquotedNameStrings.ReplaceAllString(command, "")) {
 			return false
-		case "go":
-			// A redraw changes neither the card nor the stack. It ends a run
-			// in observe, like any other command, and hides nothing else.
-			if sequenceRedrawGo.MatchString(command) {
-				continue
-			}
-			if !sequenceLiteralGo.MatchString(command) {
+		}
+		for _, request := range goCommands(command) {
+			switch {
+			case sequenceRedrawGo.MatchString(request):
+			case sequenceLiteralGo.MatchString(request):
+				// Only a request that is the whole line can begin or end a run.
+				if request == command {
+					requests++
+				}
+			default:
 				return false
 			}
-			goCount++
 		}
 	}
-	return goCount >= 2
+	return requests >= 2
+}
+
+// goCommands returns every go command of a line: the one that starts it and
+// those that follow then or else, each up to a following else. Quoted text is
+// not searched.
+func goCommands(command string) []string {
+	masked := unquotedNameStrings.ReplaceAllStringFunc(command, func(quoted string) string { return strings.Repeat("\"", len(quoted)) })
+	var requests []string
+	for _, match := range sequenceGoStart.FindAllStringIndex(masked, -1) {
+		begin := match[1] - len("go")
+		end := len(masked)
+		if next := sequenceElse.FindStringIndex(masked[begin:]); next != nil {
+			end = begin + next[0]
+		}
+		requests = append(requests, strings.TrimSpace(command[begin:end]))
+	}
+	return requests
 }
 
 func (s *literalSequence) cardDeclarations(card *HyperCardCard) map[string]int {
@@ -178,6 +214,12 @@ func (s *literalSequence) observe(index int, line ScriptLine, link *HyperCardLin
 	// VS is an explicit visual-only convention of this abstraction, not an
 	// inferred summary of arbitrary external handlers. Imported overrides win.
 	if sequenceVS.MatchString(command) && !s.overridden("vs") || sequenceVisual.MatchString(command) && !s.overridden("visual") || s.transparent(command) {
+		return nil
+	}
+	// Only display, sound and wait commands separate the request from this
+	// line, so no block was opened since: the branch that ends here holds the
+	// request, and the handler goes on with the line below.
+	if sequenceEndIf.MatchString(command) {
 		return nil
 	}
 	s.current = nil

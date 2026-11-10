@@ -58,7 +58,7 @@ func TestNativeMystParity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if m.TotalNodes != 1364 || m.TotalEdges != 3239 || len(m.Edges) != 3282 {
+		if m.TotalNodes != 1364 || m.TotalEdges != 3244 || len(m.Edges) != 3288 {
 			t.Fatalf("input %d: got %d nodes, %d active pairs, %d edge records", i, m.TotalNodes, m.TotalEdges, len(m.Edges))
 		}
 		g.Process()
