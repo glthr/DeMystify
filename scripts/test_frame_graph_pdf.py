@@ -55,6 +55,17 @@ class FrameGraphTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 frame_graph(source, source, date(2026, 11, 9), "subtitle")
             self.assertEqual(source.read_bytes(), original)
+            # The same file under another name: a hard link everywhere, and
+            # another letter case where the volume ignores case.
+            alias = Path(directory) / "alias.pdf"
+            os.link(source, alias)
+            with self.assertRaises(ValueError):
+                frame_graph(source, alias, date(2026, 11, 9), "subtitle")
+            other_case = Path(directory) / "GRAPH.PDF"
+            if other_case.exists():
+                with self.assertRaises(ValueError):
+                    frame_graph(source, other_case, date(2026, 11, 9), "subtitle")
+            self.assertEqual(source.read_bytes(), original)
 
     @unittest.skipIf(os.name == "nt", "POSIX permission bits")
     def test_framed_pdf_is_as_readable_as_the_graph_it_frames(self):

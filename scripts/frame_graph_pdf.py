@@ -14,7 +14,9 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 
 def frame_graph(source, destination, updated, subtitle):
-    if source.resolve() == destination.resolve():
+    # Compare the files, not their spellings: on a case-insensitive volume
+    # "Graph.pdf" and "graph.PDF" are one file.
+    if source.resolve() == destination.resolve() or destination.exists() and os.path.samefile(source, destination):
         raise ValueError("Use a separate output file to preserve the raw graph")
     reader = PdfReader(source)
     if len(reader.pages) != 1:
