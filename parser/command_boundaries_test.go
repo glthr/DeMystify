@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/glthr/DeMystify/common"
+	"github.com/glthr/DeMystify/hypercard"
 )
 
 func TestCommandsDoNotInventLiteralTargetsFromExpressions(t *testing.T) {
@@ -82,5 +83,52 @@ func TestCommentsThatResembleCommandsDoNotAbortTheAnalysis(t *testing.T) {
 		if _, err := NewParserFromCorpus(sequenceCorpus("on mouseUp\n" + body + "\nend mouseUp")); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+}
+
+// A handler switched off by commenting out its declaration leaves its body in
+// no handler, so HyperCard never runs it. Its references are disabled, like
+// those of commented lines, and it sets no card state.
+func TestBodyUnderACommentedOutDeclarationIsReadAsCommented(t *testing.T) {
+	for name, tc := range map[string]struct {
+		script string
+		want   []string
+	}{
+		"removed handler":          {"--on mouseUp\ngo card id 2\ngo this card\nend mouseUp", []string{"Example:1 -> Example:2 disabled", "Example:1 -> Example:1 disabled"}},
+		"removed function":         {"--function pick\ngo card id 2\nend pick", []string{"Example:1 -> Example:2 disabled"}},
+		"annotated declaration":    {"-- on skipIt  -- removed\nvd\ngo to card id 2\nend skipIt", []string{"Example:1 -> Example:2 disabled"}},
+		"beside its live twin":     {"on mouseUp\ngo card id 2\nend mouseUp\n--on skipIt\ngo card id 2\nend skipIt", []string{"Example:1 -> Example:2", "Example:1 -> Example:2 disabled"}},
+		"live handler afterwards":  {"--on mouseUp\ngo card id 2\nend mouseUp\non mouseDown\ngo card id 3\nend mouseDown", []string{"Example:1 -> Example:2 disabled", "Example:1 -> Example:3"}},
+		"already commented line":   {"--on mouseUp\n--go card id 2\ngo card id 3\nend mouseUp", []string{"Example:1 -> Example:2 disabled", "Example:1 -> Example:3 disabled"}},
+		"invalid line in the body": {"--on mouseUp\ngo to card id 0\ngo card id 2\nend mouseUp", []string{"Example:1 -> Example:2 disabled"}},
+		"two removed handlers":     {"--on a\npush card id 4 of stack \"Example\"\nend a\n--on b\ngo card id 2\nend b", []string{"Example:1 -> Example:2 disabled"}},
+		// Not removed: the comment sits inside a live handler, has no end line
+		// of its own, or only begins with the word "on".
+		"comment in a live handler": {"on mouseUp\n--on mouseDown\ngo card id 2\nend mouseUp", []string{"Example:1 -> Example:2"}},
+		"no end line":               {"--on mouseUp\ngo card id 2", []string{"Example:1 -> Example:2"}},
+		"a sentence":                {"-- on the way out\ngo card id 2\nend mouseUp", []string{"Example:1 -> Example:2"}},
+		"end of another handler":    {"--on mouseUp\ngo card id 2\non mouseDown\ngo card id 3\nend mouseUp\nend mouseDown", []string{"Example:1 -> Example:2", "Example:1 -> Example:3"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			metadata := sequenceMetadata(t, sequenceCorpus(tc.script))
+			var got []string
+			for _, edge := range metadata.Edges {
+				record := edge.Source.Name + " -> " + edge.Target.Name
+				if edge.IsOfType(common.Disabled) {
+					record += " disabled"
+				}
+				got = append(got, record)
+			}
+			if strings.Join(got, "; ") != strings.Join(tc.want, "; ") {
+				t.Fatalf("records %v, want %v", got, tc.want)
+			}
+		})
+	}
+	// A removed body cannot make its card a saved-return target.
+	corpus := sequenceCorpus("on mouseUp\npush card\ngo card id 2\nend mouseUp")
+	corpus.Stacks[0].Cards[1].Parts = []hypercard.Part{{ID: 1, Script: hypercard.Script{Text: "--on mouseUp\nvd\npop card\nend mouseUp"}}}
+	metadata := sequenceMetadata(t, corpus)
+	if len(metadata.Edges) != 1 || metadata.Edges[0].IsOfType(common.Backtracking) {
+		t.Fatalf("a removed pop card made a saved return: %+v", metadata.Edges)
 	}
 }

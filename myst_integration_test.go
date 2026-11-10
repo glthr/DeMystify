@@ -105,14 +105,16 @@ func TestOriginalMystImport(t *testing.T) {
 			}
 		}
 	}
-	if classes[common.Backtracking] != 47 || classes[common.Disabled] != 9 || classes[common.NotImplemented] != 3 || classes[common.CrossAge] != 21 ||
+	if classes[common.Backtracking] != 47 || classes[common.Disabled] != 26 || classes[common.NotImplemented] != 3 || classes[common.CrossAge] != 21 ||
 		classes[common.RestrictiveTransitivityTail] != 5 || classes[common.RestrictiveTransitivityHead] != 5 {
 		t.Errorf("unexpected record classes: saved returns=%d disabled=%d absent targets=%d between Ages=%d paired tails=%d paired heads=%d",
 			classes[common.Backtracking], classes[common.Disabled], classes[common.NotImplemented], classes[common.CrossAge],
 			classes[common.RestrictiveTransitivityTail], classes[common.RestrictiveTransitivityHead])
 	}
-	if self := len(g.FindNodesWithSelfLoops()); self != 20 {
-		t.Errorf("got %d nodes with an active reference to themselves, want 20", self)
+	// Eleven marker buttons and six lever buttons hold a body whose handler
+	// declaration was commented out: 17 of the 26 disabled records.
+	if self := len(g.FindNodesWithSelfLoops()); self != 9 {
+		t.Errorf("got %d nodes with an active reference to themselves, want 9", self)
 	}
 	verifySharedStackHandlerEntries(t, g)
 	localDistance := float64(3)
@@ -203,9 +205,9 @@ func mystInputProfile(t *testing.T, dir string) (uint, int, bool) {
 				}
 				switch strings.ToLower(strings.Join(strings.Fields(part.Script.Text), " ")) {
 				case "on mouseup 5119 end mouseup":
-					return 3249, 3275, false
+					return 3238, 3281, false
 				case "on mouseup go to card id 5119 end mouseup":
-					return 3250, 3276, true
+					return 3239, 3282, true
 				}
 			}
 		}
