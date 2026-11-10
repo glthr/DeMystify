@@ -153,6 +153,7 @@ func run(args []string) error {
 
 	fmt.Printf("Nodes count: %d\n", metadata.TotalNodes)
 	fmt.Printf("Edges count: %d\n", metadata.TotalEdges)
+	fmt.Print(analysisSummary(metadata))
 
 	// calculate the shortest path between start (Myst:8336) and end (Dunny Age:11088) of the game
 	// shortestPath, err := ComputeShortestPath(p, g, "Myst", 8336, "Dunny Age", 11088)
@@ -212,6 +213,7 @@ func run(args []string) error {
 	if err := os.WriteFile(graphFilePath, []byte(dotContent), 0644); err != nil {
 		return fmt.Errorf("saving DOT file: %w", err)
 	}
+	fmt.Printf("DOT file: %s\n", graphFilePath)
 	var drawing *pdflayout.Drawing
 	pdfRendered := false
 	if usePDFLayout {
@@ -264,6 +266,32 @@ func run(args []string) error {
 		return pdf.RenderPDF(graphFilePath)
 	}
 	return nil
+}
+
+// analysisSummary reports what the analysis found, so that the figures the
+// project publishes can be read from a run. "Edges count" above is the number
+// of non-disabled directed pairs; a pair can hold several records.
+func analysisSummary(metadata *common.Metadata) string {
+	var returns, steps, disabled int
+	for _, edge := range metadata.Edges {
+		if edge.IsOfType(common.Backtracking) {
+			returns++
+		}
+		if edge.IsOfType(common.SequenceContinuation) {
+			steps++
+		}
+		if edge.IsOfType(common.Disabled) {
+			disabled++
+		}
+	}
+	stats := metadata.Stats
+	summary := fmt.Sprintf("Edge records: %d (saved returns: %d, automatic next steps: %d, disabled: %d)\n", len(metadata.Edges), returns, steps, disabled)
+	summary += fmt.Sprintf("Source / sink / isolated flags: %d / %d / %d\n", len(stats.NodesWithNoIncoming), len(stats.NodesWithNoOutgoing), len(stats.IsolatedNodes))
+	summary += fmt.Sprintf("Nodes with an active reference to themselves: %d\n", len(stats.NodesWithSelfLoops))
+	if farthest := stats.MostSeparatedNodes; len(farthest.Path) > 1 {
+		summary += fmt.Sprintf("Largest finite shortest distance: %.0f (%s to %s)\n", farthest.Distance, farthest.Source.Name, farthest.Target.Name)
+	}
+	return summary
 }
 
 func ComputeShortestPath(

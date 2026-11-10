@@ -120,3 +120,33 @@ func TestSyntheticPipeline(t *testing.T) {
 		t.Fatalf("Graphviz rejected generated DOT: %v\n%s", err, output)
 	}
 }
+
+// A run prints the figures the project publishes, not only two totals.
+func TestAnalysisSummaryReportsRecordsFlagsAndTheLongestDistance(t *testing.T) {
+	a := &common.Node{Name: "Test Age:1", Attributes: []common.NodeAttribute{common.IsCard}}
+	b := &common.Node{Name: "Test Age:2", Attributes: []common.NodeAttribute{common.IsCard}}
+	c := &common.Node{Name: "Test Age:3", Attributes: []common.NodeAttribute{common.IsCard}}
+	d := &common.Node{Name: "Test Age:4", Attributes: []common.NodeAttribute{common.IsCard}}
+	record := func(source, target *common.Node, attributes ...common.EdgeAttribute) *common.Edge {
+		return &common.Edge{Source: source, Target: target, Attributes: append([]common.EdgeAttribute{common.IntraAge}, attributes...)}
+	}
+	metadata := &common.Metadata{Nodes: []*common.Node{a, b, c, d}, Edges: []*common.Edge{
+		record(a, b), record(b, c), record(a, c),
+		record(b, c, common.SequenceContinuation), record(c, c), record(c, a, common.Backtracking), record(a, a, common.Disabled),
+	}}
+	g, err := graph.NewGraph(metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Process()
+	want := "Edge records: 7 (saved returns: 1, automatic next steps: 1, disabled: 1)\n" +
+		"Source / sink / isolated flags: 1 / 1 / 1\n" +
+		"Nodes with an active reference to themselves: 1\n" +
+		"Largest finite shortest distance: 1 (Test Age:1 to Test Age:2)\n"
+	if got := analysisSummary(metadata); got != want {
+		t.Fatalf("summary:\n%s\nwant:\n%s", got, want)
+	}
+	if got := analysisSummary(&common.Metadata{}); strings.Contains(got, "Largest") {
+		t.Fatalf("an empty graph reported a distance:\n%s", got)
+	}
+}
