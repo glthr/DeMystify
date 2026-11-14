@@ -3,6 +3,8 @@ package riven
 import (
 	"fmt"
 	"strings"
+
+	"github.com/glthr/DeMystify/common"
 )
 
 type Branch struct {
@@ -206,7 +208,7 @@ func ParseNames(b []byte) ([]string, error) {
 		if end == len(b) {
 			return nil, fmt.Errorf("unterminated NAME string")
 		}
-		names[i] = string(b[p:end])
+		names[i] = common.DecodeMacRoman(b[p:end])
 	}
 	return names, nil
 }

@@ -2,6 +2,7 @@ package dot
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/glthr/DeMystify/common"
 )
@@ -19,6 +20,15 @@ func enrichTransitiveEdgeIDTooltip(tooltip *string, edge *common.Edge) {
 func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := g.applyNavigationStyle(edge, isOnCustomPath)
 	style.kind = edge.Kind
+	if g.metadata != nil && strings.EqualFold(g.metadata.Game, "riven") {
+		style.attributes = drawingEdgeAttributes(edge)
+	}
+	if edge.IsOfType(common.Conditional) {
+		style.tooltip = joinTooltip(style.tooltip, "Conditional reference (local script/hotspot guards retained; puzzle state is not executed)")
+		if !isOnCustomPath && !edge.IsOfType(common.Disabled) && !edge.IsOfType(common.Native) && !edge.IsOfType(common.Zip) && !edge.IsOfType(common.EndingReset) {
+			style.color, style.style = "#7aada3", "dashed"
+		}
+	}
 	if edge.IsOfType(common.SequenceContinuation) {
 		style.tooltip = joinTooltip(style.tooltip, continuationTooltip)
 		// A hollow head marks the automatic step. The calling card keeps its own
@@ -40,6 +50,18 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 		style.color = "#a08bac"
 		style.style = "dashed"
 		style.tooltip = joinTooltip(style.tooltip, "Ending reset (excluded from ordinary paths)")
+	}
+	if g.metadata != nil && strings.EqualFold(g.metadata.Game, "riven") && edge.IsOfType(common.Disabled) {
+		// A disabled native/Zip/conditional record keeps its tee and muted
+		// stroke; no optional navigation layer can paint it as an active move.
+		style.color, style.style = "#8d8875", "dashed"
+	}
+	for _, evidence := range edge.Evidence {
+		for _, key := range []string{"classification_reason", "availability_reason"} {
+			if reason, ok := evidence[key].(string); ok && reason != "" && !strings.Contains(style.tooltip, reason) {
+				style.tooltip = joinTooltip(style.tooltip, reason)
+			}
+		}
 	}
 	return style
 }

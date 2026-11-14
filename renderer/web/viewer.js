@@ -39,7 +39,7 @@
       node.assetName = String(input.assetName || "");
       node.sourceId = String(input.sourceId || "");
       node.searchText = [node.name, node.sourceId, node.stack, node.originalName, node.assetName, node.rmap].join(" ").toLowerCase();
-      node.zones = (Array.isArray(input.zones) ? input.zones : []).map((zone, index) => ({...zone, key: index, id: zone.id == null ? index + 1 : zone.id, type: String(zone.type || "part"), name: String(zone.name || ""), layer: zone.layer === "background" ? "background" : "card", x: finite(zone.x), y: finite(zone.y), width: Math.max(0, finite(zone.width)), height: Math.max(0, finite(zone.height)), hidden: zone.hidden === true, enabled: zone.enabled !== false, script: typeof zone.script === "string" ? zone.script : ""}));
+      node.zones = (Array.isArray(input.zones) ? input.zones : []).map((zone, index) => ({...zone, key: index, id: zone.id == null ? index + 1 : zone.id, type: String(zone.type || "part"), name: String(zone.name || ""), layer: zone.layer === "background" ? "background" : "card", x: finite(zone.x), y: finite(zone.y), width: Math.max(0, finite(zone.width)), height: Math.max(0, finite(zone.height)), hidden: zone.hidden === true, enabled: zone.enabled !== false, availability: String(zone.availability || "unknown"), availabilityReason: String(zone.availabilityReason || ""), script: typeof zone.script === "string" ? zone.script : ""}));
       node.atlas = {x: node.x, y: node.y, width: node.width, height: node.height};
       nodes.push(node); byID.set(node.id, node);
     }
@@ -152,7 +152,10 @@
     for (const edge of input.edges || []) {
       if (!byID.has(Number(edge.source)) || !byID.has(Number(edge.target))) return null;
       const operations = [...(edge.draw || []), ...(edge.head || []), ...(edge.tail || []), ...(edge.labels || [])];
-      edges.push({...edge, source: Number(edge.source), target: Number(edge.target), bounds: operationBounds(operations)});
+      const flags = new Set((edge.attributes || []).map(attribute));
+      // Earlier Riven drawings carried the typed kind but no attribute list.
+      if (edge.kind === "sequence-continuation") flags.add("sequencecontinuation");
+      edges.push({...edge, source: Number(edge.source), target: Number(edge.target), flags, bounds: operationBounds(operations)});
     }
     return {...input, nodes, edges};
   }
@@ -291,6 +294,7 @@
     const requestFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : callback => window.setTimeout(callback, 16);
     const visible = node => state.ages.has(node.stack);
     const edgeAllowed = edge => !isRiven || (!String(edge.kind || "").startsWith("native") || state.nativeNavigation) && (edge.kind !== "zip" || state.zipNavigation) && (!["native-ending", "native-new-game"].includes(edge.kind) || state.endingResets);
+    const pathAllowed = edge => edgeAllowed(edge) && !["disabled", "sequencecontinuation", "backtracking", "restrictivetransitivitytail", "restrictivetransitivityhead"].some(flag => has(edge, flag));
     const pathPair = edge => edge.source + ">" + edge.target;
     const muted = node => state.highlights.size > 0 && !node.highlightMatch;
     const edgeMuted = edge => state.highlights.size > 0 && !graph.byID.get(edge.source).highlightMatch && !graph.byID.get(edge.target).highlightMatch;
@@ -344,7 +348,8 @@
       $("map-surface").classList.toggle("is-pdf", mode === "pdf"); $("map-surface").classList.toggle("has-layouts", !!graph.pdfLayout);
       $("layout-tools").hidden = !graph.pdfLayout; $("pdf-images-control").hidden = mode !== "pdf" || !hasPictures;
       $("pdf-layout").setAttribute("aria-pressed", String(mode === "pdf")); $("atlas-layout").setAttribute("aria-pressed", String(mode === "atlas"));
-      $("atlas-legend").hidden = mode === "pdf" || isRiven; $("pdf-legend").hidden = mode !== "pdf" || isRiven;
+      $("atlas-legend").hidden = mode === "pdf"; $("pdf-legend").hidden = mode !== "pdf";
+      if (isRiven) updateRivenLegends();
       canvas.setAttribute("aria-label", (mode === "pdf" ? "Shared PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
       renderFilters();
       updateHighlightCounts();
@@ -423,14 +428,15 @@
       if (has(edge, "restrictivetransitivityhead") || has(edge, "restrictivetransitivitytail")) color = "#c5a269";
       if (has(edge, "backtracking")) color = "#ac94bf";
       if (has(edge, "conditional") || has(edge, "zip")) { color = "#7aada3"; dash = [7, 5]; }
-      if (has(edge, "disabled")) { color = "#8d8875"; dash = [5, 5]; alpha *= .7; }
       if (String(edge.kind || "").startsWith("native")) { color = "#c5a269"; dash = [4, 3]; }
+      if (has(edge, "disabled")) { color = "#8d8875"; dash = [5, 5]; alpha *= .7; }
       if (state.highlights.size) {
         if (edgeMuted(edge)) { color = grayColor(color, "edge", "atlas"); alpha = .3; }
         else alpha = has(edge, "disabled") ? .65 : .9;
       }
-      if (state.pathPairs.has(pathPair(edge))) { color = "#f0d28a"; dash = []; alpha = 1; }
-      return {color, dash, alpha, related: related || state.pathPairs.has(pathPair(edge))};
+      const onPath = state.pathPairs.has(pathPair(edge)) && pathAllowed(edge);
+      if (onPath) { color = "#f0d28a"; dash = []; alpha = 1; }
+      return {color, dash, alpha, related: related || onPath};
     }
     function arrow(x, y, angle, size, edge, tail = false) {
       if (!tail && has(edge, "restrictivetransitivitytail")) return;
@@ -520,7 +526,7 @@
       if (bounds && (bounds.maxX < viewport.minX || bounds.minX > viewport.maxX || bounds.maxY < viewport.minY || bounds.minY > viewport.maxY)) return;
       const defaults = {stroke: edge.color, fill: edge.color, penWidth: edge.penWidth, style: edge.style, metrics: pdfTextMetrics};
       if (edgeMuted(edge)) defaults.colorMap = color => grayColor(color, "edge", "pdf");
-      if (state.pathPairs.has(pathPair(edge))) { defaults.colorMap = () => "#b58a27"; defaults.penWidth = 2; }
+      if (state.pathPairs.has(pathPair(edge)) && pathAllowed(edge)) { defaults.colorMap = () => "#b58a27"; defaults.penWidth = 2; }
       for (const operations of [edge.draw, edge.head, edge.tail, edge.labels]) replayOperations(ctx, operations, defaults);
     }
     function drawPDFNode(node) {
@@ -702,7 +708,10 @@
         button.setAttribute("aria-label", other.name + ", " + edgeLabel(edge)); button.addEventListener("click", () => selectNode(other.id, true));
         if (isRiven) {
           const entry = element("div", "reference-entry"), evidence = element("details", "source-detail");
-          evidence.append(element("summary", "", "Inspect " + String(edge.kind || "script") + " evidence · " + (Array.isArray(edge.evidence) ? edge.evidence.length : 0) + " callsites"), element("pre", "", JSON.stringify(edge.evidence || [], null, 2)));
+          evidence.append(element("summary", "", "Inspect " + String(edge.kind || "script") + " evidence · " + (Array.isArray(edge.evidence) ? edge.evidence.length : 0) + " callsites"));
+          const reasons = [...new Set((Array.isArray(edge.evidence) ? edge.evidence : []).flatMap(item => [item.classification_reason, item.availability_reason]).filter(reason => typeof reason === "string" && reason.trim()))];
+          for (const reason of reasons) evidence.append(element("p", "reference-classification", reason));
+          evidence.append(element("pre", "", JSON.stringify(edge.evidence || [], null, 2)));
           entry.append(button, evidence); host.append(entry);
         } else host.append(button);
       }
@@ -725,9 +734,9 @@
           if (zone.hidden && !state.hiddenZones) continue;
           const box = clippedZone(zone, width, height); if (!box.width || !box.height) continue;
           const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-          rect.setAttribute("class", "zone-rect" + (zone.hidden ? " is-hidden" : "") + (!zone.enabled ? " is-disabled" : "") + (state.zone && state.zone.key === zone.key ? " is-selected" : ""));
+          rect.setAttribute("class", "zone-rect" + (zone.hidden ? " is-hidden" : "") + (zoneDisabled(zone) ? " is-disabled" : "") + (state.zone && state.zone.key === zone.key ? " is-selected" : ""));
           for (const [key, value] of Object.entries(box)) rect.setAttribute(key, value);
-          const label = (zone.name || "Part " + zone.id) + " · " + zone.layer + " " + zone.type + (zone.hidden ? " · stored hidden" : "") + (!zone.enabled ? " · stored disabled" : "");
+          const label = (zone.name || "Part " + zone.id) + " · " + zone.layer + " " + zone.type + (zone.hidden ? " · stored hidden" : "") + zoneAvailabilityLabel(zone);
           rect.setAttribute("role", "button"); rect.setAttribute("tabindex", "0"); rect.setAttribute("aria-label", label);
           zoneRectangles.get(host).push({rect, key: zone.key});
           const title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = label; rect.append(title);
@@ -740,10 +749,16 @@
       }
       host.append(stage);
     }
+    function zoneDisabled(zone) { return isRiven ? zone.availability === "disabled" : !zone.enabled; }
+    function zoneAvailabilityLabel(zone) {
+      if (!isRiven) return !zone.enabled ? " · stored disabled" : "";
+      const label = {enabled: "statically enabled", disabled: "statically disabled", conditional: "conditional availability", unknown: "availability unknown"}[zone.availability] || "availability unknown";
+      return " · " + label + (zone.availabilityReason ? " · " + zone.availabilityReason : "");
+    }
     function showZone(zone, pinned) {
       if (pinned) state.zone = zone;
       $("zone-detail").hidden = false; $("zone-name").textContent = zone.name || "Part " + zone.id;
-      const meta = zone.layer + " " + zone.type + " · ID " + zone.id + (zone.hidden ? " · stored hidden" : "") + (!zone.enabled ? " · stored disabled" : "");
+      const meta = zone.layer + " " + zone.type + " · ID " + zone.id + (zone.hidden ? " · stored hidden" : "") + zoneAvailabilityLabel(zone);
       $("zone-meta").textContent = meta; $("zone-script").textContent = zone.script || "No script stored on this part.";
       $("dialog-zone-name").textContent = zone.name || "Part " + zone.id; $("dialog-zone-meta").textContent = meta; $("dialog-zone-script").textContent = zone.script || "No script stored on this part.";
       if (pinned) for (const rectangles of zoneRectangles.values()) for (const item of rectangles) item.rect.classList.toggle("is-selected", item.key === zone.key);
@@ -810,7 +825,7 @@
       if (!state.selected) { $("path-status").textContent = "Origin: " + origin.name; return; }
       const target = state.selected, queue = [origin.id], previous = new Map([[origin.id, null]]);
       for (let index = 0; index < queue.length && !previous.has(target.id); index++) {
-        for (const edge of graph.outgoing.get(queue[index])) if (edgeAllowed(edge) && !previous.has(edge.target)) { previous.set(edge.target, edge.source); queue.push(edge.target); }
+        for (const edge of graph.outgoing.get(queue[index])) if (pathAllowed(edge) && !previous.has(edge.target)) { previous.set(edge.target, edge.source); queue.push(edge.target); }
       }
       if (!previous.has(target.id)) { $("path-status").textContent = origin.name + " → " + target.name + ": no path in these navigation layers."; return; }
       for (let id = target.id; id != null; id = previous.get(id)) state.path.push(id);
@@ -927,8 +942,16 @@
       $("age-panel-title").textContent = "EXPLORE BY STACK";
       $("cross-legend-label").textContent = "Between stacks";
       $("riven-legend").hidden = false;
-      for (const id of ["myst-return-legend", "myst-paired-legend", "myst-sequence-legend", "myst-disabled-legend"]) $(id).hidden = true;
-      $("inspector-footnote").textContent = "A reference is not a promise of access. Puzzle state, hotspot enablement and saved returns are not executed here.";
+      $("disabled-legend-label").textContent = "Statically disabled";
+      $("pdf-disabled-legend-label").textContent = "Statically disabled · tee / dashed";
+      $("conditional-legend-label").textContent = "Conditional hotspot reference";
+      $("inspector-footnote").textContent = "Static availability labels come from conservative script analysis. Full puzzle state and saved returns are not executed here.";
+    }
+    function updateRivenLegends() {
+      const present = flag => graph.edges.some(edge => has(edge, flag));
+      for (const [id, flag] of [["myst-return-legend", "backtracking"], ["pdf-return-legend", "backtracking"], ["myst-paired-legend", "restrictivetransitivitytail"], ["myst-sequence-legend", "sequencecontinuation"], ["pdf-sequence-legend", "sequencecontinuation"], ["myst-disabled-legend", "disabled"], ["pdf-disabled-legend", "disabled"], ["riven-native-legend", "native"], ["riven-zip-legend", "zip"]]) $(id).hidden = !present(flag);
+      $("conditional-legend").hidden = !present("conditional");
+      $("riven-pdf-conditional-legend").hidden = state.mode !== "pdf" || !present("conditional");
     }
     renderHighlightFilters(); setLayout(state.mode, false); resize(true);
     let hash = "";

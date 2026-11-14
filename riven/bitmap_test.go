@@ -231,13 +231,7 @@ func TestExtractImagesUsesExistingAssetsManifestAndDeduplicatesDefaultBitmap(t *
 // exercises every default view and compares representative decoded bytes to
 // the independently verified extraction, one card from each stack.
 func TestSuppliedDiscBitmapViews(t *testing.T) {
-	input := os.Getenv("RIVEN_TEST_DATA")
-	if input == "" {
-		input = os.Getenv("RIVEN_TEST_INPUT")
-	}
-	if input == "" {
-		t.Skip("set RIVEN_TEST_DATA to the supplied five-CD directory")
-	}
+	input, _ := fixtureCorpus(t)
 	imported, err := LoadInput(input)
 	if err != nil {
 		t.Fatal(err)
