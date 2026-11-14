@@ -11,8 +11,8 @@
   <div class="atlas">
     <header class="topbar">
       <a class="brand" href="#" id="home-link" aria-label="DeMystify, fit the graph">
-        <span class="brand-mark" aria-hidden="true">D</span>
-        <span><strong>DeMystify</strong><span class="eyebrow">THE CARD ATLAS</span></span>
+        <span id="brand-mark" class="brand-mark" aria-hidden="true">D</span>
+        <span><strong id="brand-name">DeMystify</strong><span class="eyebrow">THE CARD ATLAS</span></span>
       </a>
       <div class="search-wrap">
         <label class="sr-only" for="graph-search">Search all Ages by card ID, name or picture</label>
@@ -34,7 +34,7 @@
         </div>
         <aside class="map-tools">
           <details class="tool-panel age-panel" open>
-            <summary><span class="eyebrow">EXPLORE BY AGE</span><span class="summary-chevron">⌄</span></summary>
+            <summary><span id="age-panel-title" class="eyebrow">EXPLORE BY AGE</span><span class="summary-chevron">⌄</span></summary>
             <div class="age-actions"><button id="all-ages">Show all</button><button id="no-ages">Clear</button></div>
             <div id="age-filters" class="age-filters"></div>
           </details>
@@ -44,17 +44,32 @@
             <div id="node-highlights" class="node-highlights" role="group" aria-label="Highlight nodes matching any selected category" aria-describedby="highlight-description"></div>
             <div class="highlight-footer"><span><span class="highlight-stat-label">Emphasized</span><output id="highlight-count" aria-live="polite">All visible</output></span><button id="clear-highlights" aria-label="Clear node highlights">Clear</button></div>
           </details>
+          <details id="riven-projection-panel" class="tool-panel projection-panel" hidden>
+            <summary><span class="eyebrow">NAVIGATION LAYERS</span><span class="summary-chevron">⌄</span></summary>
+            <div class="projection-options">
+              <label><input id="native-navigation" type="checkbox" checked>Native navigation</label>
+              <label><input id="zip-navigation" type="checkbox">Zip shortcuts</label>
+              <label><input id="ending-resets" type="checkbox">Ending / new-game resets</label>
+            </div>
+            <p class="legend-note">Optional layers remain in the export. Saved inventory returns depend on their caller.</p>
+          </details>
+          <details id="riven-path-panel" class="tool-panel path-panel" hidden>
+            <summary><span class="eyebrow">STRUCTURAL PATH</span><span class="summary-chevron">⌄</span></summary>
+            <div class="age-actions"><button id="set-path-origin">Set selected as origin</button><button id="clear-path">Clear</button></div>
+            <p id="path-status" class="legend-note">Select a card, set the origin, then select a destination.</p>
+          </details>
           <details class="tool-panel legend-panel">
             <summary><span class="eyebrow">READ THE CONNECTIONS</span><span class="summary-chevron">⌄</span></summary>
             <div id="atlas-legend" class="legend-rows">
               <div><i class="legend-line"></i><span>Ordinary reference</span></div>
-              <div><i class="legend-line cross"></i><span>Between Ages</span></div>
-              <div title="The script saves the starting card before this move and the destination returns to it (push card / pop card)."><i class="legend-line backtracking"></i><span>Saved return · inverted arrows</span></div>
-              <div><i class="legend-line restrictive"></i><span>Paired return reference</span></div>
-              <div title="One handler requests both cards in a row: the script moves on without another click. Path search does not follow it."><svg class="legend-arrow" viewBox="0 0 24 9" aria-hidden="true"><path d="M0 4.5h17M17 1.2l6 3.3-6 3.3z"/></svg><span>Automatic next step · hollow arrow</span></div>
-              <div><i class="legend-line disabled"></i><span>Commented / disabled</span></div>
+              <div><i class="legend-line cross"></i><span id="cross-legend-label">Between Ages</span></div>
+              <div id="myst-return-legend" title="The script saves the starting card before this move and the destination returns to it (push card / pop card)."><i class="legend-line backtracking"></i><span>Saved return · inverted arrows</span></div>
+              <div id="myst-paired-legend"><i class="legend-line restrictive"></i><span>Paired return reference</span></div>
+              <div id="myst-sequence-legend" title="One handler requests both cards in a row: the script moves on without another click. Path search does not follow it."><svg class="legend-arrow" viewBox="0 0 24 9" aria-hidden="true"><path d="M0 4.5h17M17 1.2l6 3.3-6 3.3z"/></svg><span>Automatic next step · hollow arrow</span></div>
+              <div id="myst-disabled-legend"><i class="legend-line disabled"></i><span>Commented / disabled</span></div>
               <div id="conditional-legend" hidden><i class="legend-line conditional"></i><span>Conditional / Zip reference</span></div>
             </div>
+            <div id="riven-legend" class="legend-rows" hidden><div><i class="legend-line"></i><span>Ordinary reference</span></div><div><i class="legend-line cross"></i><span>Between stacks</span></div><div><i class="legend-line native"></i><span>Native interpreter transition</span></div><div><i class="legend-line conditional"></i><span>Zip shortcut · visited targets</span></div></div>
             <div id="pdf-legend" class="legend-rows" hidden>
               <div><span class="pdf-line-sample"><i class="legend-line pdf-ordinary"></i></span><span>Ordinary reference</span></div>
               <div title="The script saves the starting card before this move and the destination returns to it (push card / pop card)."><span class="pdf-line-sample"><i class="legend-line pdf-return"></i></span><span>Saved return · inverted arrows</span></div>
@@ -83,7 +98,7 @@
         <div id="welcome-panel" class="welcome-panel">
           <span class="eyebrow">LOOK A LITTLE CLOSER</span>
           <h1>Every view <br>has a story.</h1>
-          <p>Explore the cards, shared pictures and script references behind Myst.</p>
+          <p id="welcome-intro">Explore the cards, shared pictures and script references behind Myst.</p>
           <button id="start-dock" class="primary-button">Begin at the dock <span aria-hidden="true">↗</span></button>
           <div class="welcome-rule"></div>
           <div class="welcome-stat"><strong id="card-count">—</strong><span>cards to explore</span></div>
@@ -95,13 +110,18 @@
           <div id="selected-tags" class="tag-list"></div>
           <div class="picture-toolbar"><span class="eyebrow">CARD VIEW</span><button id="expand-picture" class="text-button">Expand ↗</button></div>
           <div id="selected-picture" class="picture-host"></div>
+          <p id="riven-default-view-note" class="zones-note" hidden>One stored default view. Scripts can select other picture records.</p>
           <div class="zone-controls"><label><input id="show-zones" type="checkbox" checked>Interactive zones</label><label id="hidden-zones-label" class="hidden-zones-label" hidden><input id="show-hidden-zones" type="checkbox">Include hidden</label></div>
           <p id="zones-note" class="zones-note" hidden>Stored geometry only. Runtime visibility and behavior can change.</p>
           <div id="zone-detail" class="zone-detail" hidden><div class="zone-detail-heading"><strong id="zone-name"></strong><button id="clear-zone" class="text-button">Clear</button></div><p id="zone-meta"></p><label for="zone-script" class="eyebrow">STORED SCRIPT · READ ONLY</label><pre id="zone-script"></pre></div>
           <dl id="selected-facts" class="card-facts"></dl>
+          <section id="riven-script-section" class="reference-section script-section" hidden><h2>Decompiled scripts</h2><details class="source-detail"><summary>Read stored card and hotspot scripts</summary><pre id="selected-script"></pre></details></section>
+          <details id="riven-provenance-section" class="source-detail provenance-detail" hidden><summary>Resource provenance</summary><pre id="selected-provenance"></pre></details>
+          <details id="selected-dynamic-panel" class="source-detail provenance-detail" hidden><summary>Saved return behavior</summary><pre id="selected-dynamic"></pre></details>
+
           <section class="reference-section"><h2>Incoming <span id="incoming-count"></span></h2><div id="incoming-list" class="reference-list"></div></section>
           <section class="reference-section"><h2>Outgoing <span id="outgoing-count"></span></h2><div id="outgoing-list" class="reference-list"></div></section>
-          <p class="inspector-footnote">A reference is not a promise of access. Puzzle state, message dispatch and saved returns are not executed here.</p>
+          <p id="inspector-footnote" class="inspector-footnote">A reference is not a promise of access. Puzzle state, message dispatch and saved returns are not executed here.</p>
         </div>
       </aside>
     </main>

@@ -31,3 +31,14 @@ generated/graph.pdf
 /generated/web/
 /generated/.web-*/
 /generated/.demystify-web-*/
+
+# Local Riven input, decoded views and generated evidence never belong in Git.
+/generated/riven/
+/generated/riven-assets/
+/riven-input/
+.cache/
+*.iso
+*.ISO
+*.mhk
+*.MHK
+.DS_Store

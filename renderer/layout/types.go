@@ -36,6 +36,7 @@ type Node struct {
 }
 
 type Edge struct {
+	Kind     string      `json:"kind,omitempty"`
 	Source   int64       `json:"source"`
 	Target   int64       `json:"target"`
 	Color    string      `json:"color"`

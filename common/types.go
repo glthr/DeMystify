@@ -25,6 +25,7 @@ type Node struct {
 	Name          string
 	OriginalName  *string
 	SecondaryName *string
+	Details       *CardDetails // Optional game-neutral card disassembly and stored geometry.
 }
 
 func (n Node) IsOfType(t NodeAttribute) bool {
@@ -50,12 +51,21 @@ const (
 	// follow it: one action is not several steps, and a view shared by callers
 	// does not join their routes.
 	SequenceContinuation
+	// Conditional is a structural reference whose local branch guards are retained.
+	Conditional
+	// Native marks a reviewed transition implemented by the game interpreter.
+	Native
+	// Zip and EndingReset are displayed but excluded from ordinary path search.
+	Zip
+	EndingReset
 )
 
 type Edge struct {
 	Attributes     []EdgeAttribute
 	Source, Target *Node
 	TransitivityID int64
+	Kind           string
+	Evidence       []map[string]any
 }
 
 func (e Edge) IsOfType(t EdgeAttribute) bool {
@@ -67,13 +77,16 @@ func (e Edge) GetSourceAndTargetIDs() []int64 {
 }
 
 type Metadata struct {
-	TotalCards  uint
-	TotalStacks uint
-	TotalNodes  uint
-	TotalEdges  uint
-	Nodes       []*Node
-	Edges       []*Edge
-	Stats       GraphStats
+	Game          string // Empty retains the original Myst presentation.
+	StartNodeID   int64
+	StartNodeName string
+	TotalCards    uint
+	TotalStacks   uint
+	TotalNodes    uint
+	TotalEdges    uint
+	Nodes         []*Node
+	Edges         []*Edge
+	Stats         GraphStats
 }
 
 // GraphStats contains analysis results for a graph
@@ -136,3 +149,26 @@ const (
 	Tail // first part (tail) of restrictive transitivity edge
 	Head // second part (head) of restrictive transitivity edge
 )
+
+// CardDetails contains optional source data for engines other than HyperCard.
+// The shared graph and renderer preserve it without executing the game.
+type CardDetails struct {
+	SourceID       string
+	GlobalID       string
+	Script         string
+	ViewWidth      int
+	ViewHeight     int
+	Zones          []InteractionZone
+	Provenance     map[string]any
+	Unresolved     []map[string]any
+	PictureRecords []map[string]any
+}
+
+// InteractionZone is stored source geometry; Enabled/Hidden are not runtime guarantees.
+type InteractionZone struct {
+	ID                        int
+	Name, Type, Layer, Script string
+	X, Y, Width, Height       int
+	Enabled, Hidden           bool
+	RawFlags                  uint16
+}

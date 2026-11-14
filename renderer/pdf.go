@@ -34,16 +34,29 @@ func RenderPinnedPDFAndLayout(dotFilePath string) ([]byte, error) {
 	return renderPDF(dotFilePath, true, true)
 }
 
+// RenderToFile uses the shared renderer with a caller-selected output. The
+// original RenderPDF wrappers retain generated/graph.pdf for existing users.
+func RenderToFile(dotFilePath, outputPath string, withLayout, pinned bool) ([]byte, error) {
+	return renderPDFTo(dotFilePath, outputPath, withLayout, pinned)
+}
+
 func renderPDF(dotFilePath string, withLayout, pinned bool) ([]byte, error) {
+	return renderPDFTo(dotFilePath, pdfFilePath, withLayout, pinned)
+}
+
+func renderPDFTo(dotFilePath, outputPath string, withLayout, pinned bool) ([]byte, error) {
+	if outputPath == "" {
+		return nil, fmt.Errorf("PDF output path is empty")
+	}
 	// Graphviz does not accept "--"; absolute paths keep leading dashes literal.
 	dotInputPath, err := filepath.Abs(dotFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("resolving DOT input path: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(pdfFilePath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("creating PDF output directory: %w", err)
 	}
-	output, err := os.CreateTemp(filepath.Dir(pdfFilePath), ".graph-*.pdf")
+	output, err := os.CreateTemp(filepath.Dir(outputPath), ".graph-*.pdf")
 	if err != nil {
 		return nil, fmt.Errorf("creating temporary PDF: %w", err)
 	}
@@ -61,7 +74,7 @@ func renderPDF(dotFilePath string, withLayout, pinned bool) ([]byte, error) {
 	}
 	var layoutPath string
 	if withLayout {
-		layout, err := os.CreateTemp(filepath.Dir(pdfFilePath), ".graph-*.json")
+		layout, err := os.CreateTemp(filepath.Dir(outputPath), ".graph-*.json")
 		if err != nil {
 			return nil, fmt.Errorf("creating temporary layout: %w", err)
 		}
@@ -101,10 +114,10 @@ func renderPDF(dotFilePath string, withLayout, pinned bool) ([]byte, error) {
 			return nil, fmt.Errorf("setting rendered PDF permissions: %w", err)
 		}
 	}
-	if err := os.Rename(output.Name(), pdfFilePath); err != nil {
+	if err := os.Rename(output.Name(), outputPath); err != nil {
 		return nil, fmt.Errorf("saving rendered PDF: %w", err)
 	}
 
-	fmt.Printf("PDF generated successfully: %s\n", pdfFilePath)
+	fmt.Printf("PDF generated successfully: %s\n", outputPath)
 	return layoutData, nil
 }

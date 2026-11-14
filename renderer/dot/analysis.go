@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/glthr/DeMystify/common"
 )
@@ -83,11 +84,15 @@ func (g *Generator) assignStackColors() {
 	// sort the stack names to ensure a deterministic assignment
 	sort.Strings(uniqueStacks)
 
+	palette := nodesColors
+	if strings.EqualFold(g.metadata.Game, "riven") {
+		palette = append(append([]string(nil), nodesColors...), "#e1d2b6", "#d5e3dc")
+	}
 	// assign colors to each stack in order
 	for i, stack := range uniqueStacks {
 		if _, exists := g.stackColors[stack]; !exists {
-			colorIndex := i % len(nodesColors)
-			fillColor := nodesColors[colorIndex]
+			colorIndex := i % len(palette)
+			fillColor := palette[colorIndex]
 			nodeColor := nodeColors{
 				fillColor:   fillColor,
 				borderColor: darkenColor(fillColor),
