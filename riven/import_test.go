@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -92,7 +93,7 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	}
 	defer i.Close()
 	md := i.Metadata
-	if md.TotalCards != 2307 || len(md.Nodes) != 2312 || len(md.Edges) != 6686 || i.CommandCount != profile.commands || i.NavigationCount != 6980 || i.MissingReferences != 8 {
+	if md.TotalCards != 2307 || len(md.Nodes) != 2312 || len(md.Edges) != 6721 || i.CommandCount != profile.commands || i.NavigationCount != 6980 || i.MissingReferences != 8 {
 		t.Fatalf("corpus mismatch cards=%d nodes=%d edges=%d commands=%d navigation=%d missing=%d", md.TotalCards, len(md.Nodes), len(md.Edges), i.CommandCount, i.NavigationCount, i.MissingReferences)
 	}
 	if len(i.Archives) != profile.archives || len(i.Unresolved) != 3 {
@@ -135,6 +136,10 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		}
 	}
 	kinds := map[string]int{}
+	baseKinds := map[string]int{}
+	baseEndpoints := map[string]bool{}
+	evidenceCounts := map[string]int{}
+	disabled, conditional := 0, 0
 	calls := 0
 	for _, edge := range md.Edges {
 		kinds[edge.Kind]++
@@ -144,14 +149,70 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		if edge.Kind == "script" {
 			calls += len(edge.Evidence)
 		}
-	}
-	for k, n := range map[string]int{"script": 6063, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4} {
-		if kinds[k] != n {
-			t.Errorf("%s=%d want %d", k, kinds[k], n)
+		evidenceCounts[edge.Kind] += len(edge.Evidence)
+		if edge.IsOfType(common.Disabled) {
+			disabled++
 		}
+		if edge.IsOfType(common.Conditional) {
+			conditional++
+		}
+		if edge.Kind == "sequence-continuation" {
+			if !edge.IsOfType(common.SequenceContinuation) {
+				t.Fatal("derived continuation lost its path exclusion")
+			}
+			continue
+		}
+		if edge.IsOfType(common.SequenceContinuation) {
+			t.Fatalf("literal %s record was replaced by a continuation", edge.Kind)
+		}
+		key := edge.Source.Details.SourceID + ">" + edge.Target.Details.SourceID + ":" + edge.Kind
+		if !baseEndpoints[key] {
+			baseEndpoints[key] = true
+			baseKinds[edge.Kind]++
+		}
+	}
+	if want := (map[string]int{"script": 6077, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 21}); !reflect.DeepEqual(kinds, want) {
+		t.Errorf("classified records=%v want %v", kinds, want)
+	}
+	// Classification may split parallel records; it must preserve the original
+	// source/target/kind union and every literal instruction's provenance.
+	if want := (map[string]int{"script": 6063, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4}); len(baseEndpoints) != 6686 || !reflect.DeepEqual(baseKinds, want) {
+		t.Errorf("original endpoint union=%d kinds=%v want 6686/%v", len(baseEndpoints), baseKinds, want)
+	}
+	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 3, "native-ending": 7, "sequence-continuation": 21}); !reflect.DeepEqual(evidenceCounts, want) {
+		t.Errorf("callsite evidence=%v want %v", evidenceCounts, want)
+	}
+	if disabled != 0 || conditional != 835 {
+		t.Errorf("classification changed: disabled=%d conditional=%d", disabled, conditional)
 	}
 	if calls != 6980 {
 		t.Fatalf("navigation callsite evidence %d", calls)
+	}
+	states, ok := i.Manifest["hotspotAvailability"].(map[string]map[int]HotspotState)
+	if !ok {
+		t.Fatal("hotspot availability audit missing")
+	}
+	statuses := map[string]int{}
+	for _, hotspots := range states {
+		for _, state := range hotspots {
+			statuses[state.Status]++
+			if state.Reason == "" {
+				t.Fatal("availability classification lacks its proof limit")
+			}
+		}
+	}
+	if want := (map[string]int{"enabled": 6451, "conditional": 896, "unknown": 1151}); !reflect.DeepEqual(statuses, want) {
+		t.Errorf("hotspot availability=%v want %v", statuses, want)
+	}
+	for _, node := range md.Nodes {
+		for _, zone := range node.Details.Zones {
+			if zone.AvailabilityReason == "" || (zone.Availability != "enabled" && zone.Availability != "disabled" && zone.Availability != "conditional" && zone.Availability != "unknown") {
+				t.Fatalf("%s zone %d lost explicit availability: %+v", node.Details.SourceID, zone.ID, zone)
+			}
+			if zone.Enabled != (zone.Availability != "disabled") {
+				t.Fatalf("%s zone %d compatibility flag contradicts availability", node.Details.SourceID, zone.ID)
+			}
+		}
 	}
 	g, e := graph.NewGraph(md)
 	if e != nil {

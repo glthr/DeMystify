@@ -200,6 +200,11 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 	md := i.Metadata
 	nodes := map[string]*common.Node{}
 	edges := map[string]*common.Edge{}
+	availability, err := HotspotAvailabilityForStacks(i.Stacks)
+	if err != nil {
+		return fmt.Errorf("hotspot availability: %w", err)
+	}
+	i.Manifest["hotspotAvailability"] = availability
 	for _, key := range stackKeys {
 		s := i.Stacks[key]
 		for _, id := range sortedIDs(s.Cards) {
@@ -208,11 +213,12 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 			details := &common.CardDetails{SourceID: SourceID(key, id), GlobalID: fmt.Sprintf("0x%08x", c.GlobalID), ViewWidth: 608, ViewHeight: 392, Provenance: map[string]any{"CARD": c.Sources["CARD"], "HSPT": c.Sources["HSPT"]}}
 			var text strings.Builder
 			fmt.Fprintf(&text, "// %s RMAP 0x%x\n// CARD:%d\n%s", NodeName(key, id), c.GlobalID, id, FormatScripts(c.Scripts, s.Names))
-			for _, h := range c.Hotspots {
+			for ordinal, h := range c.Hotspots {
 				fmt.Fprintf(&text, "\n// HSPT:%d hotspot %d: %s rect=%v flags=%d\n%s", id, h.ID, h.Name, h.Rect, h.Flags, FormatScripts(h.Scripts, s.Names))
 				w, height := h.Rect[2]-h.Rect[0], h.Rect[3]-h.Rect[1]
 				if w > 0 && height > 0 {
-					details.Zones = append(details.Zones, common.InteractionZone{ID: int(h.ID), Name: h.Name, Type: "hotspot", Layer: "card", Script: FormatScripts(h.Scripts, s.Names), X: h.Rect[0], Y: h.Rect[1], Width: w, Height: height, Enabled: true, RawFlags: h.Flags})
+					state := availability[SourceID(key, id)][ordinal]
+					details.Zones = append(details.Zones, common.InteractionZone{ID: int(h.ID), Name: h.Name, Type: "hotspot", Layer: "card", Script: FormatScripts(h.Scripts, s.Names), X: h.Rect[0], Y: h.Rect[1], Width: w, Height: height, Enabled: state.Status != "disabled", RawFlags: h.Flags, Availability: state.Status, AvailabilityReason: state.Reason})
 				}
 			}
 			details.Script = text.String()
@@ -252,7 +258,11 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 			i.MissingReferences++
 		}
 		src := nodes[source]
-		edgeKey := source + ">" + targetKey + ":" + kind
+		disabled, _ := evidence["disabled"].(bool)
+		conditional := edgeEvidenceConditional(evidence)
+		// An enabled request and a disabled request between the same endpoints
+		// remain distinct records. Neither can erase the other's evidence/style.
+		edgeKey := fmt.Sprintf("%s>%s:%s:disabled=%t:conditional=%t", source, targetKey, kind, disabled, conditional)
 		edge := edges[edgeKey]
 		if edge == nil {
 			attrs := []common.EdgeAttribute{common.IntraAge}
@@ -264,6 +274,15 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 			}
 			if target.IsOfType(common.IsVirtual) {
 				attrs = append(attrs, common.NotImplemented)
+			}
+			if disabled {
+				attrs = append(attrs, common.Disabled)
+			}
+			if conditional {
+				attrs = append(attrs, common.Conditional)
+			}
+			if kind == "sequence-continuation" {
+				attrs = append(attrs, common.SequenceContinuation)
 			}
 			if kind == "zip" {
 				attrs = append(attrs, common.Zip)
@@ -329,6 +348,7 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 								ev["hotspot_blst_id"] = h.ID
 								ev["hotspot_name"] = h.Name
 								ev["hotspot_rect"] = h.Rect
+								annotateAvailability(ev, availability[source][ordinal])
 							}
 							switch cmd.Opcode {
 							case 8:
@@ -425,6 +445,18 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 					return err
 				}
 			}
+			continuations, err := sequenceReferences(s, c, i.Stacks)
+			if err != nil {
+				return fmt.Errorf("%s continuations: %w", source, err)
+			}
+			for _, continuation := range continuations {
+				if ordinal, ok := continuation.evidence["hotspot_ordinal"].(int); ok {
+					annotateAvailability(continuation.evidence, availability[source][ordinal])
+				}
+				if err := add(SourceID(key, continuation.sourceID), key, continuation.targetID, "sequence-continuation", continuation.evidence); err != nil {
+					return err
+				}
+			}
 			for _, tr := range TimerTransitions(key, c.GlobalID) {
 				if err := nativeEdge(source, tr, map[string]any{"event": "native_timer"}); err != nil {
 					return err
@@ -454,7 +486,47 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 	i.Manifest["missingReferences"] = i.MissingReferences
 	i.Manifest["warnings"] = i.Warnings
 	i.Manifest["inventory"] = InventoryModel()
+	semantics := map[string]int{"disabledRecords": 0, "conditionalRecords": 0, "sequenceContinuationRecords": 0, "sequenceContinuationCallsites": 0}
+	for _, edge := range md.Edges {
+		if edge.IsOfType(common.Disabled) {
+			semantics["disabledRecords"]++
+		}
+		if edge.IsOfType(common.Conditional) {
+			semantics["conditionalRecords"]++
+		}
+		if edge.IsOfType(common.SequenceContinuation) {
+			semantics["sequenceContinuationRecords"]++
+			semantics["sequenceContinuationCallsites"] += len(edge.Evidence)
+		}
+	}
+	i.Manifest["edgeSemantics"] = semantics
+	stateCounts := map[string]int{"enabled": 0, "disabled": 0, "conditional": 0, "unknown": 0}
+	for _, states := range availability {
+		for _, state := range states {
+			stateCounts[state.Status]++
+		}
+	}
+	i.Manifest["hotspotStateCounts"] = stateCounts
 	return nil
+}
+
+func edgeEvidenceConditional(evidence map[string]any) bool {
+	if guards, ok := evidence["guards"].([]map[string]any); ok && len(guards) != 0 {
+		return true
+	}
+	if condition, ok := evidence["condition"].(string); ok && condition != "" {
+		return true
+	}
+	return evidence["hotspot_status"] == "conditional"
+}
+
+func annotateAvailability(evidence map[string]any, state HotspotState) {
+	evidence["hotspot_status"] = state.Status
+	evidence["availability_reason"] = state.Reason
+	evidence["hotspot_availability"] = state
+	if state.Status == "disabled" {
+		evidence["disabled"] = true
+	}
 }
 
 func (i *Import) WriteEvidence(dir string) error {
@@ -482,7 +554,7 @@ func (i *Import) WriteEvidence(dir string) error {
 	}
 	es := make([]map[string]any, 0, len(i.Metadata.Edges))
 	for _, e := range i.Metadata.Edges {
-		es = append(es, map[string]any{"source": e.Source.Details.SourceID, "target": e.Target.Details.SourceID, "kind": e.Kind, "evidence": e.Evidence, "attributes": e.Attributes})
+		es = append(es, map[string]any{"source": e.Source.Details.SourceID, "target": e.Target.Details.SourceID, "kind": e.Kind, "evidence": e.Evidence, "attributes": e.Attributes, "transitivityId": e.TransitivityID, "disabled": e.IsOfType(common.Disabled), "conditional": e.IsOfType(common.Conditional), "sequenceContinuation": e.IsOfType(common.SequenceContinuation)})
 	}
 	for name, v := range map[string]any{"graph.json": map[string]any{"game": "riven", "nodes": ns, "edges": es, "stats": i.Metadata.Stats, "typedEdges": len(es), "cards": i.Metadata.TotalCards, "startNodeID": i.Metadata.StartNodeID, "unresolved": i.Unresolved}, "cards.json": i.Stacks, "manifest.json": i.Manifest} {
 		if err := write(name, v); err != nil {

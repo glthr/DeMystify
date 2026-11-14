@@ -66,18 +66,20 @@ type webNode struct {
 }
 
 type zone struct {
-	ID       int    `json:"id"`
-	Type     string `json:"type"`
-	Name     string `json:"name"`
-	Layer    string `json:"layer"`
-	X        int    `json:"x"`
-	Y        int    `json:"y"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
-	Script   string `json:"script,omitempty"`
-	Hidden   bool   `json:"hidden"`
-	Enabled  bool   `json:"enabled"`
-	RawFlags uint16 `json:"rawFlags,omitempty"`
+	ID                 int    `json:"id"`
+	Type               string `json:"type"`
+	Name               string `json:"name"`
+	Layer              string `json:"layer"`
+	X                  int    `json:"x"`
+	Y                  int    `json:"y"`
+	Width              int    `json:"width"`
+	Height             int    `json:"height"`
+	Script             string `json:"script,omitempty"`
+	Hidden             bool   `json:"hidden"`
+	Enabled            bool   `json:"enabled"`
+	RawFlags           uint16 `json:"rawFlags,omitempty"`
+	Availability       string `json:"availability,omitempty"`
+	AvailabilityReason string `json:"availabilityReason,omitempty"`
 }
 
 type webEdge struct {
@@ -144,7 +146,7 @@ func collectData(metadata *common.Metadata, corpus *hypercard.Corpus) (graphData
 			item.Provenance, item.DynamicNavigation, item.PictureRecords = details.Provenance, details.Unresolved, details.PictureRecords
 			item.HotspotCount, item.ImageCount = len(details.Zones), len(details.PictureRecords)
 			for _, part := range details.Zones {
-				item.Zones = append(item.Zones, zone{ID: part.ID, Type: part.Type, Name: part.Name, Layer: part.Layer, X: part.X, Y: part.Y, Width: part.Width, Height: part.Height, Script: part.Script, Hidden: part.Hidden, Enabled: part.Enabled, RawFlags: part.RawFlags})
+				item.Zones = append(item.Zones, zone{ID: part.ID, Type: part.Type, Name: part.Name, Layer: part.Layer, X: part.X, Y: part.Y, Width: part.Width, Height: part.Height, Script: part.Script, Hidden: part.Hidden, Enabled: part.Enabled, RawFlags: part.RawFlags, Availability: part.Availability, AvailabilityReason: part.AvailabilityReason})
 			}
 		}
 		if node.OriginalName != nil {
