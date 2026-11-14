@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/glthr/DeMystify/common"
@@ -83,26 +84,38 @@ func TestFileSliceBounds(t *testing.T) {
 	}
 }
 
-func fixtureInput(t *testing.T) string {
-	t.Helper()
-	p := os.Getenv("RIVEN_TEST_DATA")
-	if p == "" {
-		t.Skip("set RIVEN_TEST_DATA to the original five-disc directory for corpus checks")
-	}
-	return p
-}
 func TestSuppliedDiscCorpus(t *testing.T) {
-	i, e := LoadInput(fixtureInput(t))
+	input, profile := fixtureCorpus(t)
+	i, e := LoadInput(input)
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer i.Close()
 	md := i.Metadata
-	if md.TotalCards != 2307 || len(md.Nodes) != 2312 || len(md.Edges) != 6686 || i.CommandCount != 45491 || i.NavigationCount != 6980 || i.MissingReferences != 8 {
+	if md.TotalCards != 2307 || len(md.Nodes) != 2312 || len(md.Edges) != 6686 || i.CommandCount != profile.commands || i.NavigationCount != 6980 || i.MissingReferences != 8 {
 		t.Fatalf("corpus mismatch cards=%d nodes=%d edges=%d commands=%d navigation=%d missing=%d", md.TotalCards, len(md.Nodes), len(md.Edges), i.CommandCount, i.NavigationCount, i.MissingReferences)
 	}
-	if len(i.Archives) != 28 || len(i.Unresolved) != 3 {
+	if len(i.Archives) != profile.archives || len(i.Unresolved) != 3 {
 		t.Fatalf("archive/return count %d/%d", len(i.Archives), len(i.Unresolved))
+	}
+	for _, script := range []struct {
+		stack, tag        string
+		id                uint16
+		original, updated string
+	}{
+		{"bspit", "HSPT", 284, "B_DATA.MHK", "B_DATA1.MHK"},
+		{"jspit", "CARD", 255, "J_DATA1.MHK", "J_DATA3.MHK"},
+		{"jspit", "CARD", 538, "J_DATA2.MHK", "J_DATA3.MHK"},
+		{"jspit", "HSPT", 255, "J_DATA1.MHK", "J_DATA3.MHK"},
+	} {
+		want := script.original
+		if profile.edition == "1.02" {
+			want = script.updated
+		}
+		ref := i.Stacks[script.stack].Resources[script.tag][script.id]
+		if got := strings.ToUpper(filepath.Base(ref.Archive.Source.Name)); got != want {
+			t.Errorf("edition %s: %s %s:%d selected %s, want %s", profile.edition, script.stack, script.tag, script.id, got, want)
+		}
 	}
 	expected := map[string]int{"aspit": 8, "bspit": 498, "gspit": 267, "jspit": 814, "tspit": 547, "ospit": 89, "pspit": 47, "rspit": 37}
 	for s, n := range expected {

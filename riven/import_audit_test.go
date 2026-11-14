@@ -41,7 +41,8 @@ func auditKey(source string, ev map[string]any) auditCallsite {
 func auditJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
 
 func TestSuppliedDiscCommandOffsetsAndNativeAttribution(t *testing.T) {
-	i, err := LoadInput(fixtureInput(t))
+	input, profile := fixtureCorpus(t)
+	i, err := LoadInput(input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +110,8 @@ func TestSuppliedDiscCommandOffsetsAndNativeAttribution(t *testing.T) {
 			}
 		}
 	}
-	if count != 45491 {
-		t.Fatalf("decoded %d commands, want45491", count)
+	if count != profile.commands {
+		t.Fatalf("decoded %d commands, want %d for edition %s", count, profile.commands, profile.edition)
 	}
 	seen := map[auditCallsite]bool{}
 	for _, edge := range i.Metadata.Edges {

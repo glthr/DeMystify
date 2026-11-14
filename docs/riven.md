@@ -14,7 +14,7 @@ go run . --game riven --format html \
 
 `--game auto` is the default: ISO/Mohawk input selects Riven; native HyperCard or converted XML input retains Myst. `--game myst` or `--game riven` selects an engine explicitly. No Python application or intermediate conversion is needed for Riven.
 
-The importer reads ISO9660 directories and requested archive ranges directly. The images need not be mounted, audio/video are not unpacked, and original files remain read only. The original CD overlays are resolved in engine precedence: `J_DATA3 > J_DATA2 > J_DATA1` and `B_DATA1 > B_DATA`.
+The importer reads ISO9660 directories and requested archive ranges directly. The images need not be mounted, audio/video are not unpacked, and original files remain read only. Available CD overlays are resolved in engine precedence: `J_DATA3 > J_DATA2 > J_DATA1` and `B_DATA1 > B_DATA`. The verified initial 1.0 set has neither optional patch archive `B_DATA1.MHK` nor `J_DATA3.MHK`; `J_DATA2.MHK` is part of that initial set.
 
 The example decodes one stored default view per card into an ordinary `images.json` asset directory, then passes it through the same asset pipeline as `--assets`. Existing decoded pictures can instead be supplied with `--assets /path/to/views`; that option cannot be combined with `--extract-images`.
 
@@ -50,6 +50,19 @@ The optional layer controls distinguish native interpreter transitions, previous
 
 The bitmap decoder chooses one default PLST picture, rather than executing scripts to reconstruct every possible appearance. Pictures, stored hotspots and raw flags are inspection data; movie compositing, runtime visibility and puzzle changes are not simulated.
 
+## Verified CD editions
+
+Two English Windows five-CD sets have been checked independently:
+
+| Set | Disc 1 README | Bundled Windows interpreter | Mohawk archives |
+| --- | --- | --- | --- |
+| Initial 1.0 | Version 1.0, September 15, 1997 | `Riven.exe` 1.0, fixed version 1.0.0.0 | 26; no `B_DATA1.MHK` or `J_DATA3.MHK` |
+| Updated 1.02 | Version 1.02, November 12, 1997 | `Riven.exe` 1.02, fixed version 1.0.2.0 | 28; includes those two overlays |
+
+The 26 common archives have identical full SHA-256 hashes in the two verified sets. The overlays replace Boiler `HSPT:284`, Jungle `CARD:255`, Jungle `CARD:538` and Jungle `HSPT:255`, among other resources. Their animation and effect handling differs; the literal navigation commands and local branch guards in these four script resources are unchanged. Keeping the original overlays preserves the supplied edition's scripts and byte offsets. Removing them from a later copy is not a substitute for establishing an independent 1.0 source.
+
+Use the Disc 1 README and the actual interpreter's version resource to identify these sets. Folder names, upload dates, generic installer `ProductVersion = 1.0` fields and an `A_DATA.MHK` detector hash do not establish the interpreter version: that data archive is shared by both sets. DeMystify imports whichever archives are supplied and records their provenance; it does not infer or execute the original interpreter version. The Macintosh application and localized or DVD editions are not covered by these Windows version checks.
+
 ## Interpretation
 
 A graph node represents one shipped card, potentially with several rendered states, or an explicitly marked absent target. A script edge means a CARD/HSPT script contains a navigation command. All nested switch branches are combined; their local guards and offsets remain in the evidence. A handler requesting several cards contributes references from its owner, rather than inferred independent player actions.
@@ -60,7 +73,7 @@ Ordinary shared graph path search excludes Zip shortcuts and ending resets, alon
 
 Native facts are reviewed against a pinned ScummVM Mohawk implementation. The 13 destination-time redirects preserve their literal requested targets. Original disc bytecode is not modified by current ScummVM runtime patches. Opcode 36 is structurally decoded with raw arguments retained, while its purpose remains unknown in the reference engine.
 
-This imports the data and bytecode; it does not recover the original interpreter's C++ source or run the complete game. A graph path is not a walkthrough. An unreached, source or sink card does not by itself prove that an asset is unused or invisible. The original five-CD edition is validated; DVD, remaster and localized variants are not verified.
+This imports the data and bytecode; it does not recover the original interpreter's C++ source or run the complete game. A graph path is not a walkthrough. An unreached, source or sink card does not by itself prove that an asset is unused or invisible. The two five-CD sets above are validated; DVD, remaster and localized variants are not verified.
 
 See [the native-navigation audit](riven-native-navigation.md) for engine-source links and the reviewed native navigation sites.
 
@@ -74,6 +87,13 @@ go vet ./...
 node --test renderer/web/viewer_test.cjs
 ```
 
-Original game inputs are optional local test data and must never be committed. Set `RIVEN_TEST_DATA` to the directory containing the five CDs to run dataset regressions when available. Those tests reconcile resource counts, overlay precedence, all navigation callsites, absent targets, native attribution and bitmap decoding. The viewer's DOM/canvas tests exercise interaction contracts rather than replacing visual browser review.
+Original game inputs are optional local test data and must never be committed. Set `RIVEN_TEST_DATA` to the directory containing the five CDs and explicitly select the verified edition:
+
+```bash
+RIVEN_TEST_DATA="/path/to/1.0 CDs" RIVEN_TEST_EDITION=1.0 go test -v ./riven
+RIVEN_TEST_DATA="/path/to/1.02 CDs" RIVEN_TEST_EDITION=1.02 go test -v ./riven
+```
+
+`RIVEN_TEST_EDITION` defaults to `1.02` for existing test commands. Unknown values fail; the tests do not guess an edition from a shared data hash. `RIVEN_TEST_INPUT` remains an alias for the test-data path. Each profile checks the exact archive count and full archive SHA-256 fingerprints, the selected source archives of the four replaced script resources, its decoded command count (45,502 for 1.0; 45,491 for 1.02), all 6,980 navigation callsites and their original byte offsets, absent targets, native attribution and all 2,307 default bitmap views. Both sets produce the same typed graph and representative decoded picture hashes. If `RIVEN_REFERENCE_DATA` is also set, point it at an independent extraction of the same edition so byte-offset comparisons use the matching scripts. The viewer's DOM/canvas tests exercise interaction contracts rather than replacing visual browser review.
 
 The existing Myst integration tests remain available through their documented environment variables. The Myst Go entry point, original frontend controls and repository-generated Myst files are preserved.
