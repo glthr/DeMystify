@@ -80,6 +80,25 @@ func TestSequenceContinuationUsesHollowArrowheadAndExplanation(t *testing.T) {
 	}
 }
 
+func TestConditionalRivenEdgesKeepProofAndDisabledPriority(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	metadata.Game = "Riven"
+	edge := &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Attributes: []common.EdgeAttribute{common.IntraAge, common.Conditional}, Evidence: []map[string]any{{"classification_reason": "BLST 3 is selected by a door switch"}}}
+	style := g.applyEdgeStyle(edge, false)
+	if style.color != "#7aada3" || style.style != "dashed" || !strings.Contains(style.tooltip, "Conditional reference") || !strings.Contains(style.tooltip, "BLST 3") {
+		t.Fatalf("conditional proof or appearance lost: %+v", style)
+	}
+	path := g.applyEdgeStyle(edge, true)
+	if path.color != "#E74C3C" || !strings.Contains(path.tooltip, "Conditional reference") {
+		t.Fatalf("conditional style overrode the chosen path: %+v", path)
+	}
+	edge.Attributes = append(edge.Attributes, common.Disabled, common.Native, common.Zip)
+	style = g.applyEdgeStyle(edge, false)
+	if style.color != "#8d8875" || style.style != "dashed" || style.arrowhead != "tee" || !strings.Contains(strings.ToLower(style.tooltip), "disabled") {
+		t.Fatalf("optional layers painted a disabled record as active: %+v", style)
+	}
+}
+
 func TestPathHighlightPrefersTheOrdinaryReferenceOverAContinuation(t *testing.T) {
 	g, metadata := newTestGenerator(t)
 	a, b := metadata.Nodes[0], metadata.Nodes[1]

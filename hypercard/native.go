@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/glthr/DeMystify/common"
 )
 
 const nativeFormat = "hypercard-10"
@@ -549,23 +551,6 @@ func (b nativeBlock) errorAt(offset int, format string, args ...any) error {
 		b.offset+offset, fmt.Sprintf(format, args...))
 }
 
-// MacRoman's upper half, in byte order. The command-key control character uses
-// the same visible Unicode representation as the existing XML conversion.
-var macRomanUpper = []rune("ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›ﬁﬂ‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ")
-
 func decodeMacRoman(data []byte) string {
-	var out strings.Builder
-	out.Grow(len(data))
-	for _, c := range data {
-		switch {
-		case c >= 128:
-			out.WriteRune(macRomanUpper[c-128])
-		case c == 0x11:
-			out.WriteRune('⌘')
-		default:
-			out.WriteByte(c)
-		}
-	}
-	text := strings.ReplaceAll(out.String(), "\r\n", "\n")
-	return strings.ReplaceAll(text, "\r", "\n")
+	return common.DecodeMacRoman(data)
 }

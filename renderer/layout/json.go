@@ -35,6 +35,7 @@ type objectJSON struct {
 }
 
 type edgeJSON struct {
+	Attributes string      `json:"demystify_attributes"`
 	Kind       string      `json:"demystify_kind"`
 	Source     *int        `json:"tail"`
 	Target     *int        `json:"head"`
@@ -165,6 +166,13 @@ func FromJSON(data []byte) (Drawing, error) {
 		}
 		value := Edge{Source: ids[*edge.Source], Target: ids[*edge.Target],
 			Color: edge.Color, Style: edge.Style, PenWidth: penWidth, Kind: edge.Kind}
+		if edge.Attributes != "" {
+			for _, attribute := range strings.Split(edge.Attributes, ",") {
+				if attribute = strings.TrimSpace(attribute); attribute != "" {
+					value.Attributes = append(value.Attributes, attribute)
+				}
+			}
+		}
 		for _, group := range []struct {
 			source []Operation
 			target *[]Operation

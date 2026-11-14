@@ -171,4 +171,7 @@ type InteractionZone struct {
 	X, Y, Width, Height       int
 	Enabled, Hidden           bool
 	RawFlags                  uint16
+	// Availability is an optional static proof result, distinct from stored
+	// HyperCard enabled flags and from the game's current runtime state.
+	Availability, AvailabilityReason string
 }

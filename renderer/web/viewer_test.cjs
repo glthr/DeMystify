@@ -704,3 +704,75 @@ test('a virtual target stays selectable without a fabricated picture', () => {
   assert.equal(h.get('show-zones').disabled, true);
   assert.match(h.get('selected-facts').textContent, /Referenced target absent/);
 });
+
+test('Riven reuses disabled and automatic-step legends only when their records exist', () => {
+  const plain = harness(rivenFixture());
+  assert.equal(plain.get('atlas-legend').hidden, false);
+  for (const id of ['myst-disabled-legend', 'myst-sequence-legend', 'myst-return-legend', 'myst-paired-legend']) assert.equal(plain.get(id).hidden, true, id);
+  const data = rivenFixture(true);
+  data.edges[0].attributes.push('conditional');
+  data.edges.push({source: 2, target: 6, kind: 'script', attributes: ['disabled'], evidence: [{classification_reason: 'Constant zero-area hotspot cannot receive pointer input.'}]});
+  data.edges.push({source: 2, target: 4, kind: 'sequence-continuation', attributes: ['sequenceContinuation'], evidence: [{sequence_owner: 'tspit:150'}]});
+  const h = harness(data);
+  assert.equal(h.get('pdf-legend').hidden, false);
+  for (const id of ['pdf-disabled-legend', 'pdf-sequence-legend', 'riven-pdf-conditional-legend']) assert.equal(h.get(id).hidden, false, id);
+  assert.equal(h.get('pdf-return-legend').hidden, true);
+  h.app.setLayout('atlas');
+  for (const id of ['myst-disabled-legend', 'myst-sequence-legend', 'conditional-legend']) assert.equal(h.get(id).hidden, false, id);
+  assert.equal(h.get('riven-pdf-conditional-legend').hidden, true);
+  assert.equal(h.get('disabled-legend-label').textContent, 'Statically disabled');
+  h.app.selectNode(2);
+  assert.match(h.get('outgoing-list').textContent, /Constant zero-area hotspot/);
+  assert.match(h.get('outgoing-list').textContent, /Automatic next step/);
+  assert.equal(h.app.graph.edges.length, data.edges.length, 'display classification retains raw records');
+});
+
+test('Riven path search never turns disabled or caller-owned continuations into shortcuts', () => {
+  const data = rivenFixture();
+  data.edges = data.edges.filter(edge => !(edge.source === 2 && edge.target === 6));
+  data.edges.push({source: 2, target: 6, kind: 'script', attributes: ['disabled'], evidence: []});
+  data.edges.push({source: 2, target: 4, kind: 'sequence-continuation', attributes: ['sequenceContinuation'], evidence: []});
+  const h = harness(data);
+  h.get('set-path-origin').dispatch('click'); h.app.selectNode(4);
+  assert.deepEqual([...h.app.state.path], [1, 3, 4], 'the tempting continuation through2 is not a second player action');
+  h.app.selectNode(2); h.get('set-path-origin').dispatch('click'); h.app.selectNode(6);
+  assert.deepEqual([...h.app.state.path], [], 'a disabled-only reference cannot supply a route');
+  h.app.selectNode(2);
+  assert.match(h.get('outgoing-list').textContent, /Disabled/);
+  assert.match(h.get('outgoing-list').textContent, /Automatic next step/);
+});
+
+test('Riven hotspot availability distinguishes static proofs from conditional and unknown controls', () => {
+  const data = rivenFixture();
+  const availability = ['enabled', 'disabled', 'conditional', 'unknown', undefined];
+  data.nodes[0].zones = availability.map((value, index) => ({id: index + 1, type: 'hotspot', layer: 'card', name: 'Control' + index, x: 10 + index * 20, y: 20, width: 16, height: 40, enabled: index === 1, availability: value, availabilityReason: index === 2 ? 'The door switch controls BLST 3.' : '', script: 'change_card(156);'}));
+  const h = harness(data), rectangles = descendants(h.get('selected-picture'), 'rect');
+  assert.equal(rectangles.length, 5);
+  assert.deepEqual(rectangles.map(rect => rect.classList.contains('is-disabled')), [false, true, false, false, false], 'only an explicit disabled proof dims a Riven rectangle');
+  const labels = ['statically enabled', 'statically disabled', 'conditional availability', 'availability unknown', 'availability unknown'];
+  rectangles.forEach((rect, index) => {
+    assert.match(rect.getAttribute('aria-label'), new RegExp(labels[index]));
+    rect.dispatch('click'); assert.match(h.get('zone-meta').textContent, new RegExp(labels[index]));
+    if (index === 2) assert.match(h.get('zone-meta').textContent, /door switch controls BLST 3/);
+  });
+  assert.doesNotMatch(h.get('zone-meta').textContent, /stored disabled/);
+});
+
+test('PDF path highlights use exported edge flags instead of repainting inactive parallel drawings', () => {
+  const data = rivenFixture(true);
+  const inactive = [
+    {source: 1, target: 2, kind: 'script', attributes: ['disabled'], color: '#112233', penWidth: 1, draw: [{op: 'L', points: [[0, 0], [10, 20]]}]},
+    {source: 1, target: 2, kind: 'sequence-continuation', attributes: ['sequenceContinuation'], color: '#334455', penWidth: 1, draw: [{op: 'L', points: [[20, 0], [30, 20]]}]}
+  ];
+  data.edges.push(...inactive.map(edge => ({...edge, evidence: []})));
+  data.pdfLayout.edges.push(...inactive);
+  const h = harness(data);
+  h.get('set-path-origin').dispatch('click'); h.app.selectNode(2);
+  assert.deepEqual([...h.app.state.path], [1, 2]);
+  h.app.state.camera = {x: 200, y: 150, scale: .5};
+  h.canvasPaints.length = 0; h.app.draw();
+  const colors = new Set(h.canvasPaints.filter(p => p.method === 'stroke').map(p => p.stroke));
+  assert.ok(colors.has('#b58a27'), 'the ordinary path record is highlighted');
+  assert.ok(colors.has('#112233'), 'disabled drawing retains its own stroke');
+  assert.ok(colors.has('#334455'), 'caller-owned drawing retains its own stroke');
+});

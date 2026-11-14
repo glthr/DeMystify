@@ -36,16 +36,17 @@ type Node struct {
 }
 
 type Edge struct {
-	Kind     string      `json:"kind,omitempty"`
-	Source   int64       `json:"source"`
-	Target   int64       `json:"target"`
-	Color    string      `json:"color"`
-	Style    string      `json:"style"`
-	PenWidth float64     `json:"penWidth"`
-	Draw     []Operation `json:"draw,omitempty"`
-	Head     []Operation `json:"head,omitempty"`
-	Tail     []Operation `json:"tail,omitempty"`
-	Labels   []Operation `json:"labels,omitempty"`
+	Attributes []string    `json:"attributes,omitempty"`
+	Kind       string      `json:"kind,omitempty"`
+	Source     int64       `json:"source"`
+	Target     int64       `json:"target"`
+	Color      string      `json:"color"`
+	Style      string      `json:"style"`
+	PenWidth   float64     `json:"penWidth"`
+	Draw       []Operation `json:"draw,omitempty"`
+	Head       []Operation `json:"head,omitempty"`
+	Tail       []Operation `json:"tail,omitempty"`
+	Labels     []Operation `json:"labels,omitempty"`
 }
 
 // Operation uses Graphviz JSON keys and opcode case. Point positions are

@@ -200,34 +200,80 @@ func TestSuppliedDiscGraphAgainstVerifiedReference(t *testing.T) {
 	}
 	wantEdges := map[string]bool{}
 	wantCalls := map[auditCallsite]map[string]any{}
+	// Aggregate evidence across classification-split records. An evidence
+	// identity belongs to its original typed endpoint and original instruction;
+	// neither a new flag nor a parallel record may duplicate or discard it.
+	type evidenceIdentity struct {
+		endpoint string
+		callsite auditCallsite
+	}
+	wantEvidence := map[evidenceIdentity]map[string]any{}
 	for _, edge := range reference.Edges {
-		wantEdges[edge.Source+">"+edge.Target+":"+edge.Kind] = true
+		endpoint := edge.Source + ">" + edge.Target + ":" + edge.Kind
+		wantEdges[endpoint] = true
+		for _, ev := range edge.Evidence {
+			identity := evidenceIdentity{endpoint, auditKey(edge.Source, ev)}
+			if _, duplicate := wantEvidence[identity]; duplicate {
+				t.Fatalf("duplicate verified reference evidence: %+v", identity)
+			}
+			wantEvidence[identity] = ev
+		}
 		if edge.Kind == "script" {
 			for _, ev := range edge.Evidence {
-				wantCalls[auditKey(edge.Source, ev)] = ev
+				identity := auditKey(edge.Source, ev)
+				if _, duplicate := wantCalls[identity]; duplicate {
+					t.Fatalf("duplicate verified literal callsite: %+v", identity)
+				}
+				wantCalls[identity] = ev
 			}
 		}
 	}
 	gotEdges := map[string]bool{}
-	calls := 0
+	gotEvidence := map[evidenceIdentity]map[string]any{}
+	gotCalls := map[auditCallsite]bool{}
+	derivedRecords, derivedCallsites := 0, 0
 	for _, edge := range i.Metadata.Edges {
+		// This is the sole derived kind. Every literal, Zip and native record
+		// remains part of the independent pre-classification audit.
+		if edge.Kind == "sequence-continuation" {
+			if !edge.IsOfType(common.SequenceContinuation) {
+				t.Fatal("derived continuation lacks its explicit attribute")
+			}
+			derivedRecords++
+			derivedCallsites += len(edge.Evidence)
+			continue
+		}
 		source, target := edge.Source.Details.SourceID, edge.Target.Details.SourceID
-		gotEdges[source+">"+target+":"+edge.Kind] = true
+		endpoint := source + ">" + target + ":" + edge.Kind
+		gotEdges[endpoint] = true
+		for _, ev := range edge.Evidence {
+			identity := evidenceIdentity{endpoint, auditKey(source, ev)}
+			if _, duplicate := gotEvidence[identity]; duplicate {
+				t.Fatalf("original evidence emitted in multiple classified records: %+v", identity)
+			}
+			gotEvidence[identity] = ev
+			want, ok := wantEvidence[identity]
+			if !ok {
+				t.Fatalf("original evidence absent from verified reference: %+v", identity)
+			}
+			for _, field := range []string{"opcode", "literal_target", "guards", "missing_target", "native_redirects", "engine_source", "condition", "external", "external_args", "zip_name", "sequence"} {
+				if auditJSON(ev[field]) != auditJSON(want[field]) {
+					t.Fatalf("%+v %s differs: Go=%s reference=%s", identity, field, auditJSON(ev[field]), auditJSON(want[field]))
+				}
+			}
+		}
 		if edge.Kind != "script" {
 			continue
 		}
 		for _, ev := range edge.Evidence {
 			identity := auditKey(source, ev)
-			want, ok := wantCalls[identity]
-			if !ok {
+			if _, ok := wantCalls[identity]; !ok {
 				t.Fatalf("callsite absent from verified reference: %+v", identity)
 			}
-			for _, field := range []string{"opcode", "literal_target", "guards", "missing_target", "native_redirects"} {
-				if auditJSON(ev[field]) != auditJSON(want[field]) {
-					t.Fatalf("%+v %s differs: Go=%s reference=%s", identity, field, auditJSON(ev[field]), auditJSON(want[field]))
-				}
+			if gotCalls[identity] {
+				t.Fatalf("literal instruction emitted twice: %+v", identity)
 			}
-			calls++
+			gotCalls[identity] = true
 		}
 	}
 	if !reflect.DeepEqual(gotEdges, wantEdges) {
@@ -242,8 +288,17 @@ func TestSuppliedDiscGraphAgainstVerifiedReference(t *testing.T) {
 			}
 		}
 	}
-	if calls != 6980 || len(wantCalls) != 6980 {
-		t.Fatalf("reference callsites %d/%d", calls, len(wantCalls))
+	if len(gotEdges) != 6686 || len(wantEdges) != 6686 {
+		t.Fatalf("original typed endpoint union %d/%d, want 6686", len(gotEdges), len(wantEdges))
 	}
-	t.Logf("all %d typed endpoints and %d navigation guards/literal destinations match verified reference", len(gotEdges), calls)
+	if len(gotCalls) != 6980 || len(wantCalls) != 6980 {
+		t.Fatalf("reference callsites %d/%d", len(gotCalls), len(wantCalls))
+	}
+	if len(gotEvidence) != 7609 || len(wantEvidence) != 7609 {
+		t.Fatalf("all original evidence %d/%d, want 7609", len(gotEvidence), len(wantEvidence))
+	}
+	if derivedRecords != 21 || derivedCallsites != 21 {
+		t.Fatalf("derived automatic continuations %d records/%d callsites, want 21/21", derivedRecords, derivedCallsites)
+	}
+	t.Logf("all %d original typed endpoints, %d evidence identities and %d literal navigation guards/destinations match verified reference; %d derived continuations audited separately", len(gotEdges), len(gotEvidence), len(gotCalls), derivedRecords)
 }

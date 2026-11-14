@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/glthr/DeMystify/common"
 )
 
 type FileSlice struct {
@@ -134,7 +136,7 @@ func OpenArchive(s FileSlice) (*Archive, error) {
 			if end < 0 {
 				return nil, fmt.Errorf("unterminated resource name")
 			}
-			names[be16(q[2:])] = string(str[:end])
+			names[be16(q[2:])] = common.DecodeMacRoman(str[:end])
 		}
 		v, e = s.Read(rt, 2)
 		if e != nil {
