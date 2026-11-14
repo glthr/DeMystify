@@ -54,12 +54,12 @@ The bitmap decoder chooses one default PLST picture, rather than executing scrip
 
 Two English Windows five-CD sets have been checked independently:
 
-| Set | Disc 1 README | Bundled Windows interpreter | Mohawk archives |
+| Set | Disc 1 README | Bundled Windows interpreter | Standalone Mohawk archives |
 | --- | --- | --- | --- |
 | Initial 1.0 | Version 1.0, September 15, 1997 | `Riven.exe` 1.0, fixed version 1.0.0.0 | 26; no `B_DATA1.MHK` or `J_DATA3.MHK` |
 | Updated 1.02 | Version 1.02, November 12, 1997 | `Riven.exe` 1.02, fixed version 1.0.2.0 | 28; includes those two overlays |
 
-The 26 common archives have identical full SHA-256 hashes in the two verified sets. The overlays replace Boiler `HSPT:284`, Jungle `CARD:255`, Jungle `CARD:538` and Jungle `HSPT:255`, among other resources. Their animation and effect handling differs; the literal navigation commands and local branch guards in these four script resources are unchanged. Keeping the original overlays preserves the supplied edition's scripts and byte offsets. Removing them from a later copy is not a substitute for establishing an independent 1.0 source.
+The 26 common standalone archives have identical full SHA-256 hashes in the two verified sets. The separately compressed, installed `Extras.MHK` also differs between these editions; it is outside this archive comparison. The overlays replace Boiler `HSPT:284`, Jungle `CARD:255`, Jungle `CARD:538` and Jungle `HSPT:255`, among other resources. Their animation and effect handling differs; the literal navigation commands and local branch guards in these four script resources are unchanged. Keeping the original overlays preserves the supplied edition's scripts and byte offsets. Removing them from a later copy is not a substitute for establishing an independent 1.0 source.
 
 Use the Disc 1 README and the actual interpreter's version resource to identify these sets. Folder names, upload dates, generic installer `ProductVersion = 1.0` fields and an `A_DATA.MHK` detector hash do not establish the interpreter version: that data archive is shared by both sets. DeMystify imports whichever archives are supplied and records their provenance; it does not infer or execute the original interpreter version. The Macintosh application and localized or DVD editions are not covered by these Windows version checks.
 
