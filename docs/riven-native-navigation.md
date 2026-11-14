@@ -2,7 +2,7 @@
 
 ScummVM reference commit: `aed0208e772b128d3f953207a297fc521c32833a`.
 All links below refer to that pinned commit; no source cache is required.
-`riven_graph/native.py` records reviewed behavior as explicitly tagged metadata.
+`riven/native.go` records reviewed behavior as explicitly tagged metadata.
 This is a supplement to the on-disc bytecode, not a claim that the original
 executable has been completely decompiled or emulated.
 
@@ -34,7 +34,7 @@ manager, card, inventory, base stack, and all eight stack implementations.
 | Location | Navigation |
 | --- | --- |
 | `riven.cpp` startup / keyboard / resume | Engine entry to menu; demo startup; menu save/return; optional intro; reload current card. These are engine controls, not CARD/HSPT edges. |
-| `riven.cpp` special-change table | 13 destination redirects, handled by `resolve_destination`. |
+| `riven.cpp` special-change table | 13 destination redirects, handled by `resolveDestination`. |
 | `riven_scripts.cpp` switchCard, stack change | Opcodes 2 and 27, extracted directly from game scripts. |
 | `riven_scripts.cpp` zipMode | Opcode 45 resolves current hotspot name to a previously visited CARD with the same NAME/1 name. Kept separate from ordinary movement. |
 | `riven_card.cpp` property patch | ScummVM CD-only patch adds ospit RMAP `0x2e76` enter-script move to local CARD 2 under `agehn == 1 && atrapbook == 1`; do **not** inject into original-disc graph. Original script transition is already present in its update handler. |

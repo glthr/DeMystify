@@ -48,6 +48,7 @@ func (g *Generator) buildEdgeStyleString(style edgeStyle) string {
 	// add properties in a fixed order
 	appendIfNotEmpty("color", style.color)
 	appendIfNotEmpty("style", style.style)
+	appendIfNotEmpty("demystify_kind", style.kind)
 
 	if style.penWidth > 0 {
 		parts = append(parts, fmt.Sprintf("penwidth=%.1f", style.penWidth))

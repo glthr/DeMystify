@@ -164,6 +164,11 @@ func (g *Generator) getBaseNodeStyle(id int64, node common.Node) nodeStyle {
 		style.borderColor = "#fbc02d"
 	}
 
+	if g.metadata.Game == "riven" && node.IsOfType(common.IsVirtual) {
+		style.style = "dashed,filled"
+		style.fillColor = "#ffffff"
+		style.borderColor = "#8a754a"
+	}
 	return style
 }
 

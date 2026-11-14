@@ -5,25 +5,32 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/glthr/DeMystify/common"
 	"github.com/glthr/DeMystify/graph"
+	"github.com/glthr/DeMystify/hypercard"
 	"github.com/glthr/DeMystify/parser"
 	pdf "github.com/glthr/DeMystify/renderer"
 	"github.com/glthr/DeMystify/renderer/dot"
 	pdflayout "github.com/glthr/DeMystify/renderer/layout"
 	web "github.com/glthr/DeMystify/renderer/web"
+	"github.com/glthr/DeMystify/riven"
 )
 
 const graphFilePath = "generated/graph.dot"
 
-const usage = `usage: go run . [options] <hypercard_stacks_directory_path>
+const usage = `usage: go run . [options] <game_input_directory_or_file>
 
 Options:
+  --game auto|myst|riven     Input engine (default auto; Riven: original five-CD edition)
+  --output directory        Output root (Myst: generated; Riven: generated/riven)
+  --extract-images directory Decode stored Riven base views into local images.json assets
   --format all|html|pdf|dot   Output formats (default all; DOT is always saved)
   --assets directory         Decoded view images and optional images.json mappings
   --web-output directory     Browser export directory (default generated/web)
@@ -36,12 +43,17 @@ HTML exports open offline. The PDF layout requires Neato during generation;
 
 type outputOptions struct {
 	format, assetsDir, webDir, webLayout, arrangement, input string
+	game, outputRoot, extractImages                          string
+	webOutputSet                                             bool
 }
 
 func parseOutputOptions(args []string) (outputOptions, error) {
 	var options outputOptions
 	flags := flag.NewFlagSet("demystify", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
+	flags.StringVar(&options.game, "game", "auto", "input engine")
+	flags.StringVar(&options.outputRoot, "output", "", "output root")
+	flags.StringVar(&options.extractImages, "extract-images", "", "decode Riven card pictures")
 	flags.StringVar(&options.format, "format", "all", "output formats")
 	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
 	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
@@ -71,6 +83,17 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	default:
 		return options, fmt.Errorf("%s\nunknown graph arrangement %q", usage, options.arrangement)
 	}
+	if options.game != "auto" && options.game != "myst" && options.game != "riven" {
+		return options, fmt.Errorf("%s\nunknown game %q", usage, options.game)
+	}
+	if options.extractImages != "" && options.assetsDir != "" {
+		return options, fmt.Errorf("--extract-images and --assets cannot be combined")
+	}
+	flags.Visit(func(option *flag.Flag) {
+		if option.Name == "web-output" {
+			options.webOutputSet = true
+		}
+	})
 	options.input = flags.Arg(0)
 	return options, nil
 }
@@ -111,45 +134,91 @@ func run(args []string) error {
 		return err
 	}
 
-	// parser: extract information from the stacks and cards
+	game, err := inputGame(options.input, options.game)
+	if err != nil {
+		return err
+	}
+	graphPath := graphFilePath
+	if game == "riven" && options.outputRoot == "" {
+		options.outputRoot = "generated/riven"
+	}
+	if options.outputRoot != "" {
+		graphPath = filepath.Join(options.outputRoot, "graph.dot")
+		if !options.webOutputSet {
+			options.webDir = filepath.Join(options.outputRoot, "web")
+		}
+	}
+	if options.extractImages != "" && game != "riven" {
+		return fmt.Errorf("--extract-images requires Riven input")
+	}
+	var corpus *hypercard.Corpus
+	var imported *riven.Import
+	var metadata *common.Metadata
 	fmt.Println("Parsing stacks and cards...")
-
-	corpus, err := parser.LoadInput(options.input)
-	if err != nil {
-		return fmt.Errorf("unable to parse stacks and cards: %w", err)
-	}
-	p, err := parser.NewParserFromCorpus(corpus)
-	if err != nil {
-		return fmt.Errorf("unable to analyze stacks and cards: %w", err)
-	}
-
-	metadata, err := p.Process()
-	if err != nil {
-		return fmt.Errorf("parser error: %w", err)
-	}
-
-	// guard clause (helpful for external contributors...)
-	// NOTE: to replace with a more robust mechanism, like hashing the files
-	if metadata.TotalStacks != 6 {
-		return fmt.Errorf("expected 6 stacks (Ages), got %d", metadata.TotalStacks)
-	}
-
-	if metadata.TotalCards != 1355 {
-		return fmt.Errorf("expected 1355 cards, got %d", metadata.TotalCards)
+	if game == "riven" {
+		for _, output := range []string{filepath.Dir(graphPath), options.webDir, options.extractImages} {
+			if output != "" {
+				if err := protectInputDirectory(options.input, output); err != nil {
+					return err
+				}
+			}
+		}
+		imported, err = riven.LoadInput(options.input)
+		if err != nil {
+			return fmt.Errorf("loading Riven input: %w", err)
+		}
+		defer imported.Close()
+		metadata = imported.Metadata
+		if options.extractImages != "" {
+			options.assetsDir, err = imported.ExtractImages(options.extractImages)
+			if err != nil {
+				return fmt.Errorf("extracting Riven pictures: %w", err)
+			}
+		}
+	} else {
+		value, err := parser.LoadInput(options.input)
+		if err != nil {
+			return fmt.Errorf("unable to parse stacks and cards: %w", err)
+		}
+		corpus = &value
+		p, err := parser.NewParserFromCorpus(value)
+		if err != nil {
+			return fmt.Errorf("unable to analyze stacks and cards: %w", err)
+		}
+		metadata, err = p.Process()
+		if err != nil {
+			return fmt.Errorf("parser error: %w", err)
+		}
+		if metadata.TotalStacks != 6 {
+			return fmt.Errorf("expected 6 stacks (Ages), got %d", metadata.TotalStacks)
+		}
+		if metadata.TotalCards != 1355 {
+			return fmt.Errorf("expected 1355 cards, got %d", metadata.TotalCards)
+		}
 	}
 
 	fmt.Printf("Stack count: %d\n", metadata.TotalStacks)
 	fmt.Printf("Cards count: %d\n", metadata.TotalCards)
 
 	// graph generation
-	fmt.Println("Generating the Myst Graph...")
+	fmt.Printf("Generating the %s Graph...\n", map[string]string{"myst": "Myst", "riven": "Riven"}[game])
 
 	g, err := graph.NewGraph(metadata)
 	if err != nil {
 		return fmt.Errorf("error while instantiating the graph: %w", err)
 	}
 
+	if metadata.StartNodeName != "" {
+		if id, ok := g.GetNodeID(metadata.StartNodeName); ok {
+			metadata.StartNodeID = id
+		}
+	}
 	g.Process()
+	if imported != nil {
+		if err := imported.WriteEvidence(filepath.Dir(graphPath)); err != nil {
+			return fmt.Errorf("saving Riven evidence: %w", err)
+		}
+	}
 
 	fmt.Printf("Nodes count: %d\n", metadata.TotalNodes)
 	fmt.Printf("Edges count: %d\n", metadata.TotalEdges)
@@ -206,26 +275,22 @@ func run(args []string) error {
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(graphFilePath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(graphPath), 0755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 
-	if err := os.WriteFile(graphFilePath, []byte(dotContent), 0644); err != nil {
+	if err := os.WriteFile(graphPath, []byte(dotContent), 0644); err != nil {
 		return fmt.Errorf("saving DOT file: %w", err)
 	}
-	fmt.Printf("DOT file: %s\n", graphFilePath)
+	fmt.Printf("DOT file: %s\n", graphPath)
 	var drawing *pdflayout.Drawing
 	pdfRendered := false
 	if usePDFLayout {
 		fmt.Println("Preparing the shared PDF graph layout...")
 		var value pdflayout.Drawing
 		if options.format == "all" {
-			var encoded []byte
-			if pinned {
-				encoded, err = pdf.RenderPinnedPDFAndLayout(graphFilePath)
-			} else {
-				encoded, err = pdf.RenderPDFAndLayout(graphFilePath)
-			}
+			encoded, renderErr := pdf.RenderToFile(graphPath, filepath.Join(filepath.Dir(graphPath), "graph.pdf"), true, pinned)
+			err = renderErr
 			if err == nil {
 				value, err = pdflayout.FromJSON(encoded)
 			}
@@ -245,7 +310,7 @@ func run(args []string) error {
 
 	if options.format == "all" || options.format == "html" {
 		fmt.Println("Generating the browser viewer...")
-		report, err := web.Write(options.webDir, metadata, web.Options{AssetsDir: options.assetsDir, InputDir: options.input, Corpus: &corpus, PDFLayout: drawing})
+		report, err := web.Write(options.webDir, metadata, web.Options{AssetsDir: options.assetsDir, InputDir: options.input, Corpus: corpus, PDFLayout: drawing})
 		if err != nil {
 			return fmt.Errorf("generating browser viewer: %w", err)
 		}
@@ -260,10 +325,8 @@ func run(args []string) error {
 	}
 	if (options.format == "all" || options.format == "pdf") && !pdfRendered {
 		fmt.Println("Generating the PDF file...")
-		if pinned {
-			return pdf.RenderPinnedPDF(graphFilePath)
-		}
-		return pdf.RenderPDF(graphFilePath)
+		_, err := pdf.RenderToFile(graphPath, filepath.Join(filepath.Dir(graphPath), "graph.pdf"), false, pinned)
+		return err
 	}
 	return nil
 }
@@ -330,5 +393,68 @@ func CheckNeatoInstalled() error {
 		return fmt.Errorf("neato is not installed: %w", err)
 	}
 
+	return nil
+}
+
+// inputGame keeps native HyperCard/XML input as the default and recognizes the
+// original Riven ISO/Mohawk containers without adding a second application.
+func inputGame(input, requested string) (string, error) {
+	if requested != "auto" {
+		return requested, nil
+	}
+	info, err := os.Stat(input)
+	if err != nil {
+		return "", fmt.Errorf("inspecting game input: %w", err)
+	}
+	isMohawk := func(name string) bool {
+		lower := strings.ToLower(name)
+		return strings.HasSuffix(lower, ".iso") || strings.HasSuffix(lower, ".mhk")
+	}
+	if !info.IsDir() {
+		if isMohawk(input) {
+			return "riven", nil
+		}
+		return "myst", nil
+	}
+	found := false
+	err = filepath.WalkDir(input, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !entry.IsDir() && isMohawk(entry.Name()) {
+			found = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("inspecting input directory: %w", err)
+	}
+	if found {
+		return "riven", nil
+	}
+	return "myst", nil
+}
+
+func protectInputDirectory(input, output string) error {
+	info, err := os.Stat(input)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return nil
+	}
+	source, err := filepath.Abs(input)
+	if err != nil {
+		return err
+	}
+	target, err := filepath.Abs(output)
+	if err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(source, target)
+	if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("output directory %q overlaps original input %q", output, input)
+	}
 	return nil
 }

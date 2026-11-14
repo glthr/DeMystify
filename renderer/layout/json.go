@@ -35,6 +35,7 @@ type objectJSON struct {
 }
 
 type edgeJSON struct {
+	Kind       string      `json:"demystify_kind"`
 	Source     *int        `json:"tail"`
 	Target     *int        `json:"head"`
 	Color      string      `json:"color"`
@@ -163,7 +164,7 @@ func FromJSON(data []byte) (Drawing, error) {
 			return Drawing{}, fmt.Errorf("edge %d: %w", i, err)
 		}
 		value := Edge{Source: ids[*edge.Source], Target: ids[*edge.Target],
-			Color: edge.Color, Style: edge.Style, PenWidth: penWidth}
+			Color: edge.Color, Style: edge.Style, PenWidth: penWidth, Kind: edge.Kind}
 		for _, group := range []struct {
 			source []Operation
 			target *[]Operation

@@ -598,3 +598,109 @@ test("tabbing out of the search control closes its list", () => {
   list.children[1].dispatch("focusout", {relatedTarget: h.get("help-button")});
   assert.equal(list.hidden, true);
 });
+
+// Riven imports exercise the same viewer, not a separate frontend.
+function rivenFixture(pdf = false) {
+  const nodes = [
+    {id: 1, sourceId: 'tspit:155', name: 'Temple:155', stack: 'Temple', originalName: 'Entry', rmap: '0x00006e9a', image: 'images/start.png', thumbnail: 'images/start-thumb.png', imageWidth: 608, imageHeight: 392, x: 0, y: 0, width: 180, height: 132, viewWidth: 608, viewHeight: 392, attributes: ['card', 'source'], scriptText: '</script><img src=x onerror=alert(1)>', provenance: {resource: 'CARD:155'}, zones: [{id: 4, type: 'hotspot', name: 'Forward <button>', x: 10, y: 20, width: 80, height: 100, script: 'change_card(156);'}]},
+    {id: 2, sourceId: 'tspit:156', name: 'Temple:156', stack: 'Temple', x: 320, y: 0, width: 180, height: 56, attributes: ['card']},
+    {id: 3, sourceId: 'ospit:1', name: 'Gehn:1', stack: 'Gehn', x: 650, y: 0, width: 180, height: 56, attributes: ['card']},
+    {id: 4, sourceId: 'gspit:1', name: 'Garden:1', stack: 'Garden', x: 950, y: 0, width: 180, height: 56, attributes: ['card']},
+    {id: 5, sourceId: 'aspit:1', name: 'Menu:1', stack: 'Menu', x: 0, y: 400, width: 180, height: 56, attributes: ['card']},
+    {id: 6, sourceId: 'tspit:361', name: 'Temple:361', stack: 'Temple', x: 320, y: 400, width: 180, height: 56, attributes: ['virtual']},
+    {id: 7, sourceId: 'aspit:5', name: 'Menu:5', stack: 'Menu', x: 650, y: 400, width: 180, height: 56, attributes: ['card'], dynamicNavigation: [{kind: 'dynamic-return'}]}
+  ];
+  const edges = [
+    {source: 1, target: 2, kind: 'script', attributes: ['intraAge'], evidence: [{resource: 'HSPT:155', byte_offset: 30}]},
+    {source: 1, target: 3, kind: 'native', attributes: ['native', 'crossAge'], evidence: [{engine_source: 'https://example.com/source'}]},
+    {source: 1, target: 4, kind: 'zip', attributes: ['zip'], evidence: [{condition: 'previously visited'}]},
+    {source: 1, target: 5, kind: 'native-ending', attributes: ['native'], evidence: [{condition: 'ending'}]},
+    {source: 2, target: 6, kind: 'script', attributes: ['notImplemented'], evidence: [{missing_target: true}]},
+    {source: 3, target: 4, kind: 'script', attributes: [], evidence: []},
+  ];
+  const data = {nodes, edges, meta: {game: "Riven", cards: 6, startNodeID: 1}};
+  if (pdf) data.pdfLayout = {
+    bounds: {minX: -100, minY: -100, maxX: 1100, maxY: 500},
+    nodes: nodes.map(n => ({id: n.id, x: n.x, y: n.y, width: n.width, height: n.height, fill: '#d0af76', stroke: '#223344'})),
+    edges: edges.map((e, i) => ({...e, color: `#ee${String(i).padStart(4, '0')}`, penWidth: 1, draw: [{op: 'L', points: [[i*50, 0], [i*50+10, 20]]}]}))
+  };
+  return data;
+}
+
+test('Riven source IDs, RMAP search and start entry survive normalization', () => {
+  const h = harness(rivenFixture());
+  assert.equal(h.app.state.selected.sourceId, 'tspit:155');
+  assert.equal(h.api.searchNodes(h.app.graph.nodes, 'tspit:155')[0].id, 1);
+  assert.equal(h.api.searchNodes(h.app.graph.nodes, '0x00006e9a')[0].id, 1);
+  assert.equal(h.get('node-highlights').children.length, 5, 'Riven uses the relevant shared highlight controls');
+  assert.equal(h.get('selected-script').textContent, '</script><img src=x onerror=alert(1)>');
+  assert.equal(descendants(h.get('selected-script'), 'img').length, 0);
+  assert.equal(h.get('selected-provenance').textContent, JSON.stringify({resource: 'CARD:155'}, null, 2));
+  const rect = descendants(h.get('selected-picture'), 'rect')[0];
+  assert.equal(rect.getAttribute('x'), '10'); assert.equal(rect.getAttribute('width'), '80');
+  rect.dispatch('click'); assert.equal(h.get('zone-script').textContent, 'change_card(156);');
+});
+
+test('navigation layers filter references and preserve every underlying record', () => {
+  const h = harness(rivenFixture());
+  assert.equal(h.app.graph.edges.length, 6);
+  assert.equal(h.get('outgoing-count').textContent, '2');
+  assert.equal(h.app.graph.edges.filter(h.app.edgeAllowed).length, 4);
+  h.get('zip-navigation').checked = true; h.get('zip-navigation').dispatch('change');
+  assert.equal(h.get('outgoing-count').textContent, '3');
+  h.get('ending-resets').checked = true; h.get('ending-resets').dispatch('change');
+  assert.equal(h.get('outgoing-count').textContent, '4');
+  h.get('native-navigation').checked = false; h.get('native-navigation').dispatch('change');
+  assert.equal(h.get('outgoing-count').textContent, '2', 'turning native off removes both movement and reset');
+  assert.equal(h.app.graph.edges.length, 6, 'filtering never rewrites the extracted model');
+  assert.equal(h.app.graph.edges[0].evidence[0].byte_offset, 30);
+  assert.match(h.get('outgoing-list').textContent, /Inspect script evidence · 1 callsites/);
+});
+
+test('both atlas and PDF drawing obey layer filters', () => {
+  const h = harness(rivenFixture(true));
+  assert.equal(h.app.state.mode, 'pdf');
+  h.app.state.camera = {x: 200, y: 150, scale: 0.5};
+  const pdfPaints = () => {
+    h.canvasPaints.length = 0; h.app.draw();
+    return new Set(h.canvasPaints.filter(p => p.method === 'stroke').map(p => p.stroke));
+  };
+  let colors = pdfPaints();
+  assert.ok(colors.has('#ee0000')); assert.ok(colors.has('#ee0001'));
+  assert.ok(!colors.has('#ee0002'), 'Zip hidden in PDF'); assert.ok(!colors.has('#ee0003'), 'ending hidden in PDF');
+  h.get('zip-navigation').checked = true; h.get('zip-navigation').dispatch('change');
+  colors = pdfPaints(); assert.ok(colors.has('#ee0002'));
+  h.get('native-navigation').checked = false; h.get('native-navigation').dispatch('change');
+  colors = pdfPaints(); assert.ok(!colors.has('#ee0001'));
+  h.app.setLayout('atlas');
+  assert.equal(h.app.state.mode, 'atlas');
+  h.get('zip-navigation').checked = false; h.get('zip-navigation').dispatch('change');
+  h.app.state.camera = {x: 200, y: 150, scale: 0.05};
+  h.canvasCalls.length = 0; h.app.draw();
+  assert.equal(h.canvasCalls.filter(c => c[0] === 'quadraticCurveTo').length, 3, 'only three script connections remain at a dot-only zoom');
+});
+
+test('shortest structural path follows active layers without inventing saved returns', () => {
+  const h = harness(rivenFixture());
+  h.get('set-path-origin').dispatch('click');
+  h.app.selectNode(4);
+  assert.deepEqual([...h.app.state.path], [1, 3, 4]);
+  assert.match(h.get('path-status').textContent, /2 references/);
+  h.get('zip-navigation').checked = true; h.get('zip-navigation').dispatch('change');
+  assert.deepEqual([...h.app.state.path], [1, 4]);
+  h.get('native-navigation').checked = false; h.get('native-navigation').dispatch('change');
+  h.get('zip-navigation').checked = false; h.get('zip-navigation').dispatch('change');
+  assert.deepEqual([...h.app.state.path], []);
+  h.app.selectNode(7); h.get('set-path-origin').dispatch('click'); h.app.selectNode(1);
+  assert.deepEqual([...h.app.state.path], []);
+  assert.equal(h.app.graph.outgoing.get(7).length, 0, 'journal metadata cannot become a path shortcut');
+});
+
+test('a virtual target stays selectable without a fabricated picture', () => {
+  const h = harness(rivenFixture()); h.app.selectNode(6);
+  assert.equal(h.get('selected-name').textContent, 'Temple:361');
+  assert.match(h.get('selected-tags').textContent, /Absent target/);
+  assert.equal(descendants(h.get('selected-picture'), 'img').length, 0);
+  assert.equal(h.get('show-zones').disabled, true);
+  assert.match(h.get('selected-facts').textContent, /Referenced target absent/);
+});

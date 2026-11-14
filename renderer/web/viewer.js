@@ -1,8 +1,9 @@
+/* Adapted from DeMystify, Copyright (c) 2025 Guillaume Lethuillier (GLTHR), MIT License. */
 (function (global) {
   "use strict";
 
-  const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79"];
-  const ATTRIBUTE_LABELS = {disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Automatic next step · hollow arrow", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
+  const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79", "#a4ad87", "#8ba7a1"];
+  const ATTRIBUTE_LABELS = {native: "Native engine transition", nativetimer: "Native timer", nativeending: "Ending reset", disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Automatic next step · hollow arrow", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation"};
   const ATTRIBUTE_HELP = {backtracking: "Saved return: the script saves the starting card before this move and the destination returns to it (push card / pop card). It is not an ordinary two-way connection.", sequencecontinuation: "Automatic next step: one handler requests both cards in a row, so the script moves from the first to the second without another click. Path search does not follow it."};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
   const HIGHLIGHTS = [
@@ -36,7 +37,8 @@
       node.thumbnail = safeImagePath(input.thumbnail) || node.image;
       node.originalName = String(input.originalName || "");
       node.assetName = String(input.assetName || "");
-      node.searchText = [node.name, node.stack, node.originalName, node.assetName].join(" ").toLowerCase();
+      node.sourceId = String(input.sourceId || "");
+      node.searchText = [node.name, node.sourceId, node.stack, node.originalName, node.assetName, node.rmap].join(" ").toLowerCase();
       node.zones = (Array.isArray(input.zones) ? input.zones : []).map((zone, index) => ({...zone, key: index, id: zone.id == null ? index + 1 : zone.id, type: String(zone.type || "part"), name: String(zone.name || ""), layer: zone.layer === "background" ? "background" : "card", x: finite(zone.x), y: finite(zone.y), width: Math.max(0, finite(zone.width)), height: Math.max(0, finite(zone.height)), hidden: zone.hidden === true, enabled: zone.enabled !== false, script: typeof zone.script === "string" ? zone.script : ""}));
       node.atlas = {x: node.x, y: node.y, width: node.width, height: node.height};
       nodes.push(node); byID.set(node.id, node);
@@ -263,6 +265,7 @@
     if (has(edge, "restrictivetransitivitytail") || has(edge, "restrictivetransitivityhead")) {
       if (edge.transitivityId != null) labels.push("ID " + edge.transitivityId);
     }
+    if (String(edge.kind || "").startsWith("native") && !labels.some(label => /Native|Ending/.test(label))) labels.push(edge.kind === "native-timer" ? "Native timer" : edge.kind === "native-ending" ? "Ending reset" : "Native engine transition");
     return labels.join(" · ") || "Ordinary reference";
   }
   function clippedZone(zone, width, height) {
@@ -278,13 +281,17 @@
 
   function createApp(document, window, raw) {
     const graph = normalizeGraph(raw), $ = id => document.getElementById(id), canvas = $("graph-canvas"), ctx = canvas.getContext("2d", {alpha: true});
-    const state = {camera: {x: 0, y: 0, scale: 1}, width: 800, height: 600, minScale: .001, mode: graph.pdfLayout ? "pdf" : "atlas", pdfImages: true, selected: null, hovered: null, ages: new Set(graph.stacks), highlights: new Set(), highlightCount: {visible: graph.nodes.length, matched: graph.nodes.length}, zones: true, hiddenZones: false, zone: null, dialog: false, search: [], searchIndex: -1};
+    const isRiven = String(graph.meta.game || "").toLowerCase() === "riven";
+    const highlightKinds = isRiven ? HIGHLIGHTS.filter(kind => ["source", "sink", "isolated", "selfReference", "virtual"].includes(kind.id)) : HIGHLIGHTS;
+    const state = {camera: {x: 0, y: 0, scale: 1}, width: 800, height: 600, minScale: .001, mode: graph.pdfLayout ? "pdf" : "atlas", pdfImages: true, selected: null, hovered: null, ages: new Set(graph.stacks), highlights: new Set(), highlightCount: {visible: graph.nodes.length, matched: graph.nodes.length}, zones: true, hiddenZones: false, zone: null, dialog: false, search: [], searchIndex: -1, nativeNavigation: true, zipNavigation: false, endingResets: false, origin: null, path: [], pathPairs: new Set()};
     const pointers = new Map(), ageInputs = new Map(), highlightInputs = new Map(), highlightLabels = new Map(), cache = new Map(), grayCache = new Map(), imageQueue = [], zoneRectangles = new Map(), pdfTextMetrics = new Map();
     const MAX_GRAY_BUFFERS = 128, MAX_GRAY_PIXELS = 2000000, MAX_GRAY_EDGE = 192;
     let animation = null, activeImages = 0, gesture = null, drag = null, multiTouch = false, frameID = 0, grayPixels = 0, neededGrayImages = new Set();
     const hasPictures = graph.nodes.some(node => node.thumbnail);
     const requestFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : callback => window.setTimeout(callback, 16);
     const visible = node => state.ages.has(node.stack);
+    const edgeAllowed = edge => !isRiven || (!String(edge.kind || "").startsWith("native") || state.nativeNavigation) && (edge.kind !== "zip" || state.zipNavigation) && (!["native-ending", "native-new-game"].includes(edge.kind) || state.endingResets);
+    const pathPair = edge => edge.source + ">" + edge.target;
     const muted = node => state.highlights.size > 0 && !node.highlightMatch;
     const edgeMuted = edge => state.highlights.size > 0 && !graph.byID.get(edge.source).highlightMatch && !graph.byID.get(edge.target).highlightMatch;
     const element = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = String(text); return node; };
@@ -337,7 +344,7 @@
       $("map-surface").classList.toggle("is-pdf", mode === "pdf"); $("map-surface").classList.toggle("has-layouts", !!graph.pdfLayout);
       $("layout-tools").hidden = !graph.pdfLayout; $("pdf-images-control").hidden = mode !== "pdf" || !hasPictures;
       $("pdf-layout").setAttribute("aria-pressed", String(mode === "pdf")); $("atlas-layout").setAttribute("aria-pressed", String(mode === "atlas"));
-      $("atlas-legend").hidden = mode === "pdf"; $("pdf-legend").hidden = mode !== "pdf";
+      $("atlas-legend").hidden = mode === "pdf" || isRiven; $("pdf-legend").hidden = mode !== "pdf" || isRiven;
       canvas.setAttribute("aria-label", (mode === "pdf" ? "Shared PDF graph layout." : "Image atlas layout.") + " Drag to pan, scroll to zoom. Search or use the incoming and outgoing references to select a card.");
       renderFilters();
       updateHighlightCounts();
@@ -417,11 +424,13 @@
       if (has(edge, "backtracking")) color = "#ac94bf";
       if (has(edge, "conditional") || has(edge, "zip")) { color = "#7aada3"; dash = [7, 5]; }
       if (has(edge, "disabled")) { color = "#8d8875"; dash = [5, 5]; alpha *= .7; }
+      if (String(edge.kind || "").startsWith("native")) { color = "#c5a269"; dash = [4, 3]; }
       if (state.highlights.size) {
         if (edgeMuted(edge)) { color = grayColor(color, "edge", "atlas"); alpha = .3; }
         else alpha = has(edge, "disabled") ? .65 : .9;
       }
-      return {color, dash, alpha, related};
+      if (state.pathPairs.has(pathPair(edge))) { color = "#f0d28a"; dash = []; alpha = 1; }
+      return {color, dash, alpha, related: related || state.pathPairs.has(pathPair(edge))};
     }
     function arrow(x, y, angle, size, edge, tail = false) {
       if (!tail && has(edge, "restrictivetransitivitytail")) return;
@@ -437,6 +446,7 @@
       }
     }
     function drawEdge(edge, viewport) {
+      if (!edgeAllowed(edge)) return;
       const a = edge.from, b = edge.to;
       if (!visible(a) || !visible(b)) return;
       const margin = 150 + Math.abs(edge.parallel) * 15;
@@ -501,14 +511,16 @@
     }
     function isNeighbor(id) {
       if (!state.selected) return false;
-      return graph.incoming.get(state.selected.id).some(edge => edge.source === id) || graph.outgoing.get(state.selected.id).some(edge => edge.target === id);
+      return graph.incoming.get(state.selected.id).some(edge => edgeAllowed(edge) && edge.source === id) || graph.outgoing.get(state.selected.id).some(edge => edgeAllowed(edge) && edge.target === id);
     }
     function drawPDFEdge(edge, viewport) {
+      if (!edgeAllowed(edge)) return;
       if (!visible(graph.byID.get(edge.source)) || !visible(graph.byID.get(edge.target))) return;
       const bounds = edge.bounds;
       if (bounds && (bounds.maxX < viewport.minX || bounds.minX > viewport.maxX || bounds.maxY < viewport.minY || bounds.minY > viewport.maxY)) return;
       const defaults = {stroke: edge.color, fill: edge.color, penWidth: edge.penWidth, style: edge.style, metrics: pdfTextMetrics};
       if (edgeMuted(edge)) defaults.colorMap = color => grayColor(color, "edge", "pdf");
+      if (state.pathPairs.has(pathPair(edge))) { defaults.colorMap = () => "#b58a27"; defaults.penWidth = 2; }
       for (const operations of [edge.draw, edge.head, edge.tail, edge.labels]) replayOperations(ctx, operations, defaults);
     }
     function drawPDFNode(node) {
@@ -591,6 +603,10 @@
       $("zoom-level").textContent = Math.round(camera.scale * 100) + "%";
       $("view-status").textContent = (state.highlights.size ? formatNumber(state.highlightCount.matched) + " / " + formatNumber(state.highlightCount.visible) + " highlighted" : formatNumber(state.highlightCount.visible) + " nodes") + " · " + (state.mode === "pdf" ? state.pdfImages && hasPictures ? "PDF layout · zoom for pictures" : "PDF layout · original labels" : hasPictures ? "zoom in to reveal pictures" : "zoom in to read the names");
       $("map-empty").hidden = state.ages.size !== 0 || !graph.nodes.length;
+      if (isRiven) {
+        const shownEdges = graph.edges.filter(edge => edgeAllowed(edge) && visible(edge.from) && visible(edge.to));
+        $("graph-summary").textContent = formatNumber(graph.nodes.filter(visible).length) + " nodes · " + formatNumber(shownEdges.length) + " references · " + state.ages.size + " stacks";
+      }
     }
 
     function renderFilters() {
@@ -611,7 +627,7 @@
     function setAges(ages) { state.ages = new Set(ages.filter(age => graph.stacks.includes(age))); filtersChanged(); }
     function renderHighlightFilters() {
       const host = $("node-highlights"); host.replaceChildren();
-      for (const kind of HIGHLIGHTS) {
+      for (const kind of highlightKinds) {
         const label = element("label", "highlight-option"), input = element("input"), count = element("span", "highlight-category-count");
         input.type = "checkbox"; input.setAttribute("aria-label", "Highlight " + kind.label.toLowerCase()); input.setAttribute("aria-description", kind.description); label.title = kind.description;
         input.addEventListener("change", () => setHighlights([...highlightInputs].filter(([, control]) => control.checked).map(([id]) => id)));
@@ -673,7 +689,7 @@
     }
     function fact(name, value) { if (!value) return; $("selected-facts").append(element("dt", "", name), element("dd", "", value)); }
     function renderReferences(node, direction) {
-      const records = graph[direction].get(node.id), host = $(direction + "-list"); host.replaceChildren(); $(direction + "-count").textContent = records.length;
+      const records = graph[direction].get(node.id).filter(edgeAllowed), host = $(direction + "-list"); host.replaceChildren(); $(direction + "-count").textContent = records.length;
       if (!records.length) { host.append(element("p", "references-empty", "No extracted " + direction + " references.")); return; }
       for (const edge of records) {
         const other = direction === "incoming" ? edge.from : edge.to, button = element("button", "reference-row"), copy = element("span", "ref-copy"), dot = element("span", "ref-dot");
@@ -683,7 +699,12 @@
         marker.setAttribute("aria-hidden", "true"); button.append(marker, copy, dot);
         const help = [...edge.flags].map(flag => ATTRIBUTE_HELP[flag]).filter(Boolean).join(" ");
         if (help) { button.title = help; button.setAttribute("aria-description", help); }
-        button.setAttribute("aria-label", other.name + ", " + edgeLabel(edge)); button.addEventListener("click", () => selectNode(other.id, true)); host.append(button);
+        button.setAttribute("aria-label", other.name + ", " + edgeLabel(edge)); button.addEventListener("click", () => selectNode(other.id, true));
+        if (isRiven) {
+          const entry = element("div", "reference-entry"), evidence = element("details", "source-detail");
+          evidence.append(element("summary", "", "Inspect " + String(edge.kind || "script") + " evidence · " + (Array.isArray(edge.evidence) ? edge.evidence.length : 0) + " callsites"), element("pre", "", JSON.stringify(edge.evidence || [], null, 2)));
+          entry.append(button, evidence); host.append(entry);
+        } else host.append(button);
       }
     }
     function renderPicture(host, node) {
@@ -759,18 +780,45 @@
       $("zones-note").hidden = !state.zones;
       $("zones-note").textContent = node.zones.length ? "Stored geometry only. Runtime visibility and behavior can change." : "No stored part rectangles were exported for this card.";
       renderPicture($("selected-picture"), node); $("selected-facts").replaceChildren();
-      fact("Original", node.originalName); fact("Picture", node.assetName); fact("Age", node.stack);
+      fact("Original", node.originalName); fact("Picture", node.assetName); fact(isRiven ? "Stack" : "Age", node.stack);
+      fact("RMAP", node.rmap); fact("Hotspots", node.hotspotCount == null ? "" : String(node.hotspotCount)); fact("Pictures", node.imageCount == null ? "" : String(node.imageCount));
+      $("selected-script").textContent = node.scriptText || "No stored scripts were exported for this target.";
+      $("selected-provenance").textContent = JSON.stringify(node.provenance || {}, null, 2);
+      $("selected-dynamic-panel").hidden = !(node.dynamicNavigation || []).length;
+      $("selected-dynamic").textContent = JSON.stringify(node.dynamicNavigation || [], null, 2);
+      $("riven-default-view-note").hidden = !(node.imageCount > 1);
+      $("riven-default-view-note").textContent = "Stored default view shown. This card contains " + node.imageCount + " picture records for its different states.";
       const cardID = node.name.match(/:(\d+)$/); fact("Card ID", cardID ? cardID[1] : has(node, "stack") ? "Stack abstraction" : "Not recorded");
       fact("View", finite(node.viewWidth) && finite(node.viewHeight) ? node.viewWidth + " × " + node.viewHeight : "");
-      fact("Zones", node.zones.length ? String(node.zones.length) + " stored parts" : "None exported");
+      fact("Zones", node.zones.length ? String(node.zones.length) + (isRiven ? " stored hotspots" : " stored parts") : "None exported");
       if (has(node, "virtual")) fact("Status", "Referenced target absent from the imported data.");
       renderReferences(node, "incoming"); renderReferences(node, "outgoing");
       if (inspector) inspector.scrollTop = 0;
       announce("Selected " + node.name + ", " + graph.incoming.get(node.id).length + " incoming and " + graph.outgoing.get(node.id).length + " outgoing reference records.");
+      updatePath(); writeHash(node);
       if (focus) focusNode(node); else schedule();
       if (state.dialog) openPicture();
     }
-    function clearSelection() { state.selected = null; state.zone = null; $("selection-panel").hidden = true; $("welcome-panel").hidden = false; schedule(); }
+    function writeHash(node) {
+      if (!isRiven || !window.history || typeof window.history.replaceState !== "function") return;
+      try { window.history.replaceState(null, "", "#" + (node ? encodeURIComponent(node.sourceId || node.id) : "")); } catch (_) { /* Embedded file previews can restrict history changes. */ }
+    }
+    function updatePath() {
+      state.path = []; state.pathPairs.clear();
+      const origin = state.origin == null ? null : graph.byID.get(state.origin);
+      if (!origin) { $("path-status").textContent = "Select a card, set the origin, then select a destination."; return; }
+      if (!state.selected) { $("path-status").textContent = "Origin: " + origin.name; return; }
+      const target = state.selected, queue = [origin.id], previous = new Map([[origin.id, null]]);
+      for (let index = 0; index < queue.length && !previous.has(target.id); index++) {
+        for (const edge of graph.outgoing.get(queue[index])) if (edgeAllowed(edge) && !previous.has(edge.target)) { previous.set(edge.target, edge.source); queue.push(edge.target); }
+      }
+      if (!previous.has(target.id)) { $("path-status").textContent = origin.name + " → " + target.name + ": no path in these navigation layers."; return; }
+      for (let id = target.id; id != null; id = previous.get(id)) state.path.push(id);
+      state.path.reverse();
+      state.path.slice(1).forEach((id, index) => state.pathPairs.add(state.path[index] + ">" + id));
+      $("path-status").textContent = origin.name + " → " + target.name + ": " + (state.path.length - 1) + " references. Puzzle state is not evaluated.";
+    }
+    function clearSelection() { state.selected = null; state.zone = null; $("selection-panel").hidden = true; $("welcome-panel").hidden = false; updatePath(); writeHash(null); schedule(); }
     function openDialog(dialog) { if (typeof dialog.showModal === "function") { if (!dialog.open) dialog.showModal(); } else dialog.setAttribute("open", ""); }
     function closeDialog(dialog) { if (typeof dialog.close === "function") dialog.close(); else dialog.removeAttribute("open"); }
     function openPicture() {
@@ -863,17 +911,44 @@
     $("expand-picture").addEventListener("click", openPicture); $("close-picture").addEventListener("click", () => { closeDialog($("picture-dialog")); state.dialog = false; });
     $("picture-dialog").addEventListener("close", () => { state.dialog = false; });
     $("help-button").addEventListener("click", () => openDialog($("help-dialog"))); $("close-help").addEventListener("click", () => closeDialog($("help-dialog")));
-    const dock = graph.nodes.find(node => /^Myst:8336$/i.test(node.name)); $("start-dock").disabled = !dock;
+    const dock = isRiven ? graph.byID.get(Number(graph.meta.startNodeID)) || graph.nodes.find(node => node.sourceId === "tspit:155") : graph.nodes.find(node => /^Myst:8336$/i.test(node.name)); $("start-dock").disabled = !dock;
     $("start-dock").addEventListener("click", () => { if (dock) selectNode(dock.id, true); });
     $("card-count").textContent = formatNumber(graph.meta.cards == null ? graph.nodes.filter(node => has(node, "card") && !has(node, "virtual")).length : graph.meta.cards);
-    $("graph-summary").textContent = formatNumber(graph.nodes.length) + " nodes · " + graph.stacks.length + " Ages";
+    $("graph-summary").textContent = formatNumber(graph.nodes.length) + " nodes · " + graph.stacks.length + (isRiven ? " stacks" : " Ages");
     $("conditional-legend").hidden = !graph.edges.some(edge => has(edge, "conditional") || has(edge, "zip"));
     if (!graph.nodes.length) { $("welcome-panel").querySelector("h1").textContent = "No graph data."; $("view-status").textContent = "No nodes were exported"; }
+    for (const id of ["riven-projection-panel", "riven-path-panel", "riven-script-section", "riven-provenance-section", "riven-default-view-note"]) $(id).hidden = !isRiven;
+    if (isRiven) {
+      document.title = "DeMystify · Riven card atlas";
+      $("brand-name").textContent = "Riven"; $("brand-mark").textContent = "R";
+      $("home-link").setAttribute("aria-label", "Riven, fit the graph");
+      $("welcome-intro").textContent = "Explore the cards, pictures and script references behind Riven.";
+      $("start-dock").textContent = "Begin at the arrival "; $("start-dock").append(element("span", "", "↗"));
+      $("age-panel-title").textContent = "EXPLORE BY STACK";
+      $("cross-legend-label").textContent = "Between stacks";
+      $("riven-legend").hidden = false;
+      for (const id of ["myst-return-legend", "myst-paired-legend", "myst-sequence-legend", "myst-disabled-legend"]) $(id).hidden = true;
+      $("inspector-footnote").textContent = "A reference is not a promise of access. Puzzle state, hotspot enablement and saved returns are not executed here.";
+    }
     renderHighlightFilters(); setLayout(state.mode, false); resize(true);
-    const initial = dock || graph.nodes.find(node => node.image);
+    let hash = "";
+    try { hash = decodeURIComponent(window.location && window.location.hash ? window.location.hash.slice(1) : ""); } catch (_) { hash = ""; }
+    const initial = hash ? graph.nodes.find(node => node.sourceId === hash || node.name === hash || String(node.id) === hash) : dock || graph.nodes.find(node => node.image);
     if (initial) selectNode(initial.id);
+    for (const [id, field] of [["native-navigation", "nativeNavigation"], ["zip-navigation", "zipNavigation"], ["ending-resets", "endingResets"]]) $(id).addEventListener("change", () => {
+      state[field] = $(id).checked;
+      if (state.selected) { renderReferences(state.selected, "incoming"); renderReferences(state.selected, "outgoing"); }
+      updatePath(); schedule();
+    });
+    $("set-path-origin").addEventListener("click", () => { if (state.selected) { state.origin = state.selected.id; updatePath(); schedule(); } });
+    $("clear-path").addEventListener("click", () => { state.origin = null; updatePath(); schedule(); });
+    if (typeof window.addEventListener === "function") window.addEventListener("hashchange", () => {
+      let id = ""; try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (_) { return; }
+      const node = graph.nodes.find(node => node.sourceId === id || node.name === id || String(node.id) === id);
+      if (node) selectNode(node.id, true);
+    });
     if (typeof window.ResizeObserver === "function") new window.ResizeObserver(() => resize()).observe(canvas); else window.addEventListener("resize", () => resize());
-    return {graph, state, selectNode, clearSelection, fit, zoom, setAges, setHighlights, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache, grayCache, grayBudget: {buffers: MAX_GRAY_BUFFERS, pixels: MAX_GRAY_PIXELS, edge: MAX_GRAY_EDGE}};
+    return {graph, state, edgeAllowed, updatePath, selectNode, clearSelection, fit, zoom, setAges, setHighlights, setLayout, renderSearch, updateZones, showZone, draw, worldPoint: point => worldPoint(state.camera, point), screenPoint: point => screenPoint(state.camera, point), imageCache: cache, grayCache, grayBudget: {buffers: MAX_GRAY_BUFFERS, pixels: MAX_GRAY_PIXELS, edge: MAX_GRAY_EDGE}};
   }
 
   const api = {normalizeGraph, normalizePDFLayout, operationBounds, replayOperations, worldPoint, screenPoint, zoomAt, boundsFor, fitCamera, intersects, searchNodes, edgeLabel, clippedZone, viewGeometry, safeImagePath, typingTarget, matchesHighlights, highlightCounts, grayColor, arrowPolygon, HIGHLIGHTS, createApp};

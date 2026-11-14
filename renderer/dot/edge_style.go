@@ -18,6 +18,7 @@ func enrichTransitiveEdgeIDTooltip(tooltip *string, edge *common.Edge) {
 // applyEdgeStyle applies styling to an edge based on its attributes
 func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := g.applyNavigationStyle(edge, isOnCustomPath)
+	style.kind = edge.Kind
 	if edge.IsOfType(common.SequenceContinuation) {
 		style.tooltip = joinTooltip(style.tooltip, continuationTooltip)
 		// A hollow head marks the automatic step. The calling card keeps its own
@@ -25,6 +26,20 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 		if style.arrowhead == "" {
 			style.arrowhead = continuationArrow
 		}
+	}
+	if edge.IsOfType(common.Native) {
+		style.style = "dashed"
+		style.tooltip = joinTooltip(style.tooltip, "Native interpreter transition")
+	}
+	if edge.IsOfType(common.Zip) {
+		style.color = "#66998c"
+		style.style = "dashed"
+		style.tooltip = joinTooltip(style.tooltip, "Zip shortcut (previously visited target; excluded from ordinary paths)")
+	}
+	if edge.IsOfType(common.EndingReset) {
+		style.color = "#a08bac"
+		style.style = "dashed"
+		style.tooltip = joinTooltip(style.tooltip, "Ending reset (excluded from ordinary paths)")
 	}
 	return style
 }
@@ -175,6 +190,9 @@ func (g *Generator) applyDisabledStyle(edge *common.Edge, style *edgeStyle) {
 
 // edgeAttributesMatch checks if two edges match in terms of their attributes
 func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
+	if edge1.Kind != edge2.Kind {
+		return false
+	}
 	// Opposite ordered steps are separate records, not a bidirectional move.
 	if edge1.IsOfType(common.SequenceContinuation) || edge2.IsOfType(common.SequenceContinuation) {
 		return false

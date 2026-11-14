@@ -49,7 +49,3 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/pdf"
           "$RUNNER_TEMP/pdf/bin/python" -m pip install --quiet -r scripts/requirements-pdf.txt
           "$RUNNER_TEMP/pdf/bin/python" -m unittest discover -s scripts -p 'test_*.py'
-      - name: Test the Riven extractor and local viewer
-        run: |
-          python3 -m unittest discover -s tests -p 'test_*.py'
-          node --test tests/test_viewer.cjs

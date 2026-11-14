@@ -111,13 +111,13 @@ The optional formatter preserves the graph at its native size and adds the origi
 
 ## Generate the Riven Graph
 
-The optional `riven_graph` Python package reads the original 1997 five-CD edition of Riven directly from ISO9660 images or extracted Mohawk archives. It disassembles card and hotspot scripts and generates a local card atlas using the Myst viewer's visual style, along with GraphML, JSON, CSV and DOT exports. Native transitions, Zip shortcuts, absent targets and caller-sensitive returns remain explicitly distinguished.
+The same Go command also reads the original 1997 five-CD edition of Riven from ISO9660 images or extracted Mohawk archives. `--game auto` detects these inputs; `--game riven` selects them explicitly. Both games use the same `common.Metadata` model, Gonum graph analysis, DOT/PDF generators and offline card-atlas viewer.
 
 ```bash
-python3 -m riven_graph "/path/to/Riven CDs" --output generated/riven
+go run . --game riven --format html --extract-images generated/riven-assets "/path/to/Riven CDs"
 ```
 
-Open `generated/riven/index.html` locally. For pictures, run the optional bitmap extractor and refresh the viewer as described in [the Riven guide](docs/riven.md). The Python package is separate from the Myst Go command and uses Python's standard library; Graphviz improves placement and optional PDF output uses ReportLab. Game files, extracted images and generated game scripts are not included in the repository.
+Open `generated/riven/web/index.html`. The Riven import preserves script byte offsets and branch guards, absent targets, reviewed native transitions and caller-sensitive return metadata. Its optional native/Zip/reset layers and card-script inspector extend the existing viewer; the original Myst command and rendering remain supported. See [the Riven guide](docs/riven.md) for output options, interpretation and validation. No original game files, decoded pictures or generated game scripts are included in the repository.
 
 ## Stay Up-to-Date
 

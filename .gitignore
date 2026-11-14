@@ -32,15 +32,17 @@ generated/graph.pdf
 /generated/.web-*/
 /generated/.demystify-web-*/
 
-# Riven inputs and local exports contain original game data.
+# Local Riven input, decoded views and generated evidence never belong in Git.
 /generated/riven/
-/output/pdf/
+/generated/riven-assets/
 /riven-input/
+.cache/
 *.iso
 *.ISO
 *.mhk
 *.MHK
-.cache/
+.DS_Store
+
+# Caches from the existing optional Myst Python helpers.
 __pycache__/
 *.py[cod]
-.DS_Store

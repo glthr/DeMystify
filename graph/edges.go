@@ -11,9 +11,9 @@ import (
 )
 
 // notTraversed reports whether a displayed edge is excluded from path search:
-// a saved return, or the automatic step that continues a caller's handler.
+// a saved return, an automatic continuation, a Zip shortcut, or an ending reset.
 func notTraversed(edge *common.Edge) bool {
-	return edge.IsOfType(common.Backtracking) || edge.IsOfType(common.SequenceContinuation)
+	return edge.IsOfType(common.Backtracking) || edge.IsOfType(common.SequenceContinuation) || edge.IsOfType(common.Zip) || edge.IsOfType(common.EndingReset)
 }
 
 func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
@@ -51,7 +51,7 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 
 	lineID := len(g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID])
 	for i, existingEdge := range g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] {
-		if existingEdge.TransitivityID == edge.TransitivityID &&
+		if existingEdge.TransitivityID == edge.TransitivityID && existingEdge.Kind == edge.Kind &&
 			areAttributesEqual(existingEdge.Attributes, edge.Attributes) {
 			lineID = i
 			break
@@ -85,6 +85,8 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 			Source:         edge.Source,
 			Target:         edge.Target,
 			TransitivityID: edge.TransitivityID,
+			Kind:           edge.Kind,
+			Evidence:       slices.Clone(edge.Evidence),
 		}
 		g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] = append(
 			g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID], newEdge)
@@ -132,7 +134,7 @@ func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.
 			changed = true
 		}
 	}
-	if changed && (attribute == common.Disabled || attribute == common.Backtracking || attribute == common.SequenceContinuation) {
+	if changed && (attribute == common.Disabled || attribute == common.Backtracking || attribute == common.SequenceContinuation || attribute == common.Zip || attribute == common.EndingReset) {
 		lines := g.Graph.WeightedLines(sourceID, targetID)
 		for lines.Next() {
 			line := lines.WeightedLine()

@@ -38,44 +38,55 @@ type graphData struct {
 }
 
 type webNode struct {
-	ID           int64    `json:"id"`
-	Name         string   `json:"name"`
-	Stack        string   `json:"stack"`
-	OriginalName string   `json:"originalName,omitempty"`
-	AssetName    string   `json:"assetName,omitempty"`
-	Image        string   `json:"image,omitempty"`
-	Thumbnail    string   `json:"thumbnail,omitempty"`
-	ImageWidth   int      `json:"imageWidth,omitempty"`
-	ImageHeight  int      `json:"imageHeight,omitempty"`
-	X            float64  `json:"x"`
-	Y            float64  `json:"y"`
-	Width        float64  `json:"width"`
-	Height       float64  `json:"height"`
-	Attributes   []string `json:"attributes"`
-	Zones        []zone   `json:"zones,omitempty"`
-	ViewWidth    int      `json:"viewWidth,omitempty"`
-	ViewHeight   int      `json:"viewHeight,omitempty"`
+	ID                int64            `json:"id"`
+	Name              string           `json:"name"`
+	Stack             string           `json:"stack"`
+	OriginalName      string           `json:"originalName,omitempty"`
+	AssetName         string           `json:"assetName,omitempty"`
+	Image             string           `json:"image,omitempty"`
+	Thumbnail         string           `json:"thumbnail,omitempty"`
+	ImageWidth        int              `json:"imageWidth,omitempty"`
+	ImageHeight       int              `json:"imageHeight,omitempty"`
+	X                 float64          `json:"x"`
+	Y                 float64          `json:"y"`
+	Width             float64          `json:"width"`
+	Height            float64          `json:"height"`
+	Attributes        []string         `json:"attributes"`
+	Zones             []zone           `json:"zones,omitempty"`
+	ViewWidth         int              `json:"viewWidth,omitempty"`
+	ViewHeight        int              `json:"viewHeight,omitempty"`
+	SourceID          string           `json:"sourceId,omitempty"`
+	HotspotCount      int              `json:"hotspotCount,omitempty"`
+	ImageCount        int              `json:"imageCount,omitempty"`
+	RMAP              string           `json:"rmap,omitempty"`
+	ScriptText        string           `json:"scriptText,omitempty"`
+	Provenance        map[string]any   `json:"provenance,omitempty"`
+	DynamicNavigation []map[string]any `json:"dynamicNavigation,omitempty"`
+	PictureRecords    []map[string]any `json:"pictureRecords,omitempty"`
 }
 
 type zone struct {
-	ID      int    `json:"id"`
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	Layer   string `json:"layer"`
-	X       int    `json:"x"`
-	Y       int    `json:"y"`
-	Width   int    `json:"width"`
-	Height  int    `json:"height"`
-	Script  string `json:"script,omitempty"`
-	Hidden  bool   `json:"hidden"`
-	Enabled bool   `json:"enabled"`
+	ID       int    `json:"id"`
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Layer    string `json:"layer"`
+	X        int    `json:"x"`
+	Y        int    `json:"y"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+	Script   string `json:"script,omitempty"`
+	Hidden   bool   `json:"hidden"`
+	Enabled  bool   `json:"enabled"`
+	RawFlags uint16 `json:"rawFlags,omitempty"`
 }
 
 type webEdge struct {
-	Source         int64    `json:"source"`
-	Target         int64    `json:"target"`
-	Attributes     []string `json:"attributes"`
-	TransitivityID int64    `json:"transitivityId"`
+	Source         int64            `json:"source"`
+	Target         int64            `json:"target"`
+	Attributes     []string         `json:"attributes"`
+	TransitivityID int64            `json:"transitivityId"`
+	Kind           string           `json:"kind,omitempty"`
+	Evidence       []map[string]any `json:"evidence,omitempty"`
 }
 
 type bounds struct {
@@ -91,6 +102,8 @@ type layoutGroup struct {
 }
 
 type webMeta struct {
+	Game            string        `json:"game,omitempty"`
+	StartNodeID     int64         `json:"startNodeID,omitempty"`
 	Cards           uint          `json:"cards"`
 	Stacks          uint          `json:"stacks"`
 	Nodes           int           `json:"nodes"`
@@ -125,6 +138,15 @@ func collectData(metadata *common.Metadata, corpus *hypercard.Corpus) (graphData
 		}
 		item := webNode{ID: node.GraphID, Name: node.Name, Stack: stack, Width: 180, Height: 56,
 			Attributes: nodeAttributes(node.Attributes)}
+		if details := node.Details; details != nil {
+			item.SourceID, item.RMAP, item.ScriptText = details.SourceID, details.GlobalID, details.Script
+			item.ViewWidth, item.ViewHeight = details.ViewWidth, details.ViewHeight
+			item.Provenance, item.DynamicNavigation, item.PictureRecords = details.Provenance, details.Unresolved, details.PictureRecords
+			item.HotspotCount, item.ImageCount = len(details.Zones), len(details.PictureRecords)
+			for _, part := range details.Zones {
+				item.Zones = append(item.Zones, zone{ID: part.ID, Type: part.Type, Name: part.Name, Layer: part.Layer, X: part.X, Y: part.Y, Width: part.Width, Height: part.Height, Script: part.Script, Hidden: part.Hidden, Enabled: part.Enabled, RawFlags: part.RawFlags})
+			}
+		}
 		if node.OriginalName != nil {
 			item.OriginalName = *node.OriginalName
 		}
@@ -145,7 +167,7 @@ func collectData(metadata *common.Metadata, corpus *hypercard.Corpus) (graphData
 			return graphData{}, fmt.Errorf("HTML edge has unsafe transitivity ID %d", edge.TransitivityID)
 		}
 		data.Edges = append(data.Edges, webEdge{Source: edge.Source.GraphID, Target: edge.Target.GraphID,
-			Attributes: edgeAttributes(edge.Attributes), TransitivityID: edge.TransitivityID})
+			Attributes: edgeAttributes(edge.Attributes), TransitivityID: edge.TransitivityID, Kind: edge.Kind, Evidence: edge.Evidence})
 	}
 	// Preserve every edge record, including equal parallel records and loops.
 	// Sorting makes the output independent of caller map/iteration order.
@@ -162,7 +184,7 @@ func collectData(metadata *common.Metadata, corpus *hypercard.Corpus) (graphData
 		}
 		return strings.Join(a.Attributes, "\x00") < strings.Join(b.Attributes, "\x00")
 	})
-	data.Meta = webMeta{Cards: metadata.TotalCards, Stacks: metadata.TotalStacks,
+	data.Meta = webMeta{Game: metadata.Game, StartNodeID: metadata.StartNodeID, Cards: metadata.TotalCards, Stacks: metadata.TotalStacks,
 		Nodes: len(data.Nodes), Edges: len(data.Edges), LayoutAlgorithm: "deterministic grouped force with rectangle packing", DefaultLayout: "atlas"}
 	if corpus != nil {
 		if err := addZones(&data, corpus); err != nil {
@@ -196,7 +218,8 @@ func edgeAttributes(attributes []common.EdgeAttribute) []string {
 			common.IntraAge: "intraAge", common.CrossAge: "crossAge", common.Disabled: "disabled",
 			common.SelfReference: "selfReference", common.NotImplemented: "notImplemented", common.Backtracking: "backtracking",
 			common.RestrictiveTransitivityTail: "restrictiveTransitivityTail", common.RestrictiveTransitivityHead: "restrictiveTransitivityHead",
-			common.SequenceContinuation: "sequenceContinuation",
+			common.SequenceContinuation: "sequenceContinuation", common.Conditional: "conditional",
+			common.Native: "native", common.Zip: "zip", common.EndingReset: "endingReset",
 		}[attribute]
 		if !ok {
 			name = fmt.Sprintf("unknown:%d", attribute)
