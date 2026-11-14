@@ -109,6 +109,16 @@ python3 -m venv /tmp/demystify-pdf
 
 The optional formatter preserves the graph at its native size and adds the original margins, Times-Roman heading, border and clickable `glthr.com` footer. Use `--date YYYY-MM-DD` to set the footer date, or `--subtitle "..."` for a path-specific graph. The raw PDF and DOT remain unchanged.
 
+## Generate the Riven Graph
+
+The optional `riven_graph` Python package reads the original 1997 five-CD edition of Riven directly from ISO9660 images or extracted Mohawk archives. It disassembles card and hotspot scripts and generates a local card atlas using the Myst viewer's visual style, along with GraphML, JSON, CSV and DOT exports. Native transitions, Zip shortcuts, absent targets and caller-sensitive returns remain explicitly distinguished.
+
+```bash
+python3 -m riven_graph "/path/to/Riven CDs" --output generated/riven
+```
+
+Open `generated/riven/index.html` locally. For pictures, run the optional bitmap extractor and refresh the viewer as described in [the Riven guide](docs/riven.md). The Python package is separate from the Myst Go command and uses Python's standard library; Graphviz improves placement and optional PDF output uses ReportLab. Game files, extracted images and generated game scripts are not included in the repository.
+
 ## Stay Up-to-Date
 
 *   [The Myst Graph: A New Perspective on Myst](https://glthr.com/myst-graph-1)
