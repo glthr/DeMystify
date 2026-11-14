@@ -42,3 +42,7 @@ generated/graph.pdf
 *.mhk
 *.MHK
 .DS_Store
+
+# Caches from the existing optional Myst Python helpers.
+__pycache__/
+*.py[cod]
