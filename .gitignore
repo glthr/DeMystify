@@ -31,3 +31,16 @@ generated/graph.pdf
 /generated/web/
 /generated/.web-*/
 /generated/.demystify-web-*/
+
+# Riven inputs and local exports contain original game data.
+/generated/riven/
+/output/pdf/
+/riven-input/
+*.iso
+*.ISO
+*.mhk
+*.MHK
+.cache/
+__pycache__/
+*.py[cod]
+.DS_Store
