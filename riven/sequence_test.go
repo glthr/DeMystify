@@ -161,6 +161,45 @@ func TestSequenceRejectsMalformedCardChanges(t *testing.T) {
 	}
 }
 
+func TestSequenceStoredMovieOpcodeIsJudgedByTheCommandItStores(t *testing.T) {
+	stored := func(command uint16, extra ...uint16) Command {
+		return Command{Opcode: 38, Args: append([]uint16{1, 0, 0, command}, extra...), Offset: 20}
+	}
+	for _, test := range []struct {
+		name    string
+		command Command
+		joined  bool
+	}{
+		{"activates a sound list", stored(40, 2), true},
+		{"activates a picture list", stored(39, 2), true},
+		{"changes card", stored(2, 5), false},
+		{"changes stack", stored(27, 5), false},
+		{"runs an external command", stored(17, 0), false},
+		{"refreshes the card", stored(19, 0), false},
+		{"has too few arguments to tell", Command{Opcode: 38, Args: []uint16{1, 0, 0, 40}, Offset: 20}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			s, c, stacks := sequenceFixture()
+			sequenceHotspot(c, sequenceMove(2, 10), test.command, sequenceMove(3, 30))
+			refs, err := sequenceReferences(s, c, stacks)
+			if err != nil || (len(refs) == 1) != test.joined {
+				t.Fatalf("stored movie opcode %+v: got %+v, %v; want joined=%v", test.command, refs, err, test.joined)
+			}
+		})
+	}
+}
+
+func TestSequenceCallbacksAcceptOnlyHarmlessStoredMovieOpcodes(t *testing.T) {
+	harmless := &Card{ID: 2, Scripts: []Script{{Type: 9, Commands: []Command{{Opcode: 38, Args: []uint16{1, 0, 0, 40, 2}}}}}}
+	if !sequenceCallbacksStable(harmless) {
+		t.Fatal("a stored sound-list activation made the callbacks unstable")
+	}
+	risky := &Card{ID: 2, Scripts: []Script{{Type: 9, Commands: []Command{{Opcode: 38, Args: []uint16{1, 0, 0, 2, 5}}}}}}
+	if sequenceCallbacksStable(risky) {
+		t.Fatal("a stored card change left the callbacks stable")
+	}
+}
+
 func TestSequenceOriginalDiscCorpus(t *testing.T) {
 	input := os.Getenv("RIVEN_TEST_DATA")
 	if input == "" {
@@ -189,10 +228,10 @@ func TestSequenceOriginalDiscCorpus(t *testing.T) {
 			}
 		}
 	}
-	if count != 21 {
-		t.Fatalf("got %d ordered sequence callsites, want 21", count)
+	if count != 22 {
+		t.Fatalf("got %d ordered sequence callsites, want 22", count)
 	}
-	for _, key := range []string{"gspit:9 11>12", "gspit:17 11>13", "jspit:360 361>362", "tspit:10 20>6", "tspit:10 20>7", "bspit:455 465>427"} {
+	for _, key := range []string{"gspit:9 11>12", "gspit:17 11>13", "jspit:360 361>362", "tspit:10 20>6", "tspit:10 20>7", "bspit:455 465>427", "jspit:151 150>148"} {
 		if !seen[key] {
 			t.Errorf("lost verified caller-owned continuation %s", key)
 		}

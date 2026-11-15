@@ -297,8 +297,8 @@ func TestSuppliedDiscGraphAgainstVerifiedReference(t *testing.T) {
 	if len(gotEvidence) != 7609 || len(wantEvidence) != 7609 {
 		t.Fatalf("all original evidence %d/%d, want 7609", len(gotEvidence), len(wantEvidence))
 	}
-	if derivedRecords != 21 || derivedCallsites != 21 {
-		t.Fatalf("derived automatic continuations %d records/%d callsites, want 21/21", derivedRecords, derivedCallsites)
+	if derivedRecords != 22 || derivedCallsites != 22 {
+		t.Fatalf("derived automatic continuations %d records/%d callsites, want 22/22", derivedRecords, derivedCallsites)
 	}
 	t.Logf("all %d original typed endpoints, %d evidence identities and %d literal navigation guards/destinations match verified reference; %d derived continuations audited separately", len(gotEdges), len(gotEvidence), len(gotCalls), derivedRecords)
 }
