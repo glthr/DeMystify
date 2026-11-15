@@ -50,6 +50,33 @@ The optional layer controls distinguish native interpreter transitions, previous
 
 The bitmap decoder chooses one default PLST picture, rather than executing scripts to reconstruct every possible appearance. Pictures, stored hotspots and raw flags are inspection data; movie compositing, runtime visibility and puzzle changes are not simulated.
 
+## Audit
+
+A card graph says which cards name which other cards. `--audit` adds what only a view of the whole game can say, and writes it to `audit.json` beside the other evidence files:
+
+```bash
+go run . --game riven --format dot --audit --output /path/to/local/export "/path/to/Riven CDs"
+```
+
+The run ends with a summary. On the verified 1.0 discs:
+
+```text
+Variables: 163 (never written: adoit; never read: gcathtime, ostove)
+Dead branches: 28 (adoit = 1; bdrwr = 2; gnmagcar = 0)
+Picture entries never selected: 19 of 4147 (7 only in dead branches); 152 more on 16 cards with native calls
+Hotspots: 8498; inert movement hotspots: 66; blank cards: Gehn:89, Prison:46
+Reachable from Temple:155: 2262 cards; Temple:133 stands before 2235 of them
+Zip: 606 shortcuts to 189 places; largest shortest distance 125 without, 74 with
+```
+
+- **Variables.** For each of the game's variables: the value a new game starts with, the literal values that scripts store, the values that `switch` commands compare it with, and the cards that do either. A variable that nothing stores is `neverWritten`; one that nothing tests is `neverRead`.
+- **Dead branches.** A `switch` case is dead when it tests a value that the variable can never hold: not its initial value, and not a value that any script stores. A nested case that contradicts the case enclosing it is dead too. This is the nearest thing Riven's bytecode has to a commented-out line of Myst.
+- **Pictures.** Every picture-list entry other than entry 1 (the interpreter's default) that no live branch of any script selects, with the bitmap it names. A selection made after a change of card in the same handler counts for the card just entered.
+- **Hotspots.** How many of the hotspots named `left`, `forwardleft`, `forward`, `forwardright`, `right`, `up` and `down` still have the number (1 to 7) and the rectangle of the template they come from; the movement hotspots that do nothing; and the cards that are that template and nothing else.
+- **Structure.** The cards that every route from the start to many others must cross (dominators), the unavoidable cards on the way to the farthest one, how often a link owned by a turn or by a forward hotspot has its reverse, the groups of cards joined by turns, and what Zip mode does to distances when every shortcut is available.
+
+The audit executes nothing, and it is deliberately cautious. A variable that the pinned interpreter reads or writes natively, or that a script increments, is assumed able to hold any value, so none of its cases is reported dead. Picture entries on a card whose scripts call a native routine are counted apart, since that routine may draw any of them. The initial values and the list of natively used variables are tables in `riven/audit.go`, taken from the same pinned ScummVM revision as the other native facts. A dead branch or an unselected picture is a fact about the decoded scripts; it does not say why it is so, and it is not a playthrough.
+
 ## Verified CD editions
 
 Two English Windows five-CD sets have been checked independently:

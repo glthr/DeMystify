@@ -117,6 +117,8 @@ The same Go command also reads the original 1997 five-CD edition of Riven from I
 go run . --game riven --format html --extract-images generated/riven-assets "/path/to/Riven CDs"
 ```
 
+Add `--audit` to also write `audit.json`: the values each variable can hold, the script branches that can therefore never run, the stored pictures that nothing selects, and the cards that every route from the start must cross.
+
 Open `generated/riven/web/index.html`. The Riven import preserves script byte offsets and branch guards, absent targets, reviewed native transitions and caller-sensitive return metadata. Its optional native/Zip/reset layers and card-script inspector extend the existing viewer; the original Myst command and rendering remain supported. See [the Riven guide](docs/riven.md) for output options, interpretation and validation. No original game files, decoded pictures or generated game scripts are included in the repository.
 
 ## Stay Up-to-Date

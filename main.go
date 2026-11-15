@@ -31,6 +31,7 @@ Options:
   --game auto|myst|riven     Input engine (default auto; Riven: original five-CD edition)
   --output directory        Output root (Myst: generated; Riven: generated/riven)
   --extract-images directory Decode stored Riven base views into local images.json assets
+  --audit                    Riven: also write audit.json (variables, dead branches, unselected pictures, structure)
   --format all|html|pdf|dot   Output formats (default all; DOT is always saved)
   --assets directory         Decoded view images and optional images.json mappings
   --web-output directory     Browser export directory (default generated/web)
@@ -44,7 +45,7 @@ HTML exports open offline. The PDF layout requires Neato during generation;
 type outputOptions struct {
 	format, assetsDir, webDir, webLayout, arrangement, input string
 	game, outputRoot, extractImages                          string
-	webOutputSet                                             bool
+	webOutputSet, audit                                      bool
 }
 
 func parseOutputOptions(args []string) (outputOptions, error) {
@@ -54,6 +55,7 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	flags.StringVar(&options.game, "game", "auto", "input engine")
 	flags.StringVar(&options.outputRoot, "output", "", "output root")
 	flags.StringVar(&options.extractImages, "extract-images", "", "decode Riven card pictures")
+	flags.BoolVar(&options.audit, "audit", false, "write the Riven state and structure audit")
 	flags.StringVar(&options.format, "format", "all", "output formats")
 	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
 	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
@@ -151,6 +153,9 @@ func run(args []string) error {
 	if options.extractImages != "" && game != "riven" {
 		return fmt.Errorf("--extract-images requires Riven input")
 	}
+	if options.audit && game != "riven" {
+		return fmt.Errorf("--audit requires Riven input")
+	}
 	var corpus *hypercard.Corpus
 	var imported *riven.Import
 	var metadata *common.Metadata
@@ -218,6 +223,14 @@ func run(args []string) error {
 		if err := imported.WriteEvidence(filepath.Dir(graphPath)); err != nil {
 			return fmt.Errorf("saving Riven evidence: %w", err)
 		}
+	}
+
+	if imported != nil && options.audit {
+		audit, err := imported.WriteAudit(filepath.Dir(graphPath))
+		if err != nil {
+			return fmt.Errorf("saving Riven audit: %w", err)
+		}
+		defer fmt.Print(audit.Summary())
 	}
 
 	fmt.Printf("Nodes count: %d\n", metadata.TotalNodes)
