@@ -93,7 +93,7 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	}
 	defer i.Close()
 	md := i.Metadata
-	if md.TotalCards != 2307 || len(md.Nodes) != 2312 || len(md.Edges) != 6721 || i.CommandCount != profile.commands || i.NavigationCount != 6980 || i.MissingReferences != 8 {
+	if md.TotalCards != 2307 || len(md.Nodes) != 2312 || len(md.Edges) != 6722 || i.CommandCount != profile.commands || i.NavigationCount != 6980 || i.MissingReferences != 8 {
 		t.Fatalf("corpus mismatch cards=%d nodes=%d edges=%d commands=%d navigation=%d missing=%d", md.TotalCards, len(md.Nodes), len(md.Edges), i.CommandCount, i.NavigationCount, i.MissingReferences)
 	}
 	if len(i.Archives) != profile.archives || len(i.Unresolved) != 3 {
@@ -171,7 +171,7 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 			baseKinds[edge.Kind]++
 		}
 	}
-	if want := (map[string]int{"script": 6077, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 21}); !reflect.DeepEqual(kinds, want) {
+	if want := (map[string]int{"script": 6077, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 22}); !reflect.DeepEqual(kinds, want) {
 		t.Errorf("classified records=%v want %v", kinds, want)
 	}
 	// Classification may split parallel records; it must preserve the original
@@ -179,7 +179,7 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	if want := (map[string]int{"script": 6063, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4}); len(baseEndpoints) != 6686 || !reflect.DeepEqual(baseKinds, want) {
 		t.Errorf("original endpoint union=%d kinds=%v want 6686/%v", len(baseEndpoints), baseKinds, want)
 	}
-	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 3, "native-ending": 7, "sequence-continuation": 21}); !reflect.DeepEqual(evidenceCounts, want) {
+	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 3, "native-ending": 7, "sequence-continuation": 22}); !reflect.DeepEqual(evidenceCounts, want) {
 		t.Errorf("callsite evidence=%v want %v", evidenceCounts, want)
 	}
 	if disabled != 0 || conditional != 835 {
@@ -201,7 +201,7 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 			}
 		}
 	}
-	if want := (map[string]int{"enabled": 6451, "conditional": 896, "unknown": 1151}); !reflect.DeepEqual(statuses, want) {
+	if want := (map[string]int{"enabled": 6456, "conditional": 897, "unknown": 1145}); !reflect.DeepEqual(statuses, want) {
 		t.Errorf("hotspot availability=%v want %v", statuses, want)
 	}
 	for _, node := range md.Nodes {

@@ -13,8 +13,25 @@ type sequenceReference struct {
 
 // sequenceDisplayCommand lists non-navigating primitives that can separate two
 // requests in a display/sound/wait run. This deliberately excludes arbitrary
-// native calls, variable changes, refresh/callbacks, stored movie opcodes, Zip,
-// stack changes and opcode 36 whose purpose remains unknown.
+// native calls, variable changes, refresh/callbacks, Zip, stack changes and
+// opcode 36 whose purpose remains unknown. A stored movie opcode is judged by
+// the command it stores: see sequenceNeutralCommand.
+// sequenceNeutralCommand reports whether a command can lie between two requests
+// without ending the run. It is a display, sound or wait primitive, or a stored
+// movie opcode (38: movie slot, time high, time low, command, arguments...) whose
+// stored command is itself such a primitive. The interpreter runs the stored
+// command when its movie reaches the stored time, and a primitive of this list
+// cannot change card. Every one of the 49 stored opcodes of the original discs
+// stores opcode 40, the activation of a sound list. A stored card change, stack
+// change, external call, refresh or any other opcode keeps ending the run, as does
+// a stored opcode with too few arguments to tell.
+func sequenceNeutralCommand(command Command) bool {
+	if sequenceDisplayCommand(command.Opcode) {
+		return true
+	}
+	return command.Opcode == 38 && len(command.Args) >= 5 && sequenceDisplayCommand(command.Args[3])
+}
+
 func sequenceDisplayCommand(op uint16) bool {
 	switch op {
 	case 1, 3, 4, 12, 13, 14, 18, 20, 21, 28, 29, 31, 32, 33, 34, 37, 39, 40, 41, 44, 46:
@@ -42,7 +59,7 @@ func sequenceCallbacksStable(card *Card) bool {
 				}
 				continue
 			}
-			if !sequenceDisplayCommand(command.Opcode) && command.Opcode != 7 && command.Opcode != 9 && command.Opcode != 10 && command.Opcode != 24 && command.Opcode != 43 {
+			if !sequenceNeutralCommand(command) && command.Opcode != 7 && command.Opcode != 9 && command.Opcode != 10 && command.Opcode != 24 && command.Opcode != 43 {
 				return false
 			}
 		}
@@ -141,7 +158,7 @@ func sequenceReferences(stack *Stack, card *Card, stacks map[string]*Stack) ([]s
 					between = nil
 					continue
 				}
-				if sequenceDisplayCommand(command.Opcode) {
+				if sequenceNeutralCommand(*command) {
 					if previous != nil {
 						between = append(between, command.Opcode)
 					}
