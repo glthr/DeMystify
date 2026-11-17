@@ -387,6 +387,29 @@ func analysisSummary(metadata *common.Metadata) string {
 		summary += fmt.Sprintf("Shadowed records: %d (%s); %s\n", shadowed, strings.Join(kinds, ", "), policy)
 	}
 	summary += fmt.Sprintf("Source / sink / isolated flags: %d / %d / %d\n", len(stats.NodesWithNoIncoming), len(stats.NodesWithNoOutgoing), len(stats.IsolatedNodes))
+	// A stack node has no reference of its own and an absent target has no
+	// script, so both carry flags that say nothing about a card of the game.
+	var sources, sinks, isolated, others int
+	for _, node := range metadata.Nodes {
+		if !node.IsOfType(common.IsCard) || node.IsOfType(common.IsVirtual) {
+			if node.IsOfType(common.IsSource) || node.IsOfType(common.IsSink) || node.IsOfType(common.IsIsolated) {
+				others++
+			}
+			continue
+		}
+		if node.IsOfType(common.IsSource) {
+			sources++
+		}
+		if node.IsOfType(common.IsSink) {
+			sinks++
+		}
+		if node.IsOfType(common.IsIsolated) {
+			isolated++
+		}
+	}
+	if others != 0 {
+		summary += fmt.Sprintf("  on cards of the input alone: %d / %d / %d (%d flagged stack or absent-target nodes excluded)\n", sources, sinks, isolated, others)
+	}
 	summary += fmt.Sprintf("Nodes with an active reference to themselves: %d\n", len(stats.NodesWithSelfLoops))
 	if farthest := stats.MostSeparatedNodes; len(farthest.Path) > 1 {
 		summary += fmt.Sprintf("Largest finite shortest distance: %.0f (%s to %s)\n", farthest.Distance, farthest.Source.Name, farthest.Target.Name)
