@@ -182,8 +182,27 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 5, "native-ending": 7, "sequence-continuation": 22}); !reflect.DeepEqual(evidenceCounts, want) {
 		t.Errorf("callsite evidence=%v want %v", evidenceCounts, want)
 	}
-	if disabled != 0 || conditional != 835 {
+	if disabled != 0 || conditional != 837 {
 		t.Errorf("classification changed: disabled=%d conditional=%d", disabled, conditional)
+	}
+	// Ten records have no callsite that the pointer can reach: the book-press
+	// egg, the two about-face strips of Garden:167, and eight Zip shortcuts
+	// (seven under a hotspot that is never off, one with an inverted rectangle).
+	shadowed := map[string]int{}
+	shadowedPairs := map[string]bool{}
+	for _, edge := range md.Edges {
+		if edge.IsOfType(common.Shadowed) {
+			shadowed[edge.Kind]++
+			shadowedPairs[edge.Source.Details.SourceID+">"+edge.Target.Details.SourceID] = true
+		}
+	}
+	if want := (map[string]int{"script": 2, "zip": 8}); !reflect.DeepEqual(shadowed, want) {
+		t.Errorf("shadowed records=%v want %v", shadowed, want)
+	}
+	for _, pair := range []string{"bspit:299>bspit:304", "gspit:167>gspit:169", "tspit:371>tspit:374"} {
+		if !shadowedPairs[pair] {
+			t.Errorf("%s is not marked shadowed", pair)
+		}
 	}
 	if calls != 6980 {
 		t.Fatalf("navigation callsite evidence %d", calls)
