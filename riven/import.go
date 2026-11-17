@@ -470,8 +470,11 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 	}
 	sort.Strings(edgeKeys)
 	for _, key := range edgeKeys {
-		if edgeShadowed(edges[key]) {
-			edges[key].Attributes = append(edges[key].Attributes, common.Shadowed)
+		if edge := edges[key]; edgeShadowed(edge) {
+			// A kind of its own: the record keeps its endpoints and evidence,
+			// and remembers what it would have been.
+			edge.Attributes = append(edge.Attributes, common.Shadowed)
+			edge.BaseKind, edge.Kind = edge.Kind, ShadowedKind
 		}
 		md.Edges = append(md.Edges, edges[key])
 	}
@@ -551,6 +554,9 @@ func annotateAvailability(evidence map[string]any, state HotspotState) {
 	}
 }
 
+// ShadowedKind is the kind of a record that no mouse event can trigger.
+const ShadowedKind = "shadowed"
+
 // edgeShadowed reports whether no callsite of a record can receive a mouse
 // event. One reachable callsite, or one that needs no hotspot, keeps it live.
 func edgeShadowed(edge *common.Edge) bool {
@@ -587,7 +593,11 @@ func (i *Import) WriteEvidence(dir string) error {
 	}
 	es := make([]map[string]any, 0, len(i.Metadata.Edges))
 	for _, e := range i.Metadata.Edges {
-		es = append(es, map[string]any{"source": e.Source.Details.SourceID, "target": e.Target.Details.SourceID, "kind": e.Kind, "evidence": e.Evidence, "attributes": e.Attributes, "transitivityId": e.TransitivityID, "disabled": e.IsOfType(common.Disabled), "conditional": e.IsOfType(common.Conditional), "sequenceContinuation": e.IsOfType(common.SequenceContinuation), "shadowed": e.IsOfType(common.Shadowed)})
+		record := map[string]any{"source": e.Source.Details.SourceID, "target": e.Target.Details.SourceID, "kind": e.Kind, "evidence": e.Evidence, "attributes": e.Attributes, "transitivityId": e.TransitivityID, "disabled": e.IsOfType(common.Disabled), "conditional": e.IsOfType(common.Conditional), "sequenceContinuation": e.IsOfType(common.SequenceContinuation), "shadowed": e.IsOfType(common.Shadowed)}
+		if e.BaseKind != "" {
+			record["baseKind"] = e.BaseKind
+		}
+		es = append(es, record)
 	}
 	for name, v := range map[string]any{"graph.json": map[string]any{"game": "riven", "nodes": ns, "edges": es, "stats": i.Metadata.Stats, "typedEdges": len(es), "cards": i.Metadata.TotalCards, "startNodeID": i.Metadata.StartNodeID, "unresolved": i.Unresolved}, "cards.json": i.Stacks, "manifest.json": i.Manifest} {
 		if err := write(name, v); err != nil {

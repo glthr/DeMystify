@@ -150,3 +150,34 @@ func TestAnalysisSummaryReportsRecordsFlagsAndTheLongestDistance(t *testing.T) {
 		t.Fatalf("an empty graph reported a distance:\n%s", got)
 	}
 }
+
+func TestShadowedRecordsHaveTheirOwnSummaryLineAndOption(t *testing.T) {
+	options, err := parseOutputOptions([]string{"discs"})
+	if err != nil || options.includeShadowed {
+		t.Fatalf("shadowed references must be left out by default: %+v, %v", options, err)
+	}
+	options, err = parseOutputOptions([]string{"--include-shadowed", "discs"})
+	if err != nil || !options.includeShadowed {
+		t.Fatalf("--include-shadowed: %+v, %v", options, err)
+	}
+	for include, want := range map[bool]string{
+		false: "Shadowed records: 1 (script: 1); left out of routes and flags\nSource / sink / isolated flags: 2 / 2 / 1\n",
+		true:  "Shadowed records: 1 (script: 1); followed (--include-shadowed)\nSource / sink / isolated flags: 1 / 1 / 0\n",
+	} {
+		a := &common.Node{Name: "Test Age:1", Attributes: []common.NodeAttribute{common.IsCard}}
+		b := &common.Node{Name: "Test Age:2", Attributes: []common.NodeAttribute{common.IsCard}}
+		c := &common.Node{Name: "Test Age:3", Attributes: []common.NodeAttribute{common.IsCard}}
+		metadata := &common.Metadata{IncludeShadowed: include, Nodes: []*common.Node{a, b, c}, Edges: []*common.Edge{
+			{Source: a, Target: b, Kind: "script", Attributes: []common.EdgeAttribute{common.IntraAge}},
+			{Source: b, Target: c, Kind: "shadowed", BaseKind: "script", Attributes: []common.EdgeAttribute{common.IntraAge, common.Shadowed}},
+		}}
+		g, err := graph.NewGraph(metadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g.Process()
+		if got := analysisSummary(metadata); !strings.Contains(got, want) {
+			t.Errorf("include=%v summary:\n%s\nwant it to contain:\n%s", include, got, want)
+		}
+	}
+}

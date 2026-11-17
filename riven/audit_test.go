@@ -2,6 +2,7 @@ package riven
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/glthr/DeMystify/common"
@@ -279,5 +280,43 @@ func TestAuditNativeTimerDoesNotOwnALink(t *testing.T) {
 		if want := map[string]int{"forward": 1}[class.Class]; class.Pairs != want {
 			t.Errorf("class %q has %d pairs, want %d", class.Class, class.Pairs, want)
 		}
+	}
+}
+
+func TestAuditLeavesShadowedReferencesOutUnlessTheRunFollowsThem(t *testing.T) {
+	// 1 -> 2 -> 3 -> 1; card 4 is entered only through a shadowed reference,
+	// and the only Zip shortcut is shadowed too.
+	run := func(include bool) *Audit {
+		cards := map[uint16]*Card{1: {}, 2: {}, 3: {}, 4: {}}
+		game := auditGame(nil, cards, [2]uint16{1, 2}, [2]uint16{2, 3}, [2]uint16{3, 1})
+		nodes := game.Metadata.Nodes
+		game.Metadata.IncludeShadowed = include
+		game.Metadata.Edges = append(game.Metadata.Edges,
+			&common.Edge{Source: nodes[1], Target: nodes[3], Kind: ShadowedKind, BaseKind: "script", Attributes: []common.EdgeAttribute{common.IntraAge, common.Shadowed}, Evidence: []map[string]any{{"hotspot_name": "egg"}}},
+			&common.Edge{Source: nodes[0], Target: nodes[2], Kind: ShadowedKind, BaseKind: "zip", Attributes: []common.EdgeAttribute{common.IntraAge, common.Zip, common.Shadowed}, Evidence: []map[string]any{{"hotspot_name": "place"}}})
+		audit, err := game.Audit()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return audit
+	}
+	without, with := run(false), run(true)
+	for _, audit := range []*Audit{without, with} {
+		sh := audit.Structure.Shadowed
+		if sh.Total != 2 || sh.ByKind["script"] != 1 || sh.ByKind["zip"] != 1 || len(sh.Records) != 2 || sh.Records[0].From != "Jungle:2" || sh.Records[0].To != "Jungle:4" || sh.Records[0].Hotspots[0] != "egg" {
+			t.Fatalf("shadowed records are not counted on their own: %+v", sh)
+		}
+	}
+	if without.Structure.Shadowed.Followed || !with.Structure.Shadowed.Followed {
+		t.Fatal("the audit does not say whether it followed the shadowed references")
+	}
+	if with.Structure.Reachable != without.Structure.Reachable+1 {
+		t.Errorf("reachable: %d without, %d with", without.Structure.Reachable, with.Structure.Reachable)
+	}
+	if without.Structure.Zip.Records != 0 || with.Structure.Zip.Records != 1 {
+		t.Errorf("Zip records: %d without, %d with", without.Structure.Zip.Records, with.Structure.Zip.Records)
+	}
+	if !strings.Contains(without.Summary(), "Shadowed: 2 records (script: 1, zip: 1); left out of routes, dominators and Zip figures\n") || !strings.Contains(with.Summary(), "Shadowed: 2 records (script: 1, zip: 1); followed (--include-shadowed)\n") {
+		t.Errorf("summaries:\n%s\n%s", without.Summary(), with.Summary())
 	}
 }

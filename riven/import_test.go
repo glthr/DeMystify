@@ -85,6 +85,14 @@ func TestFileSliceBounds(t *testing.T) {
 	}
 }
 
+// originalKind is the kind a record had before it was classed as shadowed.
+func originalKind(edge *common.Edge) string {
+	if edge.BaseKind != "" {
+		return edge.BaseKind
+	}
+	return edge.Kind
+}
+
 func TestSuppliedDiscCorpus(t *testing.T) {
 	input, profile := fixtureCorpus(t)
 	i, e := LoadInput(input)
@@ -146,10 +154,11 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		if edge.Source == nil || edge.Target == nil || len(edge.Evidence) == 0 {
 			t.Fatal("edge lost provenance")
 		}
-		if edge.Kind == "script" {
+		original := originalKind(edge)
+		if original == "script" {
 			calls += len(edge.Evidence)
 		}
-		evidenceCounts[edge.Kind] += len(edge.Evidence)
+		evidenceCounts[original] += len(edge.Evidence)
 		if edge.IsOfType(common.Disabled) {
 			disabled++
 		}
@@ -165,13 +174,13 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		if edge.IsOfType(common.SequenceContinuation) {
 			t.Fatalf("literal %s record was replaced by a continuation", edge.Kind)
 		}
-		key := edge.Source.Details.SourceID + ">" + edge.Target.Details.SourceID + ":" + edge.Kind
+		key := edge.Source.Details.SourceID + ">" + edge.Target.Details.SourceID + ":" + original
 		if !baseEndpoints[key] {
 			baseEndpoints[key] = true
-			baseKinds[edge.Kind]++
+			baseKinds[original]++
 		}
 	}
-	if want := (map[string]int{"script": 6077, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 22}); !reflect.DeepEqual(kinds, want) {
+	if want := (map[string]int{"script": 6075, "zip": 598, "shadowed": 10, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 22}); !reflect.DeepEqual(kinds, want) {
 		t.Errorf("classified records=%v want %v", kinds, want)
 	}
 	// Classification may split parallel records; it must preserve the original
@@ -192,7 +201,10 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	shadowedPairs := map[string]bool{}
 	for _, edge := range md.Edges {
 		if edge.IsOfType(common.Shadowed) {
-			shadowed[edge.Kind]++
+			if edge.Kind != ShadowedKind {
+				t.Errorf("a shadowed record kept the kind %q", edge.Kind)
+			}
+			shadowed[edge.BaseKind]++
 			shadowedPairs[edge.Source.Details.SourceID+">"+edge.Target.Details.SourceID] = true
 		}
 	}
@@ -278,8 +290,11 @@ func TestReferenceWhoseEveryCallsiteIsShadowedIsMarked(t *testing.T) {
 			if !edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 1 || edge.Evidence[0]["hotspot_shadow"] != ShadowAlways {
 				t.Errorf("the egg's reference is not marked: %v %v", edge.Attributes, edge.Evidence)
 			}
+			if edge.Kind != ShadowedKind || edge.BaseKind != "script" {
+				t.Errorf("the egg's reference has kind %q (base %q), want shadowed (script)", edge.Kind, edge.BaseKind)
+			}
 		case "tspit:3": // the strip is covered, but two live hotspots lead there too
-			if edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 3 {
+			if edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 3 || edge.Kind != "script" || edge.BaseKind != "" {
 				t.Errorf("a reference with a reachable callsite must stay live: %v, %d callsites", edge.Attributes, len(edge.Evidence))
 			}
 		default:

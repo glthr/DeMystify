@@ -3,7 +3,7 @@
   "use strict";
 
   const PALETTE = ["#b5b583", "#8daf91", "#b29abc", "#d0af76", "#85a9b3", "#bd8e79", "#a4ad87", "#8ba7a1"];
-  const ATTRIBUTE_LABELS = {native: "Native engine transition", nativetimer: "Native timer", nativeending: "Ending reset", disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Automatic next step · hollow arrow", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation", shadowed: "Shadowed · under a hotspot that is never off"};
+  const ATTRIBUTE_LABELS = {native: "Native engine transition", nativetimer: "Native timer", nativeending: "Ending reset", disabled: "Disabled", backtracking: "Saved return · inverted arrows", sequencecontinuation: "Automatic next step · hollow arrow", crossage: "Between Ages", selfreference: "Self-reference", notimplemented: "Absent target", restrictivetransitivitytail: "Paired return · tail", restrictivetransitivityhead: "Paired return · head", conditional: "Conditional", zip: "Zip navigation", shadowed: "Shadowed · no click reaches its hotspot · not followed by paths"};
   const ATTRIBUTE_HELP = {backtracking: "Saved return: the script saves the starting card before this move and the destination returns to it (push card / pop card). It is not an ordinary two-way connection.", sequencecontinuation: "Automatic next step: one handler requests both cards in a row, so the script moves from the first to the second without another click. Path search does not follow it."};
   const NODE_LABELS = {virtual: "Absent target", stack: "Stack", source: "Source flag", sink: "Sink flag", isolated: "Isolate", containsbluepage: "Blue page", containsredpage: "Red page", containswhitepage: "White page"};
   const HIGHLIGHTS = [
@@ -294,7 +294,7 @@
     const requestFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : callback => window.setTimeout(callback, 16);
     const visible = node => state.ages.has(node.stack);
     const edgeAllowed = edge => !isRiven || (!String(edge.kind || "").startsWith("native") || state.nativeNavigation) && (edge.kind !== "zip" || state.zipNavigation) && (!["native-ending", "native-new-game"].includes(edge.kind) || state.endingResets);
-    const pathAllowed = edge => edgeAllowed(edge) && !["disabled", "sequencecontinuation", "backtracking", "restrictivetransitivitytail", "restrictivetransitivityhead"].some(flag => has(edge, flag));
+    const pathAllowed = edge => edgeAllowed(edge) && !["disabled", "shadowed", "sequencecontinuation", "backtracking", "restrictivetransitivitytail", "restrictivetransitivityhead"].some(flag => has(edge, flag));
     const pathPair = edge => edge.source + ">" + edge.target;
     const muted = node => state.highlights.size > 0 && !node.highlightMatch;
     const edgeMuted = edge => state.highlights.size > 0 && !graph.byID.get(edge.source).highlightMatch && !graph.byID.get(edge.target).highlightMatch;
@@ -430,6 +430,7 @@
       if (has(edge, "conditional") || has(edge, "zip")) { color = "#7aada3"; dash = [7, 5]; }
       if (String(edge.kind || "").startsWith("native")) { color = "#c5a269"; dash = [4, 3]; }
       if (has(edge, "disabled")) { color = "#8d8875"; dash = [5, 5]; alpha *= .7; }
+      if (has(edge, "shadowed")) { color = "#8f887d"; dash = [1.5, 4]; }
       if (state.highlights.size) {
         if (edgeMuted(edge)) { color = grayColor(color, "edge", "atlas"); alpha = .3; }
         else alpha = has(edge, "disabled") ? .65 : .9;

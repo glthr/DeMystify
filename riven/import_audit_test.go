@@ -116,7 +116,7 @@ func TestSuppliedDiscCommandOffsetsAndNativeAttribution(t *testing.T) {
 	seen := map[auditCallsite]bool{}
 	for _, edge := range i.Metadata.Edges {
 		for _, ev := range edge.Evidence {
-			if edge.Kind == "script" {
+			if originalKind(edge) == "script" {
 				identity := auditKey(edge.Source.Details.SourceID, ev)
 				cmd, ok := commands[identity]
 				if !ok || (cmd.Opcode != 2 && cmd.Opcode != 27) || auditNumber(ev["opcode"]) != int(cmd.Opcode) {
@@ -244,7 +244,7 @@ func TestSuppliedDiscGraphAgainstVerifiedReference(t *testing.T) {
 			continue
 		}
 		source, target := edge.Source.Details.SourceID, edge.Target.Details.SourceID
-		endpoint := source + ">" + target + ":" + edge.Kind
+		endpoint := source + ">" + target + ":" + originalKind(edge)
 		gotEdges[endpoint] = true
 		for _, ev := range edge.Evidence {
 			identity := evidenceIdentity{endpoint, auditKey(source, ev)}
@@ -262,7 +262,7 @@ func TestSuppliedDiscGraphAgainstVerifiedReference(t *testing.T) {
 				}
 			}
 		}
-		if edge.Kind != "script" {
+		if originalKind(edge) != "script" {
 			continue
 		}
 		for _, ev := range edge.Evidence {

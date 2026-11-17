@@ -210,3 +210,25 @@ func TestAutomaticStepSharesTheStrokeOfAParallelOrdinaryReference(t *testing.T) 
 		})
 	}
 }
+
+func TestShadowedRivenEdgeIsDottedGreyWhateverItWouldHaveBeen(t *testing.T) {
+	g, metadata := newTestGenerator(t)
+	metadata.Game = "riven"
+	for _, attributes := range [][]common.EdgeAttribute{
+		{common.IntraAge, common.Shadowed},
+		{common.IntraAge, common.Conditional, common.Shadowed},
+		{common.IntraAge, common.Conditional, common.Zip, common.Shadowed},
+	} {
+		edge := &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Kind: "shadowed", BaseKind: "script", Attributes: attributes}
+		style := g.applyEdgeStyle(edge, false)
+		if style.color != ShadowedColor || style.style != "dotted" || style.arrowhead != "" || style.kind != "shadowed" {
+			t.Fatalf("%v: a shadowed record must be dotted grey with an ordinary arrowhead: %+v", attributes, style)
+		}
+		if !strings.Contains(style.tooltip, "Shadowed reference") || !strings.Contains(style.attributes, "shadowed") {
+			t.Fatalf("%v: explanation or drawing flag lost: %+v", attributes, style)
+		}
+	}
+	if ShadowedColor == "#7aada3" || ShadowedColor == "#66998c" || ShadowedColor == "#a08bac" || ShadowedColor == "#8d8875" {
+		t.Fatal("the shadowed stroke reuses the color of another kind")
+	}
+}

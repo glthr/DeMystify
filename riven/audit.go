@@ -193,6 +193,23 @@ type ZipAudit struct {
 	FarthestWith        int     `json:"farthestFromStartWith"`
 }
 
+// ShadowedRecord is one reference that no mouse event can trigger.
+type ShadowedRecord struct {
+	From     string   `json:"from"`
+	To       string   `json:"to"`
+	Kind     string   `json:"baseKind"`
+	Hotspots []string `json:"hotspots"`
+}
+
+// ShadowedAudit counts the shadowed references and says whether the figures
+// of the structure follow them.
+type ShadowedAudit struct {
+	Total    int              `json:"records"`
+	ByKind   map[string]int   `json:"byBaseKind"`
+	Followed bool             `json:"followedByRoutes"`
+	Records  []ShadowedRecord `json:"list"`
+}
+
 type StructureAudit struct {
 	Start     string `json:"start"`
 	Reachable int    `json:"reachableFromStart"`
@@ -209,6 +226,8 @@ type StructureAudit struct {
 	Places           int         `json:"placesJoinedByTurns"`
 	PlaceSizes       map[int]int `json:"placeSizes"`
 	Zip              ZipAudit    `json:"zip"`
+	// Shadowed references are left out of everything above unless Followed.
+	Shadowed ShadowedAudit `json:"shadowed"`
 }
 
 type Audit struct {
@@ -222,7 +241,9 @@ type Audit struct {
 
 const auditPolicy = "Static audit of the decoded scripts; nothing is executed. A variable touched by a native " +
 	"routine or incremented by a script is assumed able to hold any value. Entries on cards whose scripts call a " +
-	"native routine are not reported as unselected. Movement excludes Zip, ending resets and automatic next steps."
+	"native routine are not reported as unselected. Movement excludes Zip, ending resets and automatic next steps. " +
+	"A shadowed reference (no mouse event can reach its hotspot) is left out of movement and of the Zip figures " +
+	"unless the run follows them."
 
 type variableUse struct {
 	display            string
@@ -678,8 +699,23 @@ func (i *Import) structureAudit() StructureAudit {
 	type pair struct{ a, b int }
 	owners := map[pair]map[string]bool{}
 	var zips []pair
+	shadowed := ShadowedAudit{ByKind: map[string]int{}, Followed: md.IncludeShadowed, Records: []ShadowedRecord{}}
 	for _, e := range md.Edges {
 		a, b := int(e.Source.GraphID), int(e.Target.GraphID)
+		if e.IsOfType(common.Shadowed) {
+			names := map[string]bool{}
+			for _, ev := range e.Evidence {
+				if name, ok := ev["hotspot_name"].(string); ok {
+					names[name] = true
+				}
+			}
+			shadowed.Total++
+			shadowed.ByKind[e.BaseKind]++
+			shadowed.Records = append(shadowed.Records, ShadowedRecord{From: e.Source.Name, To: e.Target.Name, Kind: e.BaseKind, Hotspots: sortedStrings(names)})
+			if !md.IncludeShadowed {
+				continue
+			}
+		}
 		if e.IsOfType(common.Zip) {
 			zips = append(zips, pair{a, b})
 			continue
@@ -977,6 +1013,7 @@ func (i *Import) structureAudit() StructureAudit {
 		}
 	}
 	s.Zip = z
+	s.Shadowed = shadowed
 	return s
 }
 
@@ -1039,6 +1076,21 @@ func (a *Audit) Summary() string {
 			fmt.Fprintf(&b, "Reachable from %s: %d cards; %s stands before %d of them\n", a.Structure.Start, a.Structure.Reachable, d.Card, d.Dominated)
 			break
 		}
+	}
+	if sh := a.Structure.Shadowed; sh.Total != 0 {
+		kinds := make([]string, 0, len(sh.ByKind))
+		for kind := range sh.ByKind {
+			kinds = append(kinds, kind)
+		}
+		sort.Strings(kinds)
+		for k, kind := range kinds {
+			kinds[k] = fmt.Sprintf("%s: %d", kind, sh.ByKind[kind])
+		}
+		policy := "left out of routes, dominators and Zip figures"
+		if sh.Followed {
+			policy = "followed (--include-shadowed)"
+		}
+		fmt.Fprintf(&b, "Shadowed: %d records (%s); %s\n", sh.Total, strings.Join(kinds, ", "), policy)
 	}
 	z := a.Structure.Zip
 	fmt.Fprintf(&b, "Zip: %d shortcuts to %d places; largest shortest distance %d without, %d with\n", z.Records, z.Destinations, z.DiameterWithout, z.DiameterWith)

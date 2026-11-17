@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/glthr/DeMystify/common"
@@ -32,6 +33,7 @@ Options:
   --output directory        Output root (Myst: generated; Riven: generated/riven)
   --extract-images directory Decode stored Riven base views into local images.json assets
   --audit                    Riven: also write audit.json (variables, dead branches, unselected pictures, structure)
+  --include-shadowed         Riven: let routes, flags and the audit follow shadowed references (left out by default)
   --format all|html|pdf|dot   Output formats (default all; DOT is always saved)
   --assets directory         Decoded view images and optional images.json mappings
   --web-output directory     Browser export directory (default generated/web)
@@ -45,7 +47,7 @@ HTML exports open offline. The PDF layout requires Neato during generation;
 type outputOptions struct {
 	format, assetsDir, webDir, webLayout, arrangement, input string
 	game, outputRoot, extractImages                          string
-	webOutputSet, audit                                      bool
+	webOutputSet, audit, includeShadowed                     bool
 }
 
 func parseOutputOptions(args []string) (outputOptions, error) {
@@ -56,6 +58,7 @@ func parseOutputOptions(args []string) (outputOptions, error) {
 	flags.StringVar(&options.outputRoot, "output", "", "output root")
 	flags.StringVar(&options.extractImages, "extract-images", "", "decode Riven card pictures")
 	flags.BoolVar(&options.audit, "audit", false, "write the Riven state and structure audit")
+	flags.BoolVar(&options.includeShadowed, "include-shadowed", false, "follow shadowed Riven references")
 	flags.StringVar(&options.format, "format", "all", "output formats")
 	flags.StringVar(&options.assetsDir, "assets", "", "decoded view images")
 	flags.StringVar(&options.webDir, "web-output", "generated/web", "browser export directory")
@@ -208,6 +211,7 @@ func run(args []string) error {
 	// graph generation
 	fmt.Printf("Generating the %s Graph...\n", map[string]string{"myst": "Myst", "riven": "Riven"}[game])
 
+	metadata.IncludeShadowed = options.includeShadowed
 	g, err := graph.NewGraph(metadata)
 	if err != nil {
 		return fmt.Errorf("error while instantiating the graph: %w", err)
@@ -349,9 +353,11 @@ func run(args []string) error {
 // of non-disabled directed pairs; a pair can hold several records.
 func analysisSummary(metadata *common.Metadata) string {
 	var returns, steps, disabled, shadowed int
+	shadowedKinds := map[string]int{}
 	for _, edge := range metadata.Edges {
 		if edge.IsOfType(common.Shadowed) {
 			shadowed++
+			shadowedKinds[edge.BaseKind]++
 		}
 		if edge.IsOfType(common.Backtracking) {
 			returns++
@@ -366,7 +372,19 @@ func analysisSummary(metadata *common.Metadata) string {
 	stats := metadata.Stats
 	summary := fmt.Sprintf("Edge records: %d (saved returns: %d, automatic next steps: %d, disabled: %d)\n", len(metadata.Edges), returns, steps, disabled)
 	if shadowed != 0 {
-		summary += fmt.Sprintf("Shadowed records (no callsite can receive a mouse event): %d\n", shadowed)
+		kinds := make([]string, 0, len(shadowedKinds))
+		for kind := range shadowedKinds {
+			kinds = append(kinds, kind)
+		}
+		sort.Strings(kinds)
+		for k, kind := range kinds {
+			kinds[k] = fmt.Sprintf("%s: %d", kind, shadowedKinds[kind])
+		}
+		policy := "left out of routes and flags"
+		if metadata.IncludeShadowed {
+			policy = "followed (--include-shadowed)"
+		}
+		summary += fmt.Sprintf("Shadowed records: %d (%s); %s\n", shadowed, strings.Join(kinds, ", "), policy)
 	}
 	summary += fmt.Sprintf("Source / sink / isolated flags: %d / %d / %d\n", len(stats.NodesWithNoIncoming), len(stats.NodesWithNoOutgoing), len(stats.IsolatedNodes))
 	summary += fmt.Sprintf("Nodes with an active reference to themselves: %d\n", len(stats.NodesWithSelfLoops))
