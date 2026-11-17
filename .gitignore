@@ -34,7 +34,7 @@ generated/graph.pdf
 
 # Local Riven input, decoded views and generated evidence never belong in Git.
 /generated/riven/
-/generated/riven-assets/
+/generated/riven-*/
 /riven-input/
 .cache/
 *.iso
