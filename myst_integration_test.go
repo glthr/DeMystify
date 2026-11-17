@@ -71,6 +71,29 @@ func TestOriginalMystImport(t *testing.T) {
 			t.Errorf("missing relative transition %s -> %s", pair[0], pair[1])
 		}
 	}
+	// Two "right" buttons of Myst:89742 lie entirely under a later "right"
+	// button that leads elsewhere, and nothing can move or hide it: their
+	// reference is the one shadowed record of the six stacks. It is kept, and
+	// it is no line of the graph.
+	var shadowed []string
+	for _, edge := range metadata.Edges {
+		if edge.IsOfType(common.Shadowed) {
+			shadowed = append(shadowed, edge.Source.Name+" -> "+edge.Target.Name)
+		}
+	}
+	if !slices.Equal(shadowed, []string{"Myst:89742 -> Myst:88832"}) {
+		t.Errorf("shadowed records: got %v", shadowed)
+	}
+	if from, _ := g.GetNodeID("Myst:89742"); true {
+		to, _ := g.GetNodeID("Myst:88832")
+		cover, _ := g.GetNodeID("Myst:88345")
+		if _, exists := g.Weight(from, to); exists || !g.HasEdge("Myst:89742", "Myst:88832") {
+			t.Error("the shadowed reference of Myst:89742 must be recorded without being a line of the graph")
+		}
+		if weight, exists := g.Weight(from, cover); !exists || weight != 1 {
+			t.Error("the reference of the covering button of Myst:89742 is missing")
+		}
+	}
 	// An intermediate elevator view continues to the level chosen by its caller,
 	// whether the script spells the transition as vs left or vs "left". The
 	// caller keeps its own reference to that level.
@@ -230,9 +253,9 @@ func mystInputProfile(t *testing.T, dir string) (uint, int, bool) {
 				}
 				switch strings.ToLower(strings.Join(strings.Fields(part.Script.Text), " ")) {
 				case "on mouseup 5119 end mouseup":
-					return 3245, 3289, false
+					return 3244, 3289, false
 				case "on mouseup go to card id 5119 end mouseup":
-					return 3246, 3290, true
+					return 3245, 3290, true
 				}
 			}
 		}

@@ -21,6 +21,8 @@ type HyperCardCard struct {
 	HasBluePage  bool
 	HasRedPage   bool
 	HasWhitePage bool
+	// shadowed marks, script by script, the parts that no click can reach.
+	shadowed []bool
 }
 
 // ParseSimpleCard is the compatibility XML reader for one card. Corpus loading

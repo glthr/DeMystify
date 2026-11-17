@@ -30,6 +30,7 @@ type HyperCardLink struct {
 	IsDisabled             bool // commented out script line
 	IsBacktracking         bool
 	IsSequenceContinuation bool
+	IsShadowed             bool // in a part that lies entirely under a later button
 
 	// Transitivity
 	TransitivityRank common.TransitivityRank
@@ -132,13 +133,23 @@ func (p *Parser) identifyLinks() error {
 	}
 
 	for _, card := range p.cards {
-		for _, script := range card.Scripts {
+		for i, script := range card.Scripts {
+			state := *card
 			links, err := p.identifyScriptLinks(card, script, &transitivityID)
 			if err != nil {
 				return fmt.Errorf("card %s: %w", card.Name, err)
 			}
+			links = append(links, p.projectHandlerCalls(card, script)...)
+			if i < len(card.shadowed) && card.shadowed[i] {
+				// No click reaches this part: its references are kept, marked,
+				// and it sets no state of the card (a saved return, a page).
+				card.IsPushCard, card.IsPopCard = state.IsPushCard, state.IsPopCard
+				card.HasBluePage, card.HasRedPage, card.HasWhitePage = state.HasBluePage, state.HasRedPage, state.HasWhitePage
+				for _, link := range links {
+					link.IsShadowed = !link.IsDisabled
+				}
+			}
 			p.links = append(p.links, links...)
-			p.links = append(p.links, p.projectHandlerCalls(card, script)...)
 		}
 	}
 

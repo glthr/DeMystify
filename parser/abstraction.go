@@ -53,7 +53,19 @@ func (p *Parser) Process() (*common.Metadata, error) {
 		transitivityID int64
 	}
 	edgeExists := make(map[edgeKey]bool)
+	// A reference is shadowed when every part that holds it is: a covered copy
+	// of a button that another part repeats adds nothing.
+	type pair struct{ source, target any }
+	reachable := make(map[pair]bool)
 	for _, link := range p.links {
+		if !link.IsDisabled && !link.IsShadowed {
+			reachable[pair{link.Source, link.Target}] = true
+		}
+	}
+	for _, link := range p.links {
+		if link.IsShadowed && reachable[pair{link.Source, link.Target}] {
+			continue
+		}
 		sourceNode, sourceStack := findNodeStack(metadata.Nodes, link.Source)
 		targetNode, targetStack := findNodeStack(metadata.Nodes, link.Target)
 
@@ -122,6 +134,9 @@ func getEdgeAttributes(
 
 	if link.IsDisabled {
 		edgeTypes = append(edgeTypes, common.Disabled)
+	}
+	if link.IsShadowed {
+		edgeTypes = append(edgeTypes, common.Shadowed)
 	}
 
 	if sourceStack != nil && targetStack != nil && sourceStack != targetStack ||
