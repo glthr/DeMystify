@@ -533,7 +533,9 @@ func edgeEvidenceConditional(evidence map[string]any) bool {
 	if condition, ok := evidence["condition"].(string); ok && condition != "" {
 		return true
 	}
-	return evidence["hotspot_status"] == "conditional"
+	// A hotspot under a cover that scripts switch can be clicked only while
+	// the cover is off, whatever its own activation.
+	return evidence["hotspot_status"] == "conditional" || evidence["hotspot_shadow"] == ShadowConditional
 }
 
 func annotateAvailability(evidence map[string]any, state HotspotState) {

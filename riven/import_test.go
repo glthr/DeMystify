@@ -278,3 +278,32 @@ func TestReferenceWhoseEveryCallsiteIsShadowedIsMarked(t *testing.T) {
 		t.Errorf("hotspot shadow counts %v", counts)
 	}
 }
+
+func TestReferenceUnderASwitchedCoverIsConditional(t *testing.T) {
+	// Jungle:335 of the original discs: "forward" climbs the ladder, and
+	// "lowerladder", later and on the same rectangle, is on until the ladder
+	// is down. The climb is possible in one state only.
+	change := []Script{{Type: 0, Commands: []Command{{Opcode: 2, Args: []uint16{2}, Offset: 8}}}}
+	rect := [4]int{184, 104, 423, 330}
+	start := &Card{ID: 1, GlobalID: 0x6e9a,
+		Scripts: []Script{{Type: 6, Commands: []Command{{Opcode: 8, Variable: 1, Offset: 4, Branches: []Branch{{Value: 1, Commands: []Command{{Opcode: 10, Args: []uint16{9}, Offset: 12}}}}}}}},
+		Hotspots: []Hotspot{
+			{ID: 3, Name: "forward", Index: 1, Rect: rect, Scripts: change},
+			{ID: 9, Name: "lowerladder", Index: 2, Rect: rect},
+		}}
+	stack := &Stack{Name: "tspit", Names: map[uint16][]string{4: {"a", "jladder"}}, RMap: []uint32{0, 0x6e9a, 2}, Cards: map[uint16]*Card{1: start, 2: {ID: 2, GlobalID: 2}}, Resources: map[string]map[uint16]ResourceRef{}}
+	i := &Import{Metadata: &common.Metadata{Game: "riven"}, Stacks: map[string]*Stack{"tspit": stack}, Manifest: map[string]any{}}
+	if err := i.buildMetadata([]string{"tspit"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(i.Metadata.Edges) != 1 {
+		t.Fatalf("got %d records", len(i.Metadata.Edges))
+	}
+	edge := i.Metadata.Edges[0]
+	if edge.Evidence[0]["hotspot_status"] != "enabled" || edge.Evidence[0]["hotspot_shadow"] != ShadowConditional {
+		t.Fatalf("fixture lost its premise: %v", edge.Evidence[0])
+	}
+	if !edge.IsOfType(common.Conditional) || edge.IsOfType(common.Shadowed) || edge.IsOfType(common.Disabled) {
+		t.Fatalf("a reference under a switched cover must be conditional and nothing else: %v", edge.Attributes)
+	}
+}
