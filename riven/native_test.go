@@ -155,3 +155,20 @@ func TestSunnerTimersAndInventoryPolicy(t *testing.T) {
 		t.Fatalf("inventory destinations: %v", got)
 	}
 }
+
+func TestLagoonAlertsNavigateLikeTheTimersOfTheirCards(t *testing.T) {
+	// xjlagoon700_alert runs on entering RMAP 0x79bd and xjlagoon800_alert on
+	// entering 0x7beb: each must name the destination of that card's timer.
+	for name, card := range map[string]uint32{"xjlagoon700_alert": 0x79bd, "xjLagoon800_Alert": 0x7beb} {
+		alert, timer := ExternalTransitions("jspit", name), TimerTransitions("jspit", card)
+		if len(alert) != 1 || len(timer) != 1 {
+			t.Fatalf("%s: %d alert and %d timer transitions", name, len(alert), len(timer))
+		}
+		if alert[0].Stack != timer[0].Stack || alert[0].GlobalID != timer[0].GlobalID || alert[0].Kind != timer[0].Kind || alert[0].Condition == "" || alert[0].Source == timer[0].Source {
+			t.Errorf("%s: %+v does not match the timer %+v", name, alert[0], timer[0])
+		}
+	}
+	if got := ExternalTransitions("jspit", "xjlagoon1500_alert"); got != nil {
+		t.Errorf("the beach alert does not navigate: %+v", got)
+	}
+}

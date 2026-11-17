@@ -149,6 +149,13 @@ func ExternalTransitions(stack, external string) []NativeTransition {
 				condition = "handle dragged down"
 			}
 			return []NativeTransition{nativeGlobal("jspit", 0x1e374, "native", condition, "riven_stacks/jspit.cpp#L375-L420")}
+		case "xjlagoon700_alert":
+			// The alert video of the middle and lower stairs is the same
+			// interaction as the timer of its card, with the same destination:
+			// same kind, so that the record gains a callsite, not a twin.
+			return []NativeTransition{nativeGlobal("jspit", 0x7beb, "native-timer", "jsunners == 0; click or move forward while the alert video plays", "riven_stacks/jspit.cpp#L487-L500")}
+		case "xjlagoon800_alert":
+			return []NativeTransition{nativeGlobal("jspit", 0xb6ca, "native-timer", "jsunners == 0; click or move forward while the alert video plays", "riven_stacks/jspit.cpp#L502-L522")}
 		case "xhandlecontrolmid":
 			return []NativeTransition{
 				nativeGlobal("jspit", 0x1e597, "native", "handle dragged up", "riven_stacks/jspit.cpp#L422-L460"),

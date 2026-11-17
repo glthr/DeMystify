@@ -179,7 +179,7 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	if want := (map[string]int{"script": 6063, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4}); len(baseEndpoints) != 6686 || !reflect.DeepEqual(baseKinds, want) {
 		t.Errorf("original endpoint union=%d kinds=%v want 6686/%v", len(baseEndpoints), baseKinds, want)
 	}
-	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 3, "native-ending": 7, "sequence-continuation": 22}); !reflect.DeepEqual(evidenceCounts, want) {
+	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 5, "native-ending": 7, "sequence-continuation": 22}); !reflect.DeepEqual(evidenceCounts, want) {
 		t.Errorf("callsite evidence=%v want %v", evidenceCounts, want)
 	}
 	if disabled != 0 || conditional != 835 {
