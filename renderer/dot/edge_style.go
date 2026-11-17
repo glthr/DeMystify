@@ -22,7 +22,7 @@ const ShadowedColor = "#8f887d"
 // applyEdgeStyle applies styling to an edge based on its attributes
 func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := g.applyNavigationStyle(edge, isOnCustomPath)
-	style.kind = edge.Kind
+	style.kind, style.baseKind = edge.Kind, edge.BaseKind
 	if g.metadata != nil && strings.EqualFold(g.metadata.Game, "riven") {
 		style.attributes = drawingEdgeAttributes(edge)
 	}

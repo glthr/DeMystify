@@ -49,6 +49,7 @@ func (g *Generator) buildEdgeStyleString(style edgeStyle) string {
 	appendIfNotEmpty("color", style.color)
 	appendIfNotEmpty("style", style.style)
 	appendIfNotEmpty("demystify_kind", style.kind)
+	appendIfNotEmpty("demystify_base_kind", style.baseKind)
 	appendIfNotEmpty("demystify_attributes", style.attributes)
 
 	if style.penWidth > 0 {

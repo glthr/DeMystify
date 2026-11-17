@@ -221,7 +221,7 @@ func TestShadowedRivenEdgeIsDottedGreyWhateverItWouldHaveBeen(t *testing.T) {
 	} {
 		edge := &common.Edge{Source: metadata.Nodes[0], Target: metadata.Nodes[1], Kind: "shadowed", BaseKind: "script", Attributes: attributes}
 		style := g.applyEdgeStyle(edge, false)
-		if style.color != ShadowedColor || style.style != "dotted" || style.arrowhead != "" || style.kind != "shadowed" {
+		if style.color != ShadowedColor || style.style != "dotted" || style.arrowhead != "" || style.kind != "shadowed" || style.baseKind != "script" {
 			t.Fatalf("%v: a shadowed record must be dotted grey with an ordinary arrowhead: %+v", attributes, style)
 		}
 		if !strings.Contains(style.tooltip, "Shadowed reference") || !strings.Contains(style.attributes, "shadowed") {
