@@ -253,14 +253,33 @@ func TestAuditOriginalCorpus(t *testing.T) {
 		t.Fatalf("hotspots %d inert %d blank %v", audit.Hotspots.Total, len(audit.Hotspots.Inert), audit.Hotspots.BlankCards)
 	}
 	s := audit.Structure
-	if s.Reachable != 2262 || s.Dominators[1] != (Dominator{"Temple:133", 2235}) || s.Dominators[6] != (Dominator{"Temple:113", 2218}) || s.Dominators[7] != (Dominator{"Gehn:1", 125}) || len(s.FarthestChain) != 37 {
+	// The ten shadowed references are left out: Boiler:304 is no longer
+	// reached, one pair of turns is gone (Garden:167 to 169) and eight Zip
+	// shortcuts no longer count.
+	if s.Reachable != 2261 || s.Dominators[1] != (Dominator{"Temple:133", 2234}) || s.Dominators[6] != (Dominator{"Temple:113", 2217}) || s.Dominators[7] != (Dominator{"Gehn:1", 125}) || len(s.FarthestChain) != 37 {
 		t.Fatalf("structure %+v", s.Dominators[:8])
 	}
-	if s.Links[0] != (LinkClass{"turn", 3460, 3164, 91.4}) || s.Links[1] != (LinkClass{"forward", 1584, 146, 9.2}) || s.Places != 908 {
+	if s.Links[0] != (LinkClass{"turn", 3459, 3164, 91.5}) || s.Links[1] != (LinkClass{"forward", 1584, 146, 9.2}) || s.Places != 908 {
 		t.Fatalf("links %+v places %d", s.Links, s.Places)
 	}
-	if z := s.Zip; z.Records != 606 || z.Destinations != 189 || z.DiameterWithout != 125 || z.DiameterWith != 74 || z.MeanDistanceWithout != 51.51 || z.MeanDistanceWith != 30.85 || z.FarthestWith != 59 {
+	if z := s.Zip; z.Records != 598 || z.Sources != 555 || z.Destinations != 189 || z.DiameterWithout != 125 || z.DiameterWith != 75 || z.MeanDistanceWithout != 51.52 || z.MeanDistanceWith != 30.99 || z.FarthestWith != 59 {
 		t.Fatalf("zip %+v", z)
+	}
+	if sh := s.Shadowed; sh.Total != 10 || sh.ByKind["script"] != 2 || sh.ByKind["zip"] != 8 || sh.Followed || len(sh.Records) != 10 {
+		t.Fatalf("shadowed %+v", sh)
+	}
+	// Following them gives back the figures of the export that did not know them.
+	imported.Metadata.IncludeShadowed = true
+	followed, err := imported.Audit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = followed.Structure
+	if s.Reachable != 2262 || s.Dominators[1] != (Dominator{"Temple:133", 2235}) || s.Dominators[6] != (Dominator{"Temple:113", 2218}) || s.Links[0] != (LinkClass{"turn", 3460, 3164, 91.4}) || !s.Shadowed.Followed {
+		t.Fatalf("followed structure %+v links %+v", s.Dominators[:8], s.Links)
+	}
+	if z := s.Zip; z.Records != 606 || z.Sources != 562 || z.DiameterWith != 74 || z.MeanDistanceWithout != 51.51 || z.MeanDistanceWith != 30.85 {
+		t.Fatalf("followed zip %+v", z)
 	}
 }
 
