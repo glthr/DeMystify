@@ -31,12 +31,14 @@ var (
 	goToNamedCardPattern        = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+"([^"]+)"`)
 	goToCurrentCardPattern      = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+this\s+card\b`)
 	goToCardPattern             = regexp.MustCompile(`(?i)\bgo(\s+to)?\s+card\s+id\s+(\d+)`)
-	popCardPattern              = regexp.MustCompile(`(?i)\bpop\s+card\b`)
-	bluePagePattern             = regexp.MustCompile(`(?i)\bput\s+"(\d+),A,0"\s+into\s+ALL_Page\b`)
-	redPagePattern              = regexp.MustCompile(`(?i)\bput\s+"(\d+),S,0"\s+into\s+ALL_Page\b`)
-	whitePagePattern            = regexp.MustCompile(`(?i)\bput\s+"Atrus"\s+into\s+ALL_Page\b`)
-	pushCardOfStackPattern      = regexp.MustCompile(`(?i)\bpush\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
-	pushCardPattern             = regexp.MustCompile(`(?i)\bpush\s+card\b`)
+	// A position relative to the stack's own card order: `go next`, `go to the first card`.
+	goToRelativeCardPattern = regexp.MustCompile(`(?i)\bgo(?:\s+to)?(?:\s+the)?\s+(next|previous|prev|first|last)\b(?:\s+(?:card|cd))?`)
+	popCardPattern          = regexp.MustCompile(`(?i)\bpop\s+card\b`)
+	bluePagePattern         = regexp.MustCompile(`(?i)\bput\s+"(\d+),A,0"\s+into\s+ALL_Page\b`)
+	redPagePattern          = regexp.MustCompile(`(?i)\bput\s+"(\d+),S,0"\s+into\s+ALL_Page\b`)
+	whitePagePattern        = regexp.MustCompile(`(?i)\bput\s+"Atrus"\s+into\s+ALL_Page\b`)
+	pushCardOfStackPattern  = regexp.MustCompile(`(?i)\bpush\s+card\s+id\s+(\d+)\s+of\s+stack\s+"([^"]+)"`)
+	pushCardPattern         = regexp.MustCompile(`(?i)\bpush\s+card\b`)
 )
 
 func normalizeCommand(command string) (string, bool) {
@@ -75,6 +77,9 @@ func (p *Parser) parseCardCommand(source any, command string) (*HyperCardLink, e
 	}
 	if link, err := p.handleGoToCard(source, command); link != nil || err != nil {
 		return link, err
+	}
+	if link := p.handleGoToRelativeCard(source, command); link != nil {
+		return link, nil
 	}
 	if link := p.handleGoToUnquotedCardName(source, command); link != nil {
 		return link, nil
@@ -277,6 +282,63 @@ func (p *Parser) handleGoToCard(source any, command string) (*HyperCardLink, err
 		IsCrossAges:      false,
 		IsNotImplemented: false,
 	}, nil
+}
+
+// handleGoToRelativeCard resolves `go next`, `go prev`, `go first` and `go last`
+// against the stack's stored card order. HyperCard wraps around at both ends.
+// The order must be known and complete; a stack script has no current card, so
+// only `first` and `last` are resolved for it.
+func (p *Parser) handleGoToRelativeCard(source any, command string) *HyperCardLink {
+	matches := findCommandMatch(goToRelativeCardPattern, command)
+	if matches == nil {
+		return nil
+	}
+	var stack *HyperCardStack
+	position := -1
+	switch src := source.(type) {
+	case *HyperCardCard:
+		if src == nil || src.Stack == nil {
+			return nil
+		}
+		stack = src.Stack
+		for i, id := range stack.CardOrder {
+			if id == src.ID {
+				position = i
+				break
+			}
+		}
+		if position < 0 {
+			return nil
+		}
+	case *HyperCardStack:
+		stack = src
+	}
+	if stack == nil || len(stack.CardOrder) == 0 {
+		return nil
+	}
+	count := len(stack.CardOrder)
+	var index int
+	switch strings.ToLower(matches[1]) {
+	case "first":
+		index = 0
+	case "last":
+		index = count - 1
+	case "next":
+		if position < 0 {
+			return nil
+		}
+		index = (position + 1) % count
+	default: // prev, previous
+		if position < 0 {
+			return nil
+		}
+		index = (position - 1 + count) % count
+	}
+	target, err := p.GetCardByStackAndID(stack.Name, stack.CardOrder[index])
+	if err != nil {
+		return nil
+	}
+	return &HyperCardLink{Source: source, Target: target}
 }
 
 func (p *Parser) handlePopCard(source any, command string) bool {

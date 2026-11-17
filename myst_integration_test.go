@@ -35,7 +35,7 @@ func TestOriginalMystImport(t *testing.T) {
 	if metadata.TotalStacks != 6 || metadata.TotalCards != 1355 || metadata.TotalNodes != 1364 || metadata.TotalEdges != wantPairs || len(metadata.Edges) != wantRecords {
 		t.Fatalf("unexpected graph size: stacks=%d cards=%d nodes=%d active pairs=%d records=%d", metadata.TotalStacks, metadata.TotalCards, metadata.TotalNodes, metadata.TotalEdges, len(metadata.Edges))
 	}
-	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 50 || isolated != 19 {
+	if sources, sinks, isolated := len(g.FindNodesWithNoIncomingEdges()), len(g.FindNodesWithNoOutgoingEdges()), len(g.FindIsolatedNodes()); sources != 37 || sinks != 49 || isolated != 18 {
 		t.Fatalf("unexpected source/sink/isolated counts: %d/%d/%d", sources, sinks, isolated)
 	}
 	for _, pair := range [][2]string{
@@ -55,6 +55,20 @@ func TestOriginalMystImport(t *testing.T) {
 		weight, exists := g.Weight(from, to)
 		if !fromExists || !toExists || !exists || weight != 1 {
 			t.Errorf("missing named-card transition %s -> %s", pair[0], pair[1])
+		}
+	}
+	// A card whose openCard handler only moves on is left by `go next`, resolved
+	// against the stack's own card order; the button of that card ends with
+	// `go first`. Neither makes the card reachable.
+	for _, pair := range [][2]string{
+		{"Myst:23279", "Myst:5726"},
+		{"Myst:23279", "Myst:21776"},
+	} {
+		from, fromExists := g.GetNodeID(pair[0])
+		to, toExists := g.GetNodeID(pair[1])
+		weight, exists := g.Weight(from, to)
+		if !fromExists || !toExists || !exists || weight != 1 {
+			t.Errorf("missing relative transition %s -> %s", pair[0], pair[1])
 		}
 	}
 	// An intermediate elevator view continues to the level chosen by its caller,
@@ -216,9 +230,9 @@ func mystInputProfile(t *testing.T, dir string) (uint, int, bool) {
 				}
 				switch strings.ToLower(strings.Join(strings.Fields(part.Script.Text), " ")) {
 				case "on mouseup 5119 end mouseup":
-					return 3243, 3287, false
+					return 3245, 3289, false
 				case "on mouseup go to card id 5119 end mouseup":
-					return 3244, 3288, true
+					return 3246, 3290, true
 				}
 			}
 		}
