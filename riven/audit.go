@@ -691,6 +691,11 @@ func (i *Import) structureAudit() StructureAudit {
 		if owners[pair{a, b}] == nil {
 			owners[pair{a, b}] = map[string]bool{}
 		}
+		if e.Kind == "native-timer" {
+			// The sunners' timers and alert videos are not owned by a hotspot,
+			// even when the enter script of the card starts the video.
+			continue
+		}
 		for _, ev := range e.Evidence {
 			if name, ok := ev["hotspot_name"].(string); ok {
 				owners[pair{a, b}][name] = true

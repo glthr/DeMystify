@@ -262,3 +262,22 @@ func TestAuditOriginalCorpus(t *testing.T) {
 		t.Fatalf("zip %+v", z)
 	}
 }
+
+func TestAuditNativeTimerDoesNotOwnALink(t *testing.T) {
+	// Jungle:627 to 629: a forward step, and the sunners' alert video that
+	// the enter script starts. The pair stays a step forward.
+	cards := map[uint16]*Card{1: {}, 2: {}}
+	game := auditGame(nil, cards, [2]uint16{1, 2})
+	nodes := game.Metadata.Nodes
+	game.Metadata.Edges = append(game.Metadata.Edges, &common.Edge{Source: nodes[0], Target: nodes[1], Kind: "native-timer", Attributes: []common.EdgeAttribute{common.IntraAge, common.Native, common.Conditional},
+		Evidence: []map[string]any{{"event": "native_timer"}, {"event": "card_enter", "external": "xjlagoon700_alert"}}})
+	audit, err := game.Audit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, class := range audit.Structure.Links {
+		if want := map[string]int{"forward": 1}[class.Class]; class.Pairs != want {
+			t.Errorf("class %q has %d pairs, want %d", class.Class, class.Pairs, want)
+		}
+	}
+}
