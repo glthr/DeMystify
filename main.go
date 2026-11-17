@@ -348,8 +348,11 @@ func run(args []string) error {
 // project publishes can be read from a run. "Edges count" above is the number
 // of non-disabled directed pairs; a pair can hold several records.
 func analysisSummary(metadata *common.Metadata) string {
-	var returns, steps, disabled int
+	var returns, steps, disabled, shadowed int
 	for _, edge := range metadata.Edges {
+		if edge.IsOfType(common.Shadowed) {
+			shadowed++
+		}
 		if edge.IsOfType(common.Backtracking) {
 			returns++
 		}
@@ -362,6 +365,9 @@ func analysisSummary(metadata *common.Metadata) string {
 	}
 	stats := metadata.Stats
 	summary := fmt.Sprintf("Edge records: %d (saved returns: %d, automatic next steps: %d, disabled: %d)\n", len(metadata.Edges), returns, steps, disabled)
+	if shadowed != 0 {
+		summary += fmt.Sprintf("Shadowed records (no callsite can receive a mouse event): %d\n", shadowed)
+	}
 	summary += fmt.Sprintf("Source / sink / isolated flags: %d / %d / %d\n", len(stats.NodesWithNoIncoming), len(stats.NodesWithNoOutgoing), len(stats.IsolatedNodes))
 	summary += fmt.Sprintf("Nodes with an active reference to themselves: %d\n", len(stats.NodesWithSelfLoops))
 	if farthest := stats.MostSeparatedNodes; len(farthest.Path) > 1 {

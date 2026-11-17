@@ -225,3 +225,56 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		t.Fatal("shared graph lost nodes")
 	}
 }
+
+// shadowImport builds a one-stack game whose start card has an "egg" hotspot
+// and a strip, both inside later hotspots that nothing switches off.
+func shadowImport(t *testing.T) *Import {
+	t.Helper()
+	change := func(target uint16) []Script {
+		return []Script{{Type: 0, Commands: []Command{{Opcode: 2, Args: []uint16{target}, Offset: int(target)}}}}
+	}
+	start := &Card{ID: 1, GlobalID: 0x6e9a, Hotspots: []Hotspot{
+		{ID: 1, Name: "afl", Index: 1, Rect: [4]int{0, 0, 74, 392}, Scripts: change(3)},
+		{ID: 3, Name: "egg", Index: 2, Rect: [4]int{368, 219, 380, 231}, Scripts: change(2)},
+		{ID: 8, Index: 3, Rect: [4]int{247, 0, 454, 247}, Scripts: change(3)},
+		{ID: 9, Name: "left", Index: 4, Rect: [4]int{0, 0, 94, 392}, Scripts: change(3)},
+	}}
+	cards := map[uint16]*Card{1: start, 2: {ID: 2, GlobalID: 2}, 3: {ID: 3, GlobalID: 3}}
+	stack := &Stack{Name: "tspit", Names: map[uint16][]string{}, RMap: []uint32{0, 0x6e9a, 2, 3}, Cards: cards, Resources: map[string]map[uint16]ResourceRef{}}
+	i := &Import{Metadata: &common.Metadata{Game: "riven"}, Stacks: map[string]*Stack{"tspit": stack}, Manifest: map[string]any{}}
+	if err := i.buildMetadata([]string{"tspit"}); err != nil {
+		t.Fatal(err)
+	}
+	return i
+}
+
+func TestReferenceWhoseEveryCallsiteIsShadowedIsMarked(t *testing.T) {
+	i := shadowImport(t)
+	if len(i.Metadata.Edges) != 2 {
+		t.Fatalf("got %d records, want the two original ones", len(i.Metadata.Edges))
+	}
+	for _, edge := range i.Metadata.Edges {
+		switch edge.Target.Details.SourceID {
+		case "tspit:2": // only the egg leads there
+			if !edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 1 || edge.Evidence[0]["hotspot_shadow"] != ShadowAlways {
+				t.Errorf("the egg's reference is not marked: %v %v", edge.Attributes, edge.Evidence)
+			}
+		case "tspit:3": // the strip is covered, but two live hotspots lead there too
+			if edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 3 {
+				t.Errorf("a reference with a reachable callsite must stay live: %v, %d callsites", edge.Attributes, len(edge.Evidence))
+			}
+		default:
+			t.Errorf("unexpected record to %s", edge.Target.Details.SourceID)
+		}
+		if edge.IsOfType(common.Disabled) || edge.IsOfType(common.Conditional) {
+			t.Errorf("shadowing must not change activation or conditions: %v", edge.Attributes)
+		}
+	}
+	semantics := i.Manifest["edgeSemantics"].(map[string]int)
+	if semantics["shadowedRecords"] != 1 || semantics["shadowedCallsites"] != 2 {
+		t.Errorf("manifest counts %v, want 1 record and 2 callsites", semantics)
+	}
+	if counts := i.Manifest["hotspotShadowCounts"].(map[string]int); counts[ShadowAlways] != 2 || counts[ShadowConditional] != 0 {
+		t.Errorf("hotspot shadow counts %v", counts)
+	}
+}

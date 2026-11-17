@@ -29,6 +29,9 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 			style.color, style.style = "#7aada3", "dashed"
 		}
 	}
+	if edge.IsOfType(common.Shadowed) {
+		style.tooltip = joinTooltip(style.tooltip, "Shadowed reference (its hotspot lies under a later hotspot that is never switched off; the pointer cannot reach it)")
+	}
 	if edge.IsOfType(common.SequenceContinuation) {
 		style.tooltip = joinTooltip(style.tooltip, continuationTooltip)
 		// A hollow head marks the automatic step. The calling card keeps its own

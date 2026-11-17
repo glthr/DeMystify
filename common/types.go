@@ -58,6 +58,11 @@ const (
 	// Zip and EndingReset are displayed but excluded from ordinary path search.
 	Zip
 	EndingReset
+	// Shadowed marks a reference whose every callsite belongs to a hotspot that
+	// the pointer cannot reach: its rectangle lies inside a later hotspot that
+	// is never switched off, or is empty. It stays displayed and traversed;
+	// consumers decide whether a route may use it.
+	Shadowed
 )
 
 type Edge struct {

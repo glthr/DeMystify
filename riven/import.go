@@ -470,6 +470,9 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 	}
 	sort.Strings(edgeKeys)
 	for _, key := range edgeKeys {
+		if edgeShadowed(edges[key]) {
+			edges[key].Attributes = append(edges[key].Attributes, common.Shadowed)
+		}
 		md.Edges = append(md.Edges, edges[key])
 	}
 	md.TotalNodes = uint(len(md.Nodes))
@@ -486,13 +489,21 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 	i.Manifest["missingReferences"] = i.MissingReferences
 	i.Manifest["warnings"] = i.Warnings
 	i.Manifest["inventory"] = InventoryModel()
-	semantics := map[string]int{"disabledRecords": 0, "conditionalRecords": 0, "sequenceContinuationRecords": 0, "sequenceContinuationCallsites": 0}
+	semantics := map[string]int{"disabledRecords": 0, "conditionalRecords": 0, "sequenceContinuationRecords": 0, "sequenceContinuationCallsites": 0, "shadowedRecords": 0, "shadowedCallsites": 0}
 	for _, edge := range md.Edges {
 		if edge.IsOfType(common.Disabled) {
 			semantics["disabledRecords"]++
 		}
 		if edge.IsOfType(common.Conditional) {
 			semantics["conditionalRecords"]++
+		}
+		if edge.IsOfType(common.Shadowed) {
+			semantics["shadowedRecords"]++
+		}
+		for _, evidence := range edge.Evidence {
+			if evidence["hotspot_shadow"] == ShadowAlways {
+				semantics["shadowedCallsites"]++
+			}
 		}
 		if edge.IsOfType(common.SequenceContinuation) {
 			semantics["sequenceContinuationRecords"]++
@@ -501,12 +512,17 @@ func (i *Import) buildMetadata(stackKeys []string) error {
 	}
 	i.Manifest["edgeSemantics"] = semantics
 	stateCounts := map[string]int{"enabled": 0, "disabled": 0, "conditional": 0, "unknown": 0}
+	shadowCounts := map[string]int{ShadowAlways: 0, ShadowConditional: 0, ShadowUnknown: 0}
 	for _, states := range availability {
 		for _, state := range states {
 			stateCounts[state.Status]++
+			if state.Shadow != "" {
+				shadowCounts[state.Shadow]++
+			}
 		}
 	}
 	i.Manifest["hotspotStateCounts"] = stateCounts
+	i.Manifest["hotspotShadowCounts"] = shadowCounts
 	return nil
 }
 
@@ -527,6 +543,21 @@ func annotateAvailability(evidence map[string]any, state HotspotState) {
 	if state.Status == "disabled" {
 		evidence["disabled"] = true
 	}
+	if state.Shadow != "" {
+		evidence["hotspot_shadow"] = state.Shadow
+		evidence["hotspot_shadowed_by"] = state.ShadowedBy
+	}
+}
+
+// edgeShadowed reports whether no callsite of a record can receive a mouse
+// event. One reachable callsite, or one that needs no hotspot, keeps it live.
+func edgeShadowed(edge *common.Edge) bool {
+	for _, evidence := range edge.Evidence {
+		if evidence["hotspot_shadow"] != ShadowAlways {
+			return false
+		}
+	}
+	return len(edge.Evidence) != 0
 }
 
 func (i *Import) WriteEvidence(dir string) error {
@@ -554,7 +585,7 @@ func (i *Import) WriteEvidence(dir string) error {
 	}
 	es := make([]map[string]any, 0, len(i.Metadata.Edges))
 	for _, e := range i.Metadata.Edges {
-		es = append(es, map[string]any{"source": e.Source.Details.SourceID, "target": e.Target.Details.SourceID, "kind": e.Kind, "evidence": e.Evidence, "attributes": e.Attributes, "transitivityId": e.TransitivityID, "disabled": e.IsOfType(common.Disabled), "conditional": e.IsOfType(common.Conditional), "sequenceContinuation": e.IsOfType(common.SequenceContinuation)})
+		es = append(es, map[string]any{"source": e.Source.Details.SourceID, "target": e.Target.Details.SourceID, "kind": e.Kind, "evidence": e.Evidence, "attributes": e.Attributes, "transitivityId": e.TransitivityID, "disabled": e.IsOfType(common.Disabled), "conditional": e.IsOfType(common.Conditional), "sequenceContinuation": e.IsOfType(common.SequenceContinuation), "shadowed": e.IsOfType(common.Shadowed)})
 	}
 	for name, v := range map[string]any{"graph.json": map[string]any{"game": "riven", "nodes": ns, "edges": es, "stats": i.Metadata.Stats, "typedEdges": len(es), "cards": i.Metadata.TotalCards, "startNodeID": i.Metadata.StartNodeID, "unresolved": i.Unresolved}, "cards.json": i.Stacks, "manifest.json": i.Manifest} {
 		if err := write(name, v); err != nil {

@@ -210,3 +210,81 @@ func TestHotspotMalformedActivationCommandsFail(t *testing.T) {
 		t.Fatal("accepted malformed BLST activation")
 	}
 }
+
+// shadowFixture is Boiler:299 of the original discs reduced to its two
+// overlapping hotspots: "egg" lies inside a later, larger hotspot.
+func shadowFixture() (*Stack, *Card) {
+	s, c := availabilityFixture()
+	c.Hotspots = []Hotspot{
+		{ID: 3, Name: "egg", Index: 4, Rect: [4]int{368, 219, 380, 231}},
+		{ID: 8, Index: 5, Rect: [4]int{247, 0, 454, 247}},
+	}
+	return s, c
+}
+func shadowWant(t *testing.T, s *Stack, c *Card, ordinal int, shadow string, by ...int) {
+	t.Helper()
+	states, err := HotspotAvailabilityForStacks(map[string]*Stack{s.Name: s})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := states[SourceID(s.Name, c.ID)][ordinal]
+	if got.Shadow != shadow || len(got.ShadowedBy) != len(by) || (shadow != "") != (got.ShadowReason != "") {
+		t.Fatalf("hotspot %d: got shadow %q by %v (%q); want %q by %v", ordinal, got.Shadow, got.ShadowedBy, got.ShadowReason, shadow, by)
+	}
+	for i := range by {
+		if got.ShadowedBy[i] != by[i] {
+			t.Fatalf("hotspot %d: shadowed by %v, want %v", ordinal, got.ShadowedBy, by)
+		}
+	}
+}
+
+func TestHotspotInsideALaterOneThatIsNeverOffIsShadowed(t *testing.T) {
+	s, c := shadowFixture()
+	shadowWant(t, s, c, 0, ShadowAlways, 1)
+	shadowWant(t, s, c, 1, "")
+	// Activation is a separate fact: the covered hotspot is still enabled.
+	availabilityWant(t, s, c, "enabled", "enabled")
+}
+
+func TestHotspotOverAnEarlierOneIsNotShadowed(t *testing.T) {
+	// The usual authoring order: the small target comes last and wins.
+	s, c := shadowFixture()
+	c.Hotspots[0], c.Hotspots[1] = c.Hotspots[1], c.Hotspots[0]
+	c.Hotspots[0].Index, c.Hotspots[1].Index = 4, 5
+	shadowWant(t, s, c, 0, "")
+	shadowWant(t, s, c, 1, "")
+}
+
+func TestHotspotShadowNeedsWholeContainmentAndAgreeingOrder(t *testing.T) {
+	s, c := shadowFixture()
+	c.Hotspots[1].Rect = [4]int{247, 0, 454, 230} // one row of the egg stays outside
+	shadowWant(t, s, c, 0, "")
+	s, c = shadowFixture()
+	c.Hotspots[1].Index = 4 // file order and stored index no longer agree
+	shadowWant(t, s, c, 0, "")
+	s, c = shadowFixture()
+	c.Hotspots[1].Rect = [4]int{454, 0, 247, 247} // an inverted cover contains nothing
+	shadowWant(t, s, c, 0, "")
+	shadowWant(t, s, c, 1, ShadowAlways)
+}
+
+func TestHotspotUnderACoverThatCanBeOffIsConditionallyShadowed(t *testing.T) {
+	s, c := shadowFixture()
+	availabilityLoad(c, Command{Opcode: 8, Variable: 1, Offset: 4, Branches: []Branch{{Value: 1, Commands: []Command{availabilityCommand(10, 8)}}}})
+	shadowWant(t, s, c, 0, ShadowConditional, 1)
+	// A native call may switch any hotspot: the cover is no longer certain.
+	s, c = shadowFixture()
+	c.Hotspots[1].Scripts = []Script{{Type: 0, Commands: []Command{availabilityCommand(17, 0, 0)}}}
+	shadowWant(t, s, c, 0, ShadowUnknown, 1)
+	// A Zip cover is on only once its place has been visited.
+	s, c = shadowFixture()
+	c.Hotspots[1].Flags = 1
+	shadowWant(t, s, c, 0, ShadowConditional, 1)
+}
+
+func TestHotspotCoverSwitchedOffByACallerIsNotAPermanentShadow(t *testing.T) {
+	s, c := shadowFixture()
+	caller := &Card{ID: 2, GlobalID: 200, Hotspots: []Hotspot{{ID: 1, Index: 1, Rect: [4]int{0, 0, 10, 10}, Scripts: []Script{{Type: 0, Commands: []Command{availabilityCommand(2, 1), availabilityCommand(10, 8)}}}}}}
+	s.Cards[2] = caller
+	shadowWant(t, s, c, 0, ShadowUnknown, 1)
+}
