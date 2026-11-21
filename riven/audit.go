@@ -154,6 +154,11 @@ type HotspotAudit struct {
 	// BlankCards hold the seven template hotspots and no script on any of them.
 	BlankCards []string `json:"blankCards"`
 	NoScript   int      `json:"withoutAnyScript"`
+	// EmptyRectangle lists the hotspots whose rectangle is empty or inverted
+	// (left >= right or top >= bottom). The pinned interpreter disables them
+	// when it loads them, and no point is inside such a rectangle, so a click
+	// can never reach their scripts. Source: SourceBase + "riven_card.cpp#L1273-L1280".
+	EmptyRectangle []InertHotspot `json:"emptyOrInvertedRectangle"`
 }
 
 type Dominator struct {
@@ -613,6 +618,9 @@ func (i *Import) Audit() (*Audit, error) {
 						blank++
 					}
 				}
+				if h.Rect[0] >= h.Rect[2] || h.Rect[1] >= h.Rect[3] {
+					audit.Hotspots.EmptyRectangle = append(audit.Hotspots.EmptyRectangle, InertHotspot{Card: NodeName(key, id), Name: h.Name, ID: h.ID, Rect: h.Rect})
+				}
 				if movement[h.Name] && !acts {
 					audit.Hotspots.Inert = append(audit.Hotspots.Inert, InertHotspot{Card: NodeName(key, id), Name: h.Name, ID: h.ID, Rect: h.Rect})
 				}
@@ -1016,7 +1024,11 @@ func (a *Audit) Summary() string {
 		}
 	}
 	fmt.Fprintf(&b, "Picture entries never selected: %d of %d (%d only in dead branches); %d more on %d cards with native calls\n", len(a.Pictures.Unselected), a.Pictures.Records, deadOnly, a.Pictures.NativeEntries, a.Pictures.NativeCards)
-	fmt.Fprintf(&b, "Hotspots: %d; inert movement hotspots: %d; blank cards: %s\n", a.Hotspots.Total, len(a.Hotspots.Inert), strings.Join(a.Hotspots.BlankCards, ", "))
+	var invalid []string
+	for _, h := range a.Hotspots.EmptyRectangle {
+		invalid = append(invalid, fmt.Sprintf("%s hotspot %d", h.Card, h.ID))
+	}
+	fmt.Fprintf(&b, "Hotspots: %d; inert movement hotspots: %d; blank cards: %s; empty or inverted rectangles: %s\n", a.Hotspots.Total, len(a.Hotspots.Inert), strings.Join(a.Hotspots.BlankCards, ", "), strings.Join(invalid, ", "))
 	for _, d := range a.Structure.Dominators {
 		if d.Card != a.Structure.Start {
 			fmt.Fprintf(&b, "Reachable from %s: %d cards; %s stands before %d of them\n", a.Structure.Start, a.Structure.Reachable, d.Card, d.Dominated)

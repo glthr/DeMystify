@@ -156,6 +156,9 @@ func TestAuditTemplateInertAndBlankCards(t *testing.T) {
 		// A cursor change alone leaves the hotspot inert.
 		Hotspot{ID: 6, Name: "up", Rect: [4]int{0, 0, 608, 60}, Scripts: []Script{{Type: 4, Commands: []Command{cmd(13, 3004)}}}})
 	audit, _ := auditGame(nil, map[uint16]*Card{1: {Hotspots: blank}, 2: {Hotspots: used}}).Audit()
+	if len(audit.Hotspots.EmptyRectangle) != 0 {
+		t.Fatalf("empty rectangles %+v", audit.Hotspots.EmptyRectangle)
+	}
 	if !reflect.DeepEqual(audit.Hotspots.BlankCards, []string{"Jungle:1"}) || len(audit.Hotspots.Inert) != 8 {
 		t.Fatalf("hotspots %+v", audit.Hotspots)
 	}
@@ -165,6 +168,23 @@ func TestAuditTemplateInertAndBlankCards(t *testing.T) {
 	}
 	if up := audit.Hotspots.Template[5]; up.Hotspots != 2 || up.TemplateRect != 1 {
 		t.Fatalf("up %+v", up)
+	}
+}
+
+func TestAuditEmptyAndInvertedRectangles(t *testing.T) {
+	card := &Card{Hotspots: []Hotspot{
+		{ID: 1, Name: "ok", Rect: [4]int{0, 0, 10, 10}},
+		{ID: 2, Name: "inverted", Rect: [4]int{274, 107, 227, 162}},
+		{ID: 3, Name: "flat", Rect: [4]int{5, 5, 50, 5}},
+		{ID: 4, Name: "empty"},
+	}}
+	audit, _ := auditGame(nil, map[uint16]*Card{1: card}).Audit()
+	var got []string
+	for _, h := range audit.Hotspots.EmptyRectangle {
+		got = append(got, h.Name)
+	}
+	if !reflect.DeepEqual(got, []string{"inverted", "flat", "empty"}) {
+		t.Fatalf("empty rectangles %v", got)
 	}
 }
 
@@ -224,6 +244,9 @@ func TestAuditOriginalCorpus(t *testing.T) {
 	}
 	if len(audit.Variables) != 163 || audit.Pictures.Records != 4147 || len(audit.Pictures.Unselected) != 19 || deadOnly != 7 || audit.Pictures.NativeEntries != 152 {
 		t.Fatalf("variables %d, pictures %+v", len(audit.Variables), audit.Pictures)
+	}
+	if r := audit.Hotspots.EmptyRectangle; len(r) != 1 || r[0].Card != "Temple:371" || r[0].ID != 9 || r[0].Rect != [4]int{274, 107, 227, 162} {
+		t.Fatalf("empty rectangles %+v", r)
 	}
 	if audit.Hotspots.Total != 8498 || len(audit.Hotspots.Inert) != 66 || !reflect.DeepEqual(audit.Hotspots.BlankCards, []string{"Gehn:89", "Prison:46"}) {
 		t.Fatalf("hotspots %d inert %d blank %v", audit.Hotspots.Total, len(audit.Hotspots.Inert), audit.Hotspots.BlankCards)
