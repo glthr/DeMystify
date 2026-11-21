@@ -146,6 +146,22 @@ func TestAnalysisSummaryReportsRecordsFlagsAndTheLongestDistance(t *testing.T) {
 	if got := analysisSummary(metadata); got != want {
 		t.Fatalf("summary:\n%s\nwant:\n%s", got, want)
 	}
+	// Stack nodes and absent targets carry flags too; the summary says how
+	// many of the flags belong to cards of the input.
+	stack := &common.Node{Name: "Test Age", Attributes: []common.NodeAttribute{common.IsStack}}
+	absent := &common.Node{Name: "Test Age:9", Attributes: []common.NodeAttribute{common.IsCard, common.IsVirtual}}
+	mixed := &common.Metadata{Nodes: []*common.Node{a, b, stack, absent}, Edges: []*common.Edge{record(a, b), record(b, absent)}}
+	for _, node := range []*common.Node{a, b} {
+		node.Attributes = []common.NodeAttribute{common.IsCard}
+	}
+	g, err = graph.NewGraph(mixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Process()
+	if got, line := analysisSummary(mixed), "Source / sink / isolated flags: 2 / 2 / 1\n  on cards of the input alone: 1 / 0 / 0 (2 flagged stack or absent-target nodes excluded)\n"; !strings.Contains(got, line) {
+		t.Fatalf("summary does not separate cards from other nodes:\n%s", got)
+	}
 	if got := analysisSummary(&common.Metadata{}); strings.Contains(got, "Largest") {
 		t.Fatalf("an empty graph reported a distance:\n%s", got)
 	}
@@ -179,5 +195,19 @@ func TestShadowedRecordsHaveTheirOwnSummaryLineAndOption(t *testing.T) {
 		if got := analysisSummary(metadata); !strings.Contains(got, want) {
 			t.Errorf("include=%v summary:\n%s\nwant it to contain:\n%s", include, got, want)
 		}
+	}
+	// Myst shadowed records have no BaseKind; omit empty parentheses.
+	a := &common.Node{Name: "Test Age:1", Attributes: []common.NodeAttribute{common.IsCard}}
+	b := &common.Node{Name: "Test Age:2", Attributes: []common.NodeAttribute{common.IsCard}}
+	mystShadowed := &common.Metadata{Nodes: []*common.Node{a, b}, Edges: []*common.Edge{
+		{Source: a, Target: b, Attributes: []common.EdgeAttribute{common.IntraAge, common.Shadowed}},
+	}}
+	g, err := graph.NewGraph(mystShadowed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Process()
+	if got, want := analysisSummary(mystShadowed), "Shadowed records: 1; left out of routes and flags\n"; !strings.Contains(got, want) {
+		t.Errorf("Myst shadowed summary:\n%s\nwant it to contain:\n%s", got, want)
 	}
 }

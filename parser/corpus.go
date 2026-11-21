@@ -32,7 +32,11 @@ func NewParserFromCorpus(corpus hypercard.Corpus) (*Parser, error) {
 				return nil, fmt.Errorf("duplicate card ID %d in stack %q", card.ID, input.Name)
 			}
 			seen[card.ID] = true
-			p.cards = append(p.cards, analysisCard(stack, card))
+			analyzed := analysisCard(stack, card)
+			for _, cover := range shadowedParts(input, card) {
+				analyzed.shadowed = append(analyzed.shadowed, cover >= 0)
+			}
+			p.cards = append(p.cards, analyzed)
 		}
 		order := make(map[int]bool, len(input.CardOrder))
 		for _, id := range input.CardOrder {

@@ -25,6 +25,10 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 	style.kind, style.baseKind = edge.Kind, edge.BaseKind
 	if g.metadata != nil && strings.EqualFold(g.metadata.Game, "riven") {
 		style.attributes = drawingEdgeAttributes(edge)
+	} else if edge.IsOfType(common.Shadowed) {
+		// The Myst DOT carries no drawing flags; this one lets a reader of the
+		// file tell a shadowed stroke from an active one without its color.
+		style.attributes = "shadowed"
 	}
 	if edge.IsOfType(common.Conditional) {
 		style.tooltip = joinTooltip(style.tooltip, "Conditional reference (local script/hotspot guards retained; puzzle state is not executed)")
@@ -59,11 +63,11 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 		// stroke; no optional navigation layer can paint it as an active move.
 		style.color, style.style = "#8d8875", "dashed"
 	}
-	if edge.IsOfType(common.Shadowed) {
+	if edge.IsOfType(common.Shadowed) && !edge.IsOfType(common.Disabled) {
 		// There, but never clicked: a dotted stroke in the neutral grey of
 		// what is not seen, with an ordinary arrowhead of the same grey. No
 		// other kind is dotted; a disabled record is dashed and ends in a tee.
-		style.color, style.style = ShadowedColor, "dotted"
+		style.color, style.style, style.penWidth = ShadowedColor, "dotted", 0
 		style.tooltip = joinTooltip(style.tooltip, "Shadowed reference (its hotspot lies under a later hotspot that is never switched off, or has no area; no click reaches it; excluded from paths)")
 	}
 	for _, evidence := range edge.Evidence {
@@ -238,6 +242,9 @@ func (g *Generator) edgeAttributesMatch(edge1, edge2 *common.Edge) bool {
 
 	if edge1.IsOfType(common.Disabled) || edge2.IsOfType(common.Disabled) {
 		return false // disabled edges are never merged
+	}
+	if edge1.IsOfType(common.Shadowed) || edge2.IsOfType(common.Shadowed) {
+		return false // nor is a shadowed edge: its direction is the script's
 	}
 
 	isEdge1Backtracking := edge1.IsOfType(common.Backtracking)

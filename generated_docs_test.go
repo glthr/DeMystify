@@ -55,7 +55,8 @@ var (
 
 // dotCounts returns the labelled nodes and the non-disabled directed pairs of
 // a generated DOT. A stroke written with an unquoted dir=both stands for one
-// reference in each direction; a tee head marks a disabled reference.
+// reference in each direction; a tee head marks a disabled reference, and a
+// shadowed one says so in demystify_attributes.
 func dotCounts(dot string) (int, int) {
 	nodes := 0
 	pairs := make(map[[2]string]bool)
@@ -65,7 +66,7 @@ func dotCounts(dot string) (int, int) {
 			continue
 		}
 		edge := dotEdge.FindStringSubmatch(line)
-		if edge == nil || strings.Contains(edge[3], "style=invis") || strings.Contains(edge[3], `arrowhead="tee"`) {
+		if edge == nil || strings.Contains(edge[3], "style=invis") || strings.Contains(edge[3], `arrowhead="tee"`) || strings.Contains(edge[3], `demystify_attributes="shadowed"`) {
 			continue
 		}
 		pairs[[2]string{edge[1], edge[2]}] = true
