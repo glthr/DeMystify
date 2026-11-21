@@ -49,3 +49,10 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/pdf"
           "$RUNNER_TEMP/pdf/bin/python" -m pip install --quiet -r scripts/requirements-pdf.txt
           "$RUNNER_TEMP/pdf/bin/python" -m unittest discover -s scripts -p 'test_*.py'
+      # The Exile, Revelation and End of Ages extractors: standard library only (plus openssl); the
+      # checks on the original games are skipped here, since no game data is in the repository.
+      - name: Test the Exile, Revelation and End of Ages extractors
+        run: |
+          (cd exile && python3 -m unittest discover -s tests)
+          (cd revelation && python3 -m unittest discover -s tests)
+          (cd endofages && python3 -m unittest discover -s tests)

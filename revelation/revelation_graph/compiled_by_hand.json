@@ -1,0 +1,299 @@
+{
+  "note": "Constant destinations read by hand in the disassembly of the 2004 libraries, which native.py does not find or cannot attribute (other instructions stand between the constants and the call, or the routine is a callback that a method of the class hands over). Each record gives the addresses that let a reader check it. The tests of a class are kept as text and never evaluated. \"wrong\" lists two calls whose attribution by the automatic rule of build.py is mistaken. Read on 2026-11-18.",
+  "edges": [
+    {
+      "source": "w5_z01_n110",
+      "target": "w1_z01_n310",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "m_clap1Open_variable (global.state.power_puzzle.clap1_open) is false",
+        "m_clap2Open_variable (global.state.power_puzzle.clap2_open) is false"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW5RD.DLL",
+        "call": "Transition",
+        "address": 268528955,
+        "pushes": "0x10016cad to 0x10016cb7: flag 1, speed, node 0x136 (310), zone 1, world 1; four resource copies, then the constructor of ai::Transition called at 0x10016d3b",
+        "class": "w5_z01_n110",
+        "chain": "the class name w5_z01_n110 (0x10025b4c) is registered at 0x10011ed8 with the factory 0x100116f0; its constructor 0x10010bc0 installs the vtable 0x100259b4, whose activation method 0x10016ed0 connects the routine 0x10016bc0 to the frame signal only when both variables are false",
+        "panel": "w5_z01_n110.p_explosion (m_TransitionPanel), movie w5_z01_n110.p_explosion.states.p_explosion_cinematique (m_TransitionVideo)",
+        "note": "a constant destination in compiled code, read by hand: the class of this node starts the passage from day to night when it becomes the current node and both variables are false"
+      }
+    },
+    {
+      "source": "w2_z05_n080",
+      "target": "w2_z05_n082",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the routine switches on the value at [esi+0x369c] (an index into a table at [esi+0x367c], stored first into the variable named by the parameter at [esi+0x18c]): case 4"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268624529,
+        "pushes": "0x1002e28b, 0x1002e28d, 0x1002e28f",
+        "chain": "class chain: registered name \"w2_z05_n080\" (used by node w2_z05_n080 only) -> method 0x10030fd0 hands over the callback 0x1002e470 (push at 0x10031711 and 0x10031798) -> 0x1002e470 calls 0x1002e200",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n080",
+      "target": "w2_z05_n083",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the routine switches on the value at [esi+0x369c] (an index into a table at [esi+0x367c], stored first into the variable named by the parameter at [esi+0x18c]): case 3"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268624529,
+        "pushes": "0x1002e287, 0x1002e28d, 0x1002e28f",
+        "chain": "class chain: registered name \"w2_z05_n080\" (used by node w2_z05_n080 only) -> method 0x10030fd0 hands over the callback 0x1002e470 (push at 0x10031711 and 0x10031798) -> 0x1002e470 calls 0x1002e200",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n080",
+      "target": "w2_z05_n084",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the routine switches on the value at [esi+0x369c] (an index into a table at [esi+0x367c], stored first into the variable named by the parameter at [esi+0x18c]): case 1"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268624529,
+        "pushes": "0x1002e27f, 0x1002e28d, 0x1002e28f",
+        "chain": "class chain: registered name \"w2_z05_n080\" (used by node w2_z05_n080 only) -> method 0x10030fd0 hands over the callback 0x1002e470 (push at 0x10031711 and 0x10031798) -> 0x1002e470 calls 0x1002e200",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n080",
+      "target": "w2_z05_n085",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the routine switches on the value at [esi+0x369c] (an index into a table at [esi+0x367c], stored first into the variable named by the parameter at [esi+0x18c]): case 0"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268624529,
+        "pushes": "0x1002e27b, 0x1002e28d, 0x1002e28f",
+        "chain": "class chain: registered name \"w2_z05_n080\" (used by node w2_z05_n080 only) -> method 0x10030fd0 hands over the callback 0x1002e470 (push at 0x10031711 and 0x10031798) -> 0x1002e470 calls 0x1002e200",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n080",
+      "target": "w2_z05_n086",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the routine switches on the value at [esi+0x369c] (an index into a table at [esi+0x367c], stored first into the variable named by the parameter at [esi+0x18c]): case 2"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268624529,
+        "pushes": "0x1002e283, 0x1002e28d, 0x1002e28f",
+        "chain": "class chain: registered name \"w2_z05_n080\" (used by node w2_z05_n080 only) -> method 0x10030fd0 hands over the callback 0x1002e470 (push at 0x10031711 and 0x10031798) -> 0x1002e470 calls 0x1002e200",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n082",
+      "target": "w2_z05_n080",
+      "kind": "engine",
+      "conditional": false,
+      "tests": [],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268639366,
+        "pushes": "0x10031c80, 0x10031c82, 0x10031c84",
+        "chain": "class chain: registered name \"w2_z05_n08x\" (used by the five nodes w2_z05_n082 to n086) -> methods 0x100322e0 and 0x100323d0 reference the routine 0x10031c80",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n083",
+      "target": "w2_z05_n080",
+      "kind": "engine",
+      "conditional": false,
+      "tests": [],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268639366,
+        "pushes": "0x10031c80, 0x10031c82, 0x10031c84",
+        "chain": "class chain: registered name \"w2_z05_n08x\" (used by the five nodes w2_z05_n082 to n086) -> methods 0x100322e0 and 0x100323d0 reference the routine 0x10031c80",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n084",
+      "target": "w2_z05_n080",
+      "kind": "engine",
+      "conditional": false,
+      "tests": [],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268639366,
+        "pushes": "0x10031c80, 0x10031c82, 0x10031c84",
+        "chain": "class chain: registered name \"w2_z05_n08x\" (used by the five nodes w2_z05_n082 to n086) -> methods 0x100322e0 and 0x100323d0 reference the routine 0x10031c80",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n085",
+      "target": "w2_z05_n080",
+      "kind": "engine",
+      "conditional": false,
+      "tests": [],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268639366,
+        "pushes": "0x10031c80, 0x10031c82, 0x10031c84",
+        "chain": "class chain: registered name \"w2_z05_n08x\" (used by the five nodes w2_z05_n082 to n086) -> methods 0x100322e0 and 0x100323d0 reference the routine 0x10031c80",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n086",
+      "target": "w2_z05_n080",
+      "kind": "engine",
+      "conditional": false,
+      "tests": [],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268639366,
+        "pushes": "0x10031c80, 0x10031c82, 0x10031c84",
+        "chain": "class chain: registered name \"w2_z05_n08x\" (used by the five nodes w2_z05_n082 to n086) -> methods 0x100322e0 and 0x100323d0 reference the routine 0x10031c80",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w4_z06_n260",
+      "target": "w4_z06_n310",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the resource passed to the callback is the member at [esi+0x7c0] (and neither of those at [esi+0x740], [esi+0x800])",
+        "the variable named by the member at [esi+0x90] equals 0"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW4RD.DLL",
+        "call": "ContextChange",
+        "address": 268495190,
+        "pushes": "0x1000e94d, 0x1000e952, 0x1000e954",
+        "chain": "class chain: registered name \"w4_dreamworld_final_part_a\" (used by node w4_z06_n260) -> method 0x1000ff80 calls 0x1000f780, which hands over the callback 0x1000e8a0 (push at 0x1000f797)",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w4_z06_n260",
+      "target": "w4_z06_n320",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the resource passed to the callback is the member at [esi+0x7c0] (and neither of those at [esi+0x740], [esi+0x800])",
+        "the variable named by the member at [esi+0x90] equals 1"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW4RD.DLL",
+        "call": "ContextChange",
+        "address": 268495222,
+        "pushes": "0x1000e96d, 0x1000e972, 0x1000e974",
+        "chain": "class chain: registered name \"w4_dreamworld_final_part_a\" (used by node w4_z06_n260) -> method 0x1000ff80 calls 0x1000f780, which hands over the callback 0x1000e8a0 (push at 0x1000f797)",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z02_n190",
+      "target": "w2_z12_n070",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the member byte [esi+0x364] is false (when true the same routine changes node to w2_z02_n230 instead: ContextChange at 0x10009b32)",
+        "sets the variable named by the member at [esi+0x348] to true before the transition"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "Transition",
+        "address": 268475467,
+        "pushes": "0x10009bbc, 0x10009bbe, 0x10009bc3, 0x10009bc5, 0x10009bc7",
+        "chain": "class chain: registered name \"w2_z02_n190\" (used by node w2_z02_n190) -> method 0x1000a530 hands over the callback 0x10009ae0 (push at 0x1000a5a8)",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18)"
+      }
+    },
+    {
+      "source": "w2_z05_n170",
+      "target": "w2_z05_n171",
+      "kind": "engine",
+      "conditional": true,
+      "tests": [
+        "the member byte [esi+0xb4] is false (when true the routine sets a variable and starts the Transition object at [esi+0x3fc] instead)"
+      ],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW2RD.DLL",
+        "call": "ContextChange",
+        "address": 268655467,
+        "pushes": "0x10035b62, 0x10035b67, 0x10035b69",
+        "chain": "class chain: the routine 0x10035b10 is a callback handed over at 0x100371c5 and 0x100376ce by methods of the class registered as \"w2_z05_n170\" (used by node w2_z05_n170 only)",
+        "note": "a constant destination in compiled code, read by hand (wider scan of the libraries, 2026-11-18); replaces an attribution of the scan to w2_z05_n160"
+      }
+    },
+    {
+      "source": "w1_z01_n270",
+      "target": "w4_z01_n010",
+      "kind": "engine",
+      "conditional": false,
+      "tests": [],
+      "evidence": {
+        "via": "library",
+        "library": "M4AIW1RD.DLL",
+        "call": "Transition",
+        "address": 268568572,
+        "pushes": "",
+        "chain": "the routine 0x100206d0 is a callback handed over at 0x10021a14 by the class w1_z01_n270",
+        "note": "a constant destination in compiled code, read by hand: the class of w1_z01_n270, not w1_z01_n250"
+      }
+    }
+  ],
+  "wrong": [
+    {
+      "library": "M4AIW2RD.DLL",
+      "address": 268655467,
+      "note": "the scan gave this call to w2_z05_n160 by the strings of an earlier routine; it is a callback of the class w2_z05_n170 (edge w2_z05_n170 -> w2_z05_n171 above)"
+    },
+    {
+      "library": "M4AIW1RD.DLL",
+      "address": 268568572,
+      "note": "the scan gave this call to w1_z01_n250 by the strings of an earlier routine; it is a callback of the class w1_z01_n270 (edge w1_z01_n270 -> w4_z01_n010 above)"
+    }
+  ]
+}

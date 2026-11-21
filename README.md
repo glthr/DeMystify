@@ -2,7 +2,7 @@
 
 ![](./DeMystify.png "DeMystify")
 
-DeMystify is an unofficial open-source project graph-based analysis of the classic Myst game. In other words, it represents Myst as a graph.
+DeMystify is an unofficial open-source project graph-based analysis of the classic Myst games. In other words, it represents them as graphs: Myst and Riven with the Go command of this repository, Myst III: Exile and Myst IV: Revelation with the Python extractors of [`exile/`](exile/README.md) and [`revelation/`](revelation/README.md).
 
 ## The Myst Graph
 
@@ -123,6 +123,41 @@ Add `--audit` to also write `audit.json`: the values each variable can hold, the
 
 Open `generated/riven/web/index.html`. The Riven import preserves script byte offsets and branch guards, absent targets, reviewed native transitions and caller-sensitive return metadata. Its optional native/Zip/reset layers and card-script inspector extend the existing viewer; the original Myst command and rendering remain supported. See [the Riven guide](docs/riven.md) for output options, interpretation and validation. No original game files, decoded pictures or generated game scripts are included in the repository.
 
+## Generate the Exile Graph
+
+[`exile/`](exile/README.md) reads the four CD images of the original 1.0 release of Myst III: Exile (2001). The game keeps its rooms, nodes, hotspots and scripts in the data section of its executable, which SafeDisc protects: the extractor decodes the two sections, follows the navigation instructions of every node without running them, and writes a typed graph with the evidence of each edge, an offline viewer derived from DeMystify's, and portable exports.
+
+```bash
+cd exile
+python3 -m exile_graph "/path/to/your discs" --output generated
+```
+
+Python 3.10 or newer, standard library only; [FFmpeg](https://ffmpeg.org/) assembles the panoramas; Graphviz is optional. Open `exile/generated/index.html`.
+
+## Generate the Revelation Graph
+
+[`revelation/`](revelation/README.md) reads the first DVD of the original 1.0 release of Myst IV: Revelation (2004). Each node is an archive inside `data.m4b`; the extractor decodes the commands, the parameters of the compiled classes and the positions the game stores, reads the constant destinations of the compiled libraries without running them, and writes the same kind of graph, viewer and exports.
+
+```bash
+cd revelation
+python3 -m revelation_graph /path/to/DVD1.bin --output generated
+```
+
+Python 3.10 or newer; [Pillow](https://python-pillow.org/) and FFmpeg for the pictures, `objdump` for the libraries, Graphviz for the layout. Open `revelation/generated/index.html`.
+
+## Generate the End of Ages Graph
+
+[`endofages/`](endofages/README.md) reads the Windows files of Myst V: End of Ages (2005, GOG release 2.0.0.9). Classic mode moves the player between fixed points that the game stores, one `.node` file per Age: the extractor deciphers them, adds the links, scripted links, scenes, warps, ladders and moving platforms that the pages and the compiled scripts name, and writes a typed graph with the evidence of each edge, its measures, and a comparison with the floors that Free Roam walks on.
+
+```bash
+cd endofages
+python3 -m endofages_graph "/path/to/Myst V" --output generated
+```
+
+Python 3.10 or newer, standard library only, and an `openssl` command.
+
+The three extractors read the user's own copies in place and never write to them. Their outputs contain game-derived data, scripts and pictures: `exile/generated/`, `revelation/generated/` and `endofages/generated/` are ignored by Git. Their unit tests run without the games (`python3 -m unittest discover -s tests` in each folder); set `DEMYSTIFY_EXILE_DISCS`, `DEMYSTIFY_REVELATION_DISC` or `DEMYSTIFY_ENDOFAGES_DIR` to add the checks on the original releases.
+
 ## Stay Up-to-Date
 
 *   [The Myst Graph: A New Perspective on Myst](https://glthr.com/myst-graph-1)
@@ -131,8 +166,8 @@ Open `generated/riven/web/index.html`. The Riven import preserves script byte of
 
 ## Disclaimer
 
-This project is a personal initiative to analyze and understand the classic Myst game. It is an unofficial and nonlucrative open-source effort created for educational purposes only. This project is not affiliated with Cyan Worlds or the original creators of Myst.
+This project is a personal initiative to analyze and understand the classic Myst games. It is an unofficial and nonlucrative open-source effort created for educational purposes only. This project is not affiliated with Cyan Worlds, Presto Studios, Ubisoft or the original creators of the games. No original game files, decoded pictures, generated listings or tools to download disc images are included.
 
 ## License and Credits
 
-DeMystify is released under the MIT License, acknowledging the original creators of Myst and Cyan Worlds for inspiring this project.
+DeMystify is released under the GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). It was released under the MIT License until the Exile and Revelation extractors were added; [NOTICE.md](NOTICE.md) gives the details and credits the work they rely on (ScummVM and ResidualVM, myst4tools, the Tomahna project, m4fix, myst-disclosure, libhsplasma). The project acknowledges the original creators of Myst and Cyan Worlds for inspiring it.
