@@ -58,6 +58,12 @@ const (
 	// Zip and EndingReset are displayed but excluded from ordinary path search.
 	Zip
 	EndingReset
+	// Shadowed marks a reference whose every callsite belongs to a hotspot that
+	// the pointer cannot reach: its rectangle lies inside a later hotspot that
+	// is never switched off, or is empty. Like a disabled link of the Myst
+	// Graph it is drawn, in a style of its own, and routes do not follow it,
+	// unless Metadata.IncludeShadowed asks for them.
+	Shadowed
 )
 
 type Edge struct {
@@ -65,7 +71,16 @@ type Edge struct {
 	Source, Target *Node
 	TransitivityID int64
 	Kind           string
-	Evidence       []map[string]any
+	// BaseKind is the kind a record had before a classification replaced it:
+	// "script" or "zip" for a record whose Kind is "shadowed". Empty otherwise.
+	BaseKind string
+	Evidence []map[string]any
+}
+
+// LeftOut reports whether routes ignore the edge altogether: a disabled
+// reference, or a shadowed one unless the run follows them.
+func (e Edge) LeftOut(includeShadowed bool) bool {
+	return e.IsOfType(Disabled) || (e.IsOfType(Shadowed) && !includeShadowed)
 }
 
 func (e Edge) IsOfType(t EdgeAttribute) bool {
@@ -80,13 +95,16 @@ type Metadata struct {
 	Game          string // Empty retains the original Myst presentation.
 	StartNodeID   int64
 	StartNodeName string
-	TotalCards    uint
-	TotalStacks   uint
-	TotalNodes    uint
-	TotalEdges    uint
-	Nodes         []*Node
-	Edges         []*Edge
-	Stats         GraphStats
+	// IncludeShadowed makes routes, flags and the audit follow shadowed
+	// references as if their hotspots could be clicked. Off by default.
+	IncludeShadowed bool
+	TotalCards      uint
+	TotalStacks     uint
+	TotalNodes      uint
+	TotalEdges      uint
+	Nodes           []*Node
+	Edges           []*Edge
+	Stats           GraphStats
 }
 
 // GraphStats contains analysis results for a graph

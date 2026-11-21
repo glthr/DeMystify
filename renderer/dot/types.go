@@ -31,6 +31,7 @@ type nodeStyle struct {
 type edgeStyle struct {
 	attributes    string
 	kind          string
+	baseKind      string
 	color         string
 	style         string
 	penWidth      float64

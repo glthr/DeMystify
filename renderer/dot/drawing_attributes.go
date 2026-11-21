@@ -20,6 +20,7 @@ func drawingEdgeAttributes(edge *common.Edge) string {
 		{common.RestrictiveTransitivityTail, "restrictiveTransitivityTail"},
 		{common.RestrictiveTransitivityHead, "restrictiveTransitivityHead"},
 		{common.Conditional, "conditional"},
+		{common.Shadowed, "shadowed"},
 	} {
 		if edge.IsOfType(flag.attribute) {
 			attributes = append(attributes, flag.name)

@@ -47,3 +47,29 @@ func TestTypedNativeRecordsRetainSeparateEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestShadowedReferenceIsDrawnButNotFollowedUnlessTheRunAsks(t *testing.T) {
+	for _, include := range []bool{false, true} {
+		g, nodes := newTestGraph(t, 3)
+		g.Metadata.IncludeShadowed = include
+		live := &common.Edge{Source: nodes[0], Target: nodes[1], Kind: "script", Attributes: []common.EdgeAttribute{common.IntraAge}}
+		shadowed := &common.Edge{Source: nodes[1], Target: nodes[2], Kind: "shadowed", BaseKind: "script", Attributes: []common.EdgeAttribute{common.IntraAge, common.Shadowed}, Evidence: []map[string]any{{"hotspot_name": "egg"}}}
+		for _, edge := range []*common.Edge{live, shadowed} {
+			if err := g.addEdgeWithAttributes(edge); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := g.ComputeShortestPath(0, 2, nil); (err == nil) != include {
+			t.Fatalf("include=%v: route through the shadowed reference: err=%v", include, err)
+		}
+		// Left out like a disabled link: no line at all, so that the card
+		// behind it can be flagged as a source.
+		if g.HasEdgeFromTo(1, 2) != include {
+			t.Fatalf("include=%v: the shadowed reference is a line of the graph: %v", include, g.HasEdgeFromTo(1, 2))
+		}
+		records, ok := g.GetAllEdges(1, 2)
+		if !ok || len(records) != 1 || records[0].Kind != "shadowed" || records[0].BaseKind != "script" || len(records[0].Evidence) != 1 {
+			t.Fatalf("include=%v: the record was not kept for the drawing: %+v", include, records)
+		}
+	}
+}

@@ -2,6 +2,7 @@ package riven
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/glthr/DeMystify/common"
@@ -252,13 +253,89 @@ func TestAuditOriginalCorpus(t *testing.T) {
 		t.Fatalf("hotspots %d inert %d blank %v", audit.Hotspots.Total, len(audit.Hotspots.Inert), audit.Hotspots.BlankCards)
 	}
 	s := audit.Structure
-	if s.Reachable != 2262 || s.Dominators[1] != (Dominator{"Temple:133", 2235}) || s.Dominators[6] != (Dominator{"Temple:113", 2218}) || s.Dominators[7] != (Dominator{"Gehn:1", 125}) || len(s.FarthestChain) != 37 {
+	// The ten shadowed references are left out: Boiler:304 is no longer
+	// reached, one pair of turns is gone (Garden:167 to 169) and eight Zip
+	// shortcuts no longer count.
+	if s.Reachable != 2261 || s.Dominators[1] != (Dominator{"Temple:133", 2234}) || s.Dominators[6] != (Dominator{"Temple:113", 2217}) || s.Dominators[7] != (Dominator{"Gehn:1", 125}) || len(s.FarthestChain) != 37 {
 		t.Fatalf("structure %+v", s.Dominators[:8])
 	}
-	if s.Links[0] != (LinkClass{"turn", 3460, 3164, 91.4}) || s.Links[1] != (LinkClass{"forward", 1584, 146, 9.2}) || s.Places != 908 {
+	if s.Links[0] != (LinkClass{"turn", 3459, 3164, 91.5}) || s.Links[1] != (LinkClass{"forward", 1584, 146, 9.2}) || s.Places != 908 {
 		t.Fatalf("links %+v places %d", s.Links, s.Places)
 	}
-	if z := s.Zip; z.Records != 606 || z.Destinations != 189 || z.DiameterWithout != 125 || z.DiameterWith != 74 || z.MeanDistanceWithout != 51.51 || z.MeanDistanceWith != 30.85 || z.FarthestWith != 59 {
+	if z := s.Zip; z.Records != 598 || z.Sources != 555 || z.Destinations != 189 || z.DiameterWithout != 125 || z.DiameterWith != 75 || z.MeanDistanceWithout != 51.52 || z.MeanDistanceWith != 30.99 || z.FarthestWith != 59 {
 		t.Fatalf("zip %+v", z)
+	}
+	if sh := s.Shadowed; sh.Total != 10 || sh.ByKind["script"] != 2 || sh.ByKind["zip"] != 8 || sh.Followed || len(sh.Records) != 10 {
+		t.Fatalf("shadowed %+v", sh)
+	}
+	// Following them gives back the figures of the export that did not know them.
+	imported.Metadata.IncludeShadowed = true
+	followed, err := imported.Audit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = followed.Structure
+	if s.Reachable != 2262 || s.Dominators[1] != (Dominator{"Temple:133", 2235}) || s.Dominators[6] != (Dominator{"Temple:113", 2218}) || s.Links[0] != (LinkClass{"turn", 3460, 3164, 91.4}) || !s.Shadowed.Followed {
+		t.Fatalf("followed structure %+v links %+v", s.Dominators[:8], s.Links)
+	}
+	if z := s.Zip; z.Records != 606 || z.Sources != 562 || z.DiameterWith != 74 || z.MeanDistanceWithout != 51.51 || z.MeanDistanceWith != 30.85 {
+		t.Fatalf("followed zip %+v", z)
+	}
+}
+
+func TestAuditNativeTimerDoesNotOwnALink(t *testing.T) {
+	// Jungle:627 to 629: a forward step, and the sunners' alert video that
+	// the enter script starts. The pair stays a step forward.
+	cards := map[uint16]*Card{1: {}, 2: {}}
+	game := auditGame(nil, cards, [2]uint16{1, 2})
+	nodes := game.Metadata.Nodes
+	game.Metadata.Edges = append(game.Metadata.Edges, &common.Edge{Source: nodes[0], Target: nodes[1], Kind: "native-timer", Attributes: []common.EdgeAttribute{common.IntraAge, common.Native, common.Conditional},
+		Evidence: []map[string]any{{"event": "native_timer"}, {"event": "card_enter", "external": "xjlagoon700_alert"}}})
+	audit, err := game.Audit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, class := range audit.Structure.Links {
+		if want := map[string]int{"forward": 1}[class.Class]; class.Pairs != want {
+			t.Errorf("class %q has %d pairs, want %d", class.Class, class.Pairs, want)
+		}
+	}
+}
+
+func TestAuditLeavesShadowedReferencesOutUnlessTheRunFollowsThem(t *testing.T) {
+	// 1 -> 2 -> 3 -> 1; card 4 is entered only through a shadowed reference,
+	// and the only Zip shortcut is shadowed too.
+	run := func(include bool) *Audit {
+		cards := map[uint16]*Card{1: {}, 2: {}, 3: {}, 4: {}}
+		game := auditGame(nil, cards, [2]uint16{1, 2}, [2]uint16{2, 3}, [2]uint16{3, 1})
+		nodes := game.Metadata.Nodes
+		game.Metadata.IncludeShadowed = include
+		game.Metadata.Edges = append(game.Metadata.Edges,
+			&common.Edge{Source: nodes[1], Target: nodes[3], Kind: ShadowedKind, BaseKind: "script", Attributes: []common.EdgeAttribute{common.IntraAge, common.Shadowed}, Evidence: []map[string]any{{"hotspot_name": "egg"}}},
+			&common.Edge{Source: nodes[0], Target: nodes[2], Kind: ShadowedKind, BaseKind: "zip", Attributes: []common.EdgeAttribute{common.IntraAge, common.Zip, common.Shadowed}, Evidence: []map[string]any{{"hotspot_name": "place"}}})
+		audit, err := game.Audit()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return audit
+	}
+	without, with := run(false), run(true)
+	for _, audit := range []*Audit{without, with} {
+		sh := audit.Structure.Shadowed
+		if sh.Total != 2 || sh.ByKind["script"] != 1 || sh.ByKind["zip"] != 1 || len(sh.Records) != 2 || sh.Records[0].From != "Jungle:2" || sh.Records[0].To != "Jungle:4" || sh.Records[0].Hotspots[0] != "egg" {
+			t.Fatalf("shadowed records are not counted on their own: %+v", sh)
+		}
+	}
+	if without.Structure.Shadowed.Followed || !with.Structure.Shadowed.Followed {
+		t.Fatal("the audit does not say whether it followed the shadowed references")
+	}
+	if with.Structure.Reachable != without.Structure.Reachable+1 {
+		t.Errorf("reachable: %d without, %d with", without.Structure.Reachable, with.Structure.Reachable)
+	}
+	if without.Structure.Zip.Records != 0 || with.Structure.Zip.Records != 1 {
+		t.Errorf("Zip records: %d without, %d with", without.Structure.Zip.Records, with.Structure.Zip.Records)
+	}
+	if !strings.Contains(without.Summary(), "Shadowed: 2 records (script: 1, zip: 1); left out of routes, dominators and Zip figures\n") || !strings.Contains(with.Summary(), "Shadowed: 2 records (script: 1, zip: 1); followed (--include-shadowed)\n") {
+		t.Errorf("summaries:\n%s\n%s", without.Summary(), with.Summary())
 	}
 }

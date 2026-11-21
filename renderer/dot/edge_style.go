@@ -16,10 +16,13 @@ func enrichTransitiveEdgeIDTooltip(tooltip *string, edge *common.Edge) {
 	*tooltip += fmt.Sprintf(" (Restrictive Transitivity %s ID %d)", transitivityType, edge.TransitivityID)
 }
 
+// ShadowedColor is the stroke of a shadowed reference.
+const ShadowedColor = "#8f887d"
+
 // applyEdgeStyle applies styling to an edge based on its attributes
 func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeStyle {
 	style := g.applyNavigationStyle(edge, isOnCustomPath)
-	style.kind = edge.Kind
+	style.kind, style.baseKind = edge.Kind, edge.BaseKind
 	if g.metadata != nil && strings.EqualFold(g.metadata.Game, "riven") {
 		style.attributes = drawingEdgeAttributes(edge)
 	}
@@ -55,6 +58,13 @@ func (g *Generator) applyEdgeStyle(edge *common.Edge, isOnCustomPath bool) edgeS
 		// A disabled native/Zip/conditional record keeps its tee and muted
 		// stroke; no optional navigation layer can paint it as an active move.
 		style.color, style.style = "#8d8875", "dashed"
+	}
+	if edge.IsOfType(common.Shadowed) {
+		// There, but never clicked: a dotted stroke in the neutral grey of
+		// what is not seen, with an ordinary arrowhead of the same grey. No
+		// other kind is dotted; a disabled record is dashed and ends in a tee.
+		style.color, style.style = ShadowedColor, "dotted"
+		style.tooltip = joinTooltip(style.tooltip, "Shadowed reference (its hotspot lies under a later hotspot that is never switched off, or has no area; no click reaches it; excluded from paths)")
 	}
 	for _, evidence := range edge.Evidence {
 		for _, key := range []string{"classification_reason", "availability_reason"} {

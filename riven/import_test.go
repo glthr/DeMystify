@@ -85,6 +85,14 @@ func TestFileSliceBounds(t *testing.T) {
 	}
 }
 
+// originalKind is the kind a record had before it was classed as shadowed.
+func originalKind(edge *common.Edge) string {
+	if edge.BaseKind != "" {
+		return edge.BaseKind
+	}
+	return edge.Kind
+}
+
 func TestSuppliedDiscCorpus(t *testing.T) {
 	input, profile := fixtureCorpus(t)
 	i, e := LoadInput(input)
@@ -146,10 +154,11 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		if edge.Source == nil || edge.Target == nil || len(edge.Evidence) == 0 {
 			t.Fatal("edge lost provenance")
 		}
-		if edge.Kind == "script" {
+		original := originalKind(edge)
+		if original == "script" {
 			calls += len(edge.Evidence)
 		}
-		evidenceCounts[edge.Kind] += len(edge.Evidence)
+		evidenceCounts[original] += len(edge.Evidence)
 		if edge.IsOfType(common.Disabled) {
 			disabled++
 		}
@@ -165,13 +174,13 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 		if edge.IsOfType(common.SequenceContinuation) {
 			t.Fatalf("literal %s record was replaced by a continuation", edge.Kind)
 		}
-		key := edge.Source.Details.SourceID + ">" + edge.Target.Details.SourceID + ":" + edge.Kind
+		key := edge.Source.Details.SourceID + ">" + edge.Target.Details.SourceID + ":" + original
 		if !baseEndpoints[key] {
 			baseEndpoints[key] = true
-			baseKinds[edge.Kind]++
+			baseKinds[original]++
 		}
 	}
-	if want := (map[string]int{"script": 6077, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 22}); !reflect.DeepEqual(kinds, want) {
+	if want := (map[string]int{"script": 6075, "zip": 598, "shadowed": 10, "native": 10, "native-timer": 3, "native-ending": 4, "sequence-continuation": 22}); !reflect.DeepEqual(kinds, want) {
 		t.Errorf("classified records=%v want %v", kinds, want)
 	}
 	// Classification may split parallel records; it must preserve the original
@@ -179,11 +188,33 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	if want := (map[string]int{"script": 6063, "zip": 606, "native": 10, "native-timer": 3, "native-ending": 4}); len(baseEndpoints) != 6686 || !reflect.DeepEqual(baseKinds, want) {
 		t.Errorf("original endpoint union=%d kinds=%v want 6686/%v", len(baseEndpoints), baseKinds, want)
 	}
-	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 3, "native-ending": 7, "sequence-continuation": 22}); !reflect.DeepEqual(evidenceCounts, want) {
+	if want := (map[string]int{"script": 6980, "zip": 606, "native": 13, "native-timer": 5, "native-ending": 7, "sequence-continuation": 22}); !reflect.DeepEqual(evidenceCounts, want) {
 		t.Errorf("callsite evidence=%v want %v", evidenceCounts, want)
 	}
-	if disabled != 0 || conditional != 835 {
+	if disabled != 0 || conditional != 837 {
 		t.Errorf("classification changed: disabled=%d conditional=%d", disabled, conditional)
+	}
+	// Ten records have no callsite that the pointer can reach: the book-press
+	// egg, the two about-face strips of Garden:167, and eight Zip shortcuts
+	// (seven under a hotspot that is never off, one with an inverted rectangle).
+	shadowed := map[string]int{}
+	shadowedPairs := map[string]bool{}
+	for _, edge := range md.Edges {
+		if edge.IsOfType(common.Shadowed) {
+			if edge.Kind != ShadowedKind {
+				t.Errorf("a shadowed record kept the kind %q", edge.Kind)
+			}
+			shadowed[edge.BaseKind]++
+			shadowedPairs[edge.Source.Details.SourceID+">"+edge.Target.Details.SourceID] = true
+		}
+	}
+	if want := (map[string]int{"script": 2, "zip": 8}); !reflect.DeepEqual(shadowed, want) {
+		t.Errorf("shadowed records=%v want %v", shadowed, want)
+	}
+	for _, pair := range []string{"bspit:299>bspit:304", "gspit:167>gspit:169", "tspit:371>tspit:374"} {
+		if !shadowedPairs[pair] {
+			t.Errorf("%s is not marked shadowed", pair)
+		}
 	}
 	if calls != 6980 {
 		t.Fatalf("navigation callsite evidence %d", calls)
@@ -223,5 +254,90 @@ func TestSuppliedDiscCorpus(t *testing.T) {
 	}
 	if g.Metadata.TotalNodes != 2312 {
 		t.Fatal("shared graph lost nodes")
+	}
+}
+
+// shadowImport builds a one-stack game whose start card has an "egg" hotspot
+// and a strip, both inside later hotspots that nothing switches off.
+func shadowImport(t *testing.T) *Import {
+	t.Helper()
+	change := func(target uint16) []Script {
+		return []Script{{Type: 0, Commands: []Command{{Opcode: 2, Args: []uint16{target}, Offset: int(target)}}}}
+	}
+	start := &Card{ID: 1, GlobalID: 0x6e9a, Hotspots: []Hotspot{
+		{ID: 1, Name: "afl", Index: 1, Rect: [4]int{0, 0, 74, 392}, Scripts: change(3)},
+		{ID: 3, Name: "egg", Index: 2, Rect: [4]int{368, 219, 380, 231}, Scripts: change(2)},
+		{ID: 8, Index: 3, Rect: [4]int{247, 0, 454, 247}, Scripts: change(3)},
+		{ID: 9, Name: "left", Index: 4, Rect: [4]int{0, 0, 94, 392}, Scripts: change(3)},
+	}}
+	cards := map[uint16]*Card{1: start, 2: {ID: 2, GlobalID: 2}, 3: {ID: 3, GlobalID: 3}}
+	stack := &Stack{Name: "tspit", Names: map[uint16][]string{}, RMap: []uint32{0, 0x6e9a, 2, 3}, Cards: cards, Resources: map[string]map[uint16]ResourceRef{}}
+	i := &Import{Metadata: &common.Metadata{Game: "riven"}, Stacks: map[string]*Stack{"tspit": stack}, Manifest: map[string]any{}}
+	if err := i.buildMetadata([]string{"tspit"}); err != nil {
+		t.Fatal(err)
+	}
+	return i
+}
+
+func TestReferenceWhoseEveryCallsiteIsShadowedIsMarked(t *testing.T) {
+	i := shadowImport(t)
+	if len(i.Metadata.Edges) != 2 {
+		t.Fatalf("got %d records, want the two original ones", len(i.Metadata.Edges))
+	}
+	for _, edge := range i.Metadata.Edges {
+		switch edge.Target.Details.SourceID {
+		case "tspit:2": // only the egg leads there
+			if !edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 1 || edge.Evidence[0]["hotspot_shadow"] != ShadowAlways {
+				t.Errorf("the egg's reference is not marked: %v %v", edge.Attributes, edge.Evidence)
+			}
+			if edge.Kind != ShadowedKind || edge.BaseKind != "script" {
+				t.Errorf("the egg's reference has kind %q (base %q), want shadowed (script)", edge.Kind, edge.BaseKind)
+			}
+		case "tspit:3": // the strip is covered, but two live hotspots lead there too
+			if edge.IsOfType(common.Shadowed) || len(edge.Evidence) != 3 || edge.Kind != "script" || edge.BaseKind != "" {
+				t.Errorf("a reference with a reachable callsite must stay live: %v, %d callsites", edge.Attributes, len(edge.Evidence))
+			}
+		default:
+			t.Errorf("unexpected record to %s", edge.Target.Details.SourceID)
+		}
+		if edge.IsOfType(common.Disabled) || edge.IsOfType(common.Conditional) {
+			t.Errorf("shadowing must not change activation or conditions: %v", edge.Attributes)
+		}
+	}
+	semantics := i.Manifest["edgeSemantics"].(map[string]int)
+	if semantics["shadowedRecords"] != 1 || semantics["shadowedCallsites"] != 2 {
+		t.Errorf("manifest counts %v, want 1 record and 2 callsites", semantics)
+	}
+	if counts := i.Manifest["hotspotShadowCounts"].(map[string]int); counts[ShadowAlways] != 2 || counts[ShadowConditional] != 0 {
+		t.Errorf("hotspot shadow counts %v", counts)
+	}
+}
+
+func TestReferenceUnderASwitchedCoverIsConditional(t *testing.T) {
+	// Jungle:335 of the original discs: "forward" climbs the ladder, and
+	// "lowerladder", later and on the same rectangle, is on until the ladder
+	// is down. The climb is possible in one state only.
+	change := []Script{{Type: 0, Commands: []Command{{Opcode: 2, Args: []uint16{2}, Offset: 8}}}}
+	rect := [4]int{184, 104, 423, 330}
+	start := &Card{ID: 1, GlobalID: 0x6e9a,
+		Scripts: []Script{{Type: 6, Commands: []Command{{Opcode: 8, Variable: 1, Offset: 4, Branches: []Branch{{Value: 1, Commands: []Command{{Opcode: 10, Args: []uint16{9}, Offset: 12}}}}}}}},
+		Hotspots: []Hotspot{
+			{ID: 3, Name: "forward", Index: 1, Rect: rect, Scripts: change},
+			{ID: 9, Name: "lowerladder", Index: 2, Rect: rect},
+		}}
+	stack := &Stack{Name: "tspit", Names: map[uint16][]string{4: {"a", "jladder"}}, RMap: []uint32{0, 0x6e9a, 2}, Cards: map[uint16]*Card{1: start, 2: {ID: 2, GlobalID: 2}}, Resources: map[string]map[uint16]ResourceRef{}}
+	i := &Import{Metadata: &common.Metadata{Game: "riven"}, Stacks: map[string]*Stack{"tspit": stack}, Manifest: map[string]any{}}
+	if err := i.buildMetadata([]string{"tspit"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(i.Metadata.Edges) != 1 {
+		t.Fatalf("got %d records", len(i.Metadata.Edges))
+	}
+	edge := i.Metadata.Edges[0]
+	if edge.Evidence[0]["hotspot_status"] != "enabled" || edge.Evidence[0]["hotspot_shadow"] != ShadowConditional {
+		t.Fatalf("fixture lost its premise: %v", edge.Evidence[0])
+	}
+	if !edge.IsOfType(common.Conditional) || edge.IsOfType(common.Shadowed) || edge.IsOfType(common.Disabled) {
+		t.Fatalf("a reference under a switched cover must be conditional and nothing else: %v", edge.Attributes)
 	}
 }

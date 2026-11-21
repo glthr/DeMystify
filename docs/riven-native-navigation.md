@@ -46,6 +46,7 @@ manager, card, inventory, base stack, and all eight stack implementations.
 | `jspit.cpp` xhandlecontrolup/down | conditional destination `0x1e374`. |
 | `jspit.cpp` xhandlecontrolmid | up `0x1e597`, down `0x1e29c`. |
 | `jspit.cpp` sunnersPlayVideo + timers | From RMAP `0x77d6` -> `0x79bd`; `0x79bd` -> `0x7beb`; `0x7beb` -> `0xb6ca`, conditional video interaction. Shoreline timer does not navigate. |
+| `jspit.cpp` xjlagoon700_alert, xjlagoon800_alert | The alert video that the enter script of RMAP `0x79bd` and of `0x7beb` plays goes through the same `sunnersPlayVideo`: `0x79bd` -> `0x7beb` and `0x7beb` -> `0xb6ca`, the pairs of those cards' timers. Recorded as a second callsite of the same `native-timer` record. `xjlagoon1500_alert` does not navigate. |
 | `ospit.cpp` xbookclick | conditional direct destination RMAP `0x2885`; or, on third refusal, ending credits and menu reset. |
 | `ospit.cpp` xorollcredittime | if saved return stack is rspit, special workaround to rspit `0x3338`; otherwise ending credits and menu reset. |
 | `rspit.cpp` xrcredittime | ending credits and menu reset. |

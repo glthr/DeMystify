@@ -61,7 +61,7 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 	// Each metadata edge has a stable line ID within this source/target pair.
 	// Re-adding an identical edge updates its weight; distinct parallel edges
 	// retain separate lines rather than overwriting line zero.
-	if edge.IsOfType(common.Disabled) {
+	if edge.LeftOut(g.Metadata.IncludeShadowed) {
 		// Gonum cannot remove a line whose source/target ID set was never allocated.
 		lines := g.Graph.WeightedLines(edge.Source.GraphID, edge.Target.GraphID)
 		for lines.Next() {
@@ -86,6 +86,7 @@ func (g *MystGraph) AddEdge(edge *common.Edge, weight float64) error {
 			Target:         edge.Target,
 			TransitivityID: edge.TransitivityID,
 			Kind:           edge.Kind,
+			BaseKind:       edge.BaseKind,
 			Evidence:       slices.Clone(edge.Evidence),
 		}
 		g.EdgeMap[edge.Source.GraphID][edge.Target.GraphID] = append(
@@ -134,11 +135,12 @@ func (g *MystGraph) AddEdgeAttribute(sourceID, targetID int64, attribute common.
 			changed = true
 		}
 	}
-	if changed && (attribute == common.Disabled || attribute == common.Backtracking || attribute == common.SequenceContinuation || attribute == common.Zip || attribute == common.EndingReset) {
+	leftOut := attribute == common.Disabled || (attribute == common.Shadowed && !g.Metadata.IncludeShadowed)
+	if changed && (leftOut || attribute == common.Backtracking || attribute == common.SequenceContinuation || attribute == common.Zip || attribute == common.EndingReset) {
 		lines := g.Graph.WeightedLines(sourceID, targetID)
 		for lines.Next() {
 			line := lines.WeightedLine()
-			if attribute == common.Disabled {
+			if leftOut {
 				g.Graph.RemoveLine(sourceID, targetID, line.ID())
 			} else {
 				g.Graph.SetWeightedLine(multi.WeightedLine{

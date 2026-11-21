@@ -221,7 +221,7 @@ func edgeAttributes(attributes []common.EdgeAttribute) []string {
 			common.SelfReference: "selfReference", common.NotImplemented: "notImplemented", common.Backtracking: "backtracking",
 			common.RestrictiveTransitivityTail: "restrictiveTransitivityTail", common.RestrictiveTransitivityHead: "restrictiveTransitivityHead",
 			common.SequenceContinuation: "sequenceContinuation", common.Conditional: "conditional",
-			common.Native: "native", common.Zip: "zip", common.EndingReset: "endingReset",
+			common.Native: "native", common.Zip: "zip", common.EndingReset: "endingReset", common.Shadowed: "shadowed",
 		}[attribute]
 		if !ok {
 			name = fmt.Sprintf("unknown:%d", attribute)

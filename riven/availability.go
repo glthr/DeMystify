@@ -28,6 +28,83 @@ type HotspotState struct {
 	Reason         string          `json:"reason"`
 	CanEnableLater bool            `json:"can_enable_later"`
 	Changes        []HotspotChange `json:"changes,omitempty"`
+	// Shadow is "always" when the pointer can never reach the hotspot,
+	// "conditional" when it can only while a covering hotspot that scripts
+	// switch is off, and "unknown" when the only covers have an unknown
+	// status. It says nothing about activation: Status keeps describing the
+	// hotspot itself.
+	Shadow       string `json:"shadow,omitempty"`
+	ShadowedBy   []int  `json:"shadowed_by,omitempty"`
+	ShadowReason string `json:"shadow_reason,omitempty"`
+}
+
+const (
+	ShadowAlways      = "always"
+	ShadowConditional = "conditional"
+	ShadowUnknown     = "unknown"
+)
+
+func hotspotRectValid(r [4]int) bool { return r[0] < r[2] && r[1] < r[3] }
+func hotspotRectContains(outer, inner [4]int) bool {
+	return outer[0] <= inner[0] && outer[1] <= inner[1] && outer[2] >= inner[2] && outer[3] >= inner[3]
+}
+
+// applyHotspotShadows records which hotspots the pointer cannot reach. The
+// interpreter gives a mouse event to one hotspot only: the last enabled one
+// whose rectangle contains the pointer (the pinned engine walks the list in
+// file order and keeps the last hit; the original 1.0 program sorts by the
+// stored index, descending, and takes the first). A hotspot whose whole
+// rectangle lies inside a later one therefore receives nothing while that
+// later hotspot is on. The claim is made only when file order and stored index
+// agree, and only from whole containment by a single later rectangle: a
+// hotspot hidden by several partial covers together is not reported. An empty
+// or inverted rectangle contains no point, and the pinned engine also disables
+// such a hotspot when it loads the card.
+//
+// "always" needs a cover whose status is "enabled": no script, caller or
+// native effect can switch it off. Otherwise a cover of conditional status
+// (scripts or Zip switch it) gives "conditional", and covers of unknown status
+// alone give "unknown", which claims nothing, as for activation. States must
+// be final: a later status change would invalidate the result.
+func applyHotspotShadows(c *Card, states map[int]HotspotState) {
+	for i := range c.Hotspots {
+		state := states[i]
+		state.Shadow, state.ShadowedBy, state.ShadowReason = "", nil, ""
+		h := c.Hotspots[i]
+		if !hotspotRectValid(h.Rect) {
+			state.Shadow = ShadowAlways
+			state.ShadowReason = "empty or inverted rectangle: no point lies inside it, and the interpreter disables such a hotspot when it loads the card"
+			states[i] = state
+			continue
+		}
+		var always, sometimes, unknown []int
+		for j := i + 1; j < len(c.Hotspots); j++ {
+			cover := c.Hotspots[j]
+			if cover.Index <= h.Index || !hotspotRectValid(cover.Rect) || !hotspotRectContains(cover.Rect, h.Rect) {
+				continue
+			}
+			switch states[j].Status {
+			case "enabled":
+				always = append(always, j)
+			case "conditional":
+				sometimes = append(sometimes, j)
+			case "unknown":
+				unknown = append(unknown, j)
+			}
+		}
+		switch {
+		case len(always) != 0:
+			state.Shadow, state.ShadowedBy = ShadowAlways, always
+			state.ShadowReason = "a later hotspot that is never switched off contains this rectangle and receives every mouse event in it"
+		case len(sometimes) != 0:
+			state.Shadow, state.ShadowedBy = ShadowConditional, sometimes
+			state.ShadowReason = "a later hotspot contains this rectangle; the pointer reaches this one only while that hotspot is off"
+		case len(unknown) != 0:
+			state.Shadow, state.ShadowedBy = ShadowUnknown, unknown
+			state.ShadowReason = "a later hotspot of unknown activation contains this rectangle"
+		}
+		states[i] = state
+	}
 }
 
 type hotspotEnableRecord struct{ index, enabled, hotspot uint16 }
@@ -353,6 +430,7 @@ func HotspotAvailability(s *Stack, c *Card) (map[int]HotspotState, error) {
 		}
 		out[i] = HotspotState{Status: status, EntryState: entry, Reason: reason, CanEnableLater: a.later[i], Changes: a.changes[i]}
 	}
+	applyHotspotShadows(c, out)
 	return out, nil
 }
 
@@ -572,6 +650,13 @@ func HotspotAvailabilityForStacks(stacks map[string]*Stack) (map[string]map[int]
 					states[i] = state
 				}
 			}
+		}
+	}
+	// The caller pass can only have made covers less certain: recompute.
+	for _, sk := range keys {
+		s := stacks[sk]
+		for _, id := range sortedIDs(s.Cards) {
+			applyHotspotShadows(s.Cards[id], out[SourceID(sk, id)])
 		}
 	}
 	return out, nil
