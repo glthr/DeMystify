@@ -196,4 +196,18 @@ func TestShadowedRecordsHaveTheirOwnSummaryLineAndOption(t *testing.T) {
 			t.Errorf("include=%v summary:\n%s\nwant it to contain:\n%s", include, got, want)
 		}
 	}
+	// Myst shadowed records have no BaseKind; omit empty parentheses.
+	a := &common.Node{Name: "Test Age:1", Attributes: []common.NodeAttribute{common.IsCard}}
+	b := &common.Node{Name: "Test Age:2", Attributes: []common.NodeAttribute{common.IsCard}}
+	mystShadowed := &common.Metadata{Nodes: []*common.Node{a, b}, Edges: []*common.Edge{
+		{Source: a, Target: b, Attributes: []common.EdgeAttribute{common.IntraAge, common.Shadowed}},
+	}}
+	g, err := graph.NewGraph(mystShadowed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Process()
+	if got, want := analysisSummary(mystShadowed), "Shadowed records: 1; left out of routes and flags\n"; !strings.Contains(got, want) {
+		t.Errorf("Myst shadowed summary:\n%s\nwant it to contain:\n%s", got, want)
+	}
 }

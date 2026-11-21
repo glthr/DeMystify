@@ -357,7 +357,9 @@ func analysisSummary(metadata *common.Metadata) string {
 	for _, edge := range metadata.Edges {
 		if edge.IsOfType(common.Shadowed) {
 			shadowed++
-			shadowedKinds[edge.BaseKind]++
+			if edge.BaseKind != "" {
+				shadowedKinds[edge.BaseKind]++
+			}
 		}
 		if edge.IsOfType(common.Backtracking) {
 			returns++
@@ -384,7 +386,11 @@ func analysisSummary(metadata *common.Metadata) string {
 		if metadata.IncludeShadowed {
 			policy = "followed (--include-shadowed)"
 		}
-		summary += fmt.Sprintf("Shadowed records: %d (%s); %s\n", shadowed, strings.Join(kinds, ", "), policy)
+		if len(kinds) != 0 {
+			summary += fmt.Sprintf("Shadowed records: %d (%s); %s\n", shadowed, strings.Join(kinds, ", "), policy)
+		} else {
+			summary += fmt.Sprintf("Shadowed records: %d; %s\n", shadowed, policy)
+		}
 	}
 	summary += fmt.Sprintf("Source / sink / isolated flags: %d / %d / %d\n", len(stats.NodesWithNoIncoming), len(stats.NodesWithNoOutgoing), len(stats.IsolatedNodes))
 	// A stack node has no reference of its own and an absent target has no
