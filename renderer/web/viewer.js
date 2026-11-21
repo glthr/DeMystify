@@ -1,4 +1,4 @@
-/* Adapted from DeMystify, Copyright (c) 2025 Guillaume Lethuillier (GLTHR), MIT License. */
+/* Adapted from DeMystify, Copyright (c) 2025-2026 Guillaume Lethuillier (GLTHR), GPL-3.0-or-later. */
 (function (global) {
   "use strict";
 

@@ -46,3 +46,18 @@ generated/graph.pdf
 # Caches from the existing optional Myst Python helpers.
 __pycache__/
 *.py[cod]
+
+# Exile and Revelation: outputs hold game-derived scripts and pictures; disc images and game archives never belong in Git.
+/exile/generated/
+/revelation/generated/
+/endofages/generated/
+*.img
+*.IMG
+*.ccd
+*.cue
+*.bin
+*.BIN
+*.m3a
+*.M3A
+*.m4b
+*.M4B

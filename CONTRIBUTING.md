@@ -38,11 +38,13 @@ Format changed Go files with `gofmt`. The tests use synthetic stack and card dat
 
 When Node.js 18 or newer is available, the Go web exporter tests also run the viewer's synthetic DOM/canvas interaction tests. They can be run directly with `node --test renderer/web/viewer_test.cjs`. These exercise interaction logic; they do not replace a visual browser check.
 
+Run the tests of the Exile and Revelation extractors with `python3 -m unittest discover -s tests` inside `exile/` and `revelation/` (standard library only). Their checks on the original releases run only when `DEMYSTIFY_EXILE_DISCS` (the folder of the four 1.0 CD images) or `DEMYSTIFY_REVELATION_DISC` (the first DVD image) is set; the discs and everything the extractors generate must stay outside Git.
+
 Run the optional scripts' tests with `python3 -m unittest discover -s scripts -p 'test_*.py'`. They cover the media extractor's synthetic resource forks and output safety, and the publication framing; the framing tests are skipped unless the libraries in `scripts/requirements-pdf.txt` are installed. Original game images, banks, decoded catalogues and browser exports must stay outside Git; `generated/web` is ignored by default.
 
 ## License
 
-By submitting code changes, you agree that your contributions will be licensed under the same MIT license as the rest of the project.
+By submitting code changes, you agree that your contributions will be licensed under the same license as the rest of the project: the GNU General Public License, version 3 or (at your option) any later version (see `LICENSE` and `NOTICE.md`).
 
 ## Thank you!
 
