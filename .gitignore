@@ -47,7 +47,7 @@ generated/graph.pdf
 __pycache__/
 *.py[cod]
 
-# Exile and Revelation: outputs hold game-derived scripts and pictures; disc images and game archives never belong in Git.
+# Exile, Revelation and End of Ages: outputs hold game-derived scripts and pictures; disc images and game archives never belong in Git.
 /exile/generated/
 /revelation/generated/
 /endofages/generated/

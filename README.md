@@ -2,7 +2,7 @@
 
 ![](./DeMystify.png "DeMystify")
 
-DeMystify is an unofficial open-source project graph-based analysis of the classic Myst games. In other words, it represents them as graphs: Myst and Riven with the Go command of this repository, Myst III: Exile and Myst IV: Revelation with the Python extractors of [`exile/`](exile/README.md) and [`revelation/`](revelation/README.md).
+DeMystify is an unofficial open-source project graph-based analysis of the classic Myst games. In other words, it represents them as graphs: Myst and Riven with the Go command of this repository, Myst III: Exile, Myst IV: Revelation and Myst V: End of Ages with the Python extractors of [`exile/`](exile/README.md), [`revelation/`](revelation/README.md) and [`endofages/`](endofages/README.md).
 
 ## The Myst Graph
 
@@ -170,4 +170,4 @@ This project is a personal initiative to analyze and understand the classic Myst
 
 ## License and Credits
 
-DeMystify is released under the GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). It was released under the MIT License until the Exile and Revelation extractors were added; [NOTICE.md](NOTICE.md) gives the details and credits the work they rely on (ScummVM and ResidualVM, myst4tools, the Tomahna project, m4fix, myst-disclosure, libhsplasma). The project acknowledges the original creators of Myst and Cyan Worlds for inspiring it.
+DeMystify is released under the GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). It was released under the MIT License until the Exile, Revelation and End of Ages extractors were added; [NOTICE.md](NOTICE.md) gives the details and credits the work they rely on (ScummVM and ResidualVM, myst4tools, the Tomahna project, m4fix, myst-disclosure, libhsplasma). The project acknowledges the original creators of Myst and Cyan Worlds for inspiring it.
