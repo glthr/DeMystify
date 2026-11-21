@@ -3,11 +3,11 @@
 ## License
 
 DeMystify was released under the MIT License up to and including commit `03f3fea` (pull request #19). From the
-change that adds the Exile and Revelation extractors, it is released under the GNU General Public License, version 3
+change that adds the Exile, Revelation and End of Ages extractors, it is released under the GNU General Public License, version 3
 or (at your option) any later version: see [LICENSE](LICENSE). The copies of DeMystify already published under the MIT
 License remain available under it. All the code so far is by the author listed in [AUTHORS.md](AUTHORS.md).
 
-The license changes because the Myst III extractor follows the ScummVM engine, which is licensed under the GNU
+The license changes because the Myst III and Myst V extractors follow ScummVM and libhsplasma, which are licensed under the GNU
 General Public License, version 3 or later, as described below.
 
 ## Work this project relies on
@@ -52,6 +52,6 @@ General Public License, version 3 or later, as described below.
 
 ## Game data
 
-Myst, Riven, Myst III: Exile and Myst IV: Revelation belong to their creators and publishers. Nothing of the games is
+Myst, Riven, Myst III: Exile, Myst IV: Revelation and Myst V: End of Ages belong to their creators and publishers. Nothing of the games is
 in this repository: no disc image, archive, executable, library, picture, movie, sound, script or generated listing.
 The extractors read the user's own original discs, in place, and write their outputs to ignored folders.
